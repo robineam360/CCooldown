@@ -8,6 +8,8 @@
 Claude Pro / Max / Team usage limits you've burned through, and when your 5-hour and 7-day
 windows reset. Built for people who live in Claude Code and keep hitting the wall mid-thought.
 
+**📱 Android only (for now)** — an iOS version is on the roadmap. iPhone folks, watch this space.
+
 > ⚠️ **Unofficial.** This is a personal community tool. It is not affiliated with, endorsed
 > by, or supported by Anthropic. "Claude" is a trademark of Anthropic, PBC.
 
@@ -50,8 +52,9 @@ More screenshots (settings, themes, widget setup, token guide) in
 All you need: your Android phone, and the computer where you're already signed in to
 Claude Code.
 
-**1. Install the app.** Download [`CCooldown.apk`](Release/) onto your phone and open it
-(allow "install unknown apps" if your phone asks).
+**1. Install the app.** Grab `CCooldown.apk` from the
+[latest release](../../releases/latest) onto your phone and open it (allow "install
+unknown apps" if your phone asks).
 
 **2. Put your Claude sign-in on the screen as a QR code.** On a Mac, paste this one line
 into Terminal and press Enter:

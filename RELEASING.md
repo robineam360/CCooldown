@@ -44,8 +44,15 @@ git tag v0.8
 git push && git push --tags
 ```
 
-## 5. Optional: GitHub Release
+## 5. GitHub Release
 
-For a nicer download page, publish the APK as a GitHub Release: repo page →
-Releases → "Draft a new release" → choose the `v0.8` tag → attach
-`Release/CCooldown.apk` → publish. The in-repo copy still works either way.
+Publish the APK to the Releases page (the README's download link points at
+`releases/latest`, so this is what colleagues actually install from):
+
+```bash
+gh release create v0.8 Release/CCooldown.apk \
+  --title "CCooldown v0.8" \
+  --notes "<one line on what changed>"
+```
+
+The in-repo `Release/CCooldown.apk` copy still works as a fallback either way.
