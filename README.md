@@ -23,7 +23,23 @@ windows reset. Built for people who live in Claude Code and keep hitting the wal
   behind the week itself
 - **13 theme colors** including Material You dynamic color, full light/dark support
 
-Screenshots live in [`Release/screenshots/`](Release/screenshots/).
+## Screenshots
+
+<table>
+  <tr>
+    <td align="center"><img src="Release/screenshots/widget-large-dark.png" width="240" alt="Home-screen widget, dark theme"><br><sub><b>Home-screen widget</b> — 5-hour &amp; 7-day windows at a glance</sub></td>
+    <td align="center"><img src="Release/screenshots/widget-large-light.png" width="240" alt="Home-screen widget, light theme"><br><sub><b>Light theme</b> — follows your system setting</sub></td>
+    <td align="center"><img src="Release/screenshots/app-tabs-personal.png" width="240" alt="App main screen, Personal profile"><br><sub><b>The app</b> — full breakdown with exact reset times</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="Release/screenshots/quick-settings-tiles.png" width="240" alt="Quick Settings tiles"><br><sub><b>Quick Settings tiles</b> — swipe down, see your %</sub></td>
+    <td align="center"><img src="Release/screenshots/notifications.png" width="240" alt="Usage alerts"><br><sub><b>Alerts</b> — near-limit warnings and "window has reset"</sub></td>
+    <td align="center"><img src="Release/screenshots/app-tabs-work.png" width="240" alt="Work profile tab"><br><sub><b>Two profiles</b> — Personal and Work, side by side</sub></td>
+  </tr>
+</table>
+
+More screenshots (settings, themes, widget setup, token guide) in
+[`Release/screenshots/`](Release/screenshots/).
 
 ## How it works
 
