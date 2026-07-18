@@ -1,0 +1,18 @@
+# Gradle
+.gradle/
+build/
+app/build/
+
+# Local machine config (contains SDK paths — never commit)
+local.properties
+
+# IDE
+.idea/
+*.iml
+.kotlin/
+
+# macOS
+.DS_Store
+
+# Claude Code local session settings
+.claude/settings.local.json

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CCooldown</string>
+    <string name="widget_description">Claude Cooldown — 5-hour and 7-day windows (pick a profile)</string>
+    <string name="bar_widget_description">Claude Cooldown — one bar (pick profile and window)</string>
+</resources>
