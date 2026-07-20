@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -33,6 +34,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -67,6 +69,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.Image
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.browser.customtabs.CustomTabsIntent
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import com.robin.claudeusage.data.AuthState
@@ -200,6 +203,53 @@ fun SettingsScreen(
     Spacer(Modifier.height(8.dp))
 }
 
+private data class BrowserChoice(val label: String, val packageName: String)
+
+/**
+ * Installed browsers, for the sign-in "open with" picker. Uses QUERY_ALL_PACKAGES
+ * (fine for a sideload app) so OEM skins that under-report a scoped <queries> still
+ * list every browser. Signing a given account in the browser where that account is
+ * logged in is the whole point — e.g. Work in Samsung Internet, Personal in Brave.
+ */
+private fun installedBrowsers(context: android.content.Context): List<BrowserChoice> {
+    val pm = context.packageManager
+    val probe = Intent(Intent.ACTION_VIEW, Uri.parse("http://example.com"))
+        .addCategory(Intent.CATEGORY_BROWSABLE)
+    return pm.queryIntentActivities(probe, android.content.pm.PackageManager.MATCH_ALL)
+        .mapNotNull { ri ->
+            val pkg = ri.activityInfo?.packageName ?: return@mapNotNull null
+            BrowserChoice(ri.loadLabel(pm).toString(), pkg)
+        }
+        .distinctBy { it.packageName }
+        .sortedBy { it.label.lowercase() }
+}
+
+/** Opens the sign-in URL in a specific browser (full external app, not an in-app tab). */
+private fun openInBrowser(context: android.content.Context, url: String, pkg: String?) {
+    val uri = Uri.parse(url)
+    if (pkg != null) {
+        try {
+            context.startActivity(
+                Intent(Intent.ACTION_VIEW, uri)
+                    .addCategory(Intent.CATEGORY_BROWSABLE)
+                    .setPackage(pkg)
+            )
+            return
+        } catch (_: Exception) {
+            // Fall through to a generic open.
+        }
+    }
+    try {
+        context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+    } catch (_: Exception) {
+        try {
+            CustomTabsIntent.Builder().setShowTitle(true).build().launchUrl(context, uri)
+        } catch (_: Exception) {
+            // Nothing on the device can open a web link.
+        }
+    }
+}
+
 @Composable
 private fun TokenCard(
     repo: UsageRepository,
@@ -214,6 +264,16 @@ private fun TokenCard(
     var message by remember { mutableStateOf<String?>(null) }
     var stateKey by remember { mutableIntStateOf(0) }
 
+    // Sign-in completion state. awaitingCode survives config changes; if the
+    // process was killed during the browser trip, a persisted pending sign-in
+    // for this profile re-opens the completion step on its own.
+    var awaitingCode by remember { mutableStateOf(repo.hasPendingSignIn(profile)) }
+    var codeInput by remember { mutableStateOf("") }
+    var authUrl by remember { mutableStateOf<String?>(null) }
+    var showBackup by remember { mutableStateOf(false) }
+    var showBrowserPicker by remember { mutableStateOf(false) }
+    var pendingPickUrl by remember { mutableStateOf<String?>(null) }
+
     val hasToken = remember(stateKey) { repo.hasCredentials(profile) }
     val snapshot = remember(stateKey) { repo.snapshot(profile) }
     val addedAt = remember(stateKey) { repo.tokenAddedAt(profile) }
@@ -221,8 +281,49 @@ private fun TokenCard(
     val plan = remember(stateKey) { repo.plan(profile) }
     val tokenExpiresAt = remember(stateKey) { repo.tokenExpiresAt(profile) }
     val refreshExpiresAt = remember(stateKey) { repo.refreshExpiresAt(profile) }
+    val refreshEstimated = remember(stateKey) { repo.refreshExpiryEstimated(profile) }
     val lastRenewedAt = remember(stateKey) { repo.lastRenewedAt(profile) }
     val backoffUntil = remember(stateKey) { repo.cacheSettings().backoffUntil(profile) }
+
+    // Open a sign-in URL, letting the user pick a browser when they have more than
+    // one (so they can route Work vs Personal through different browsers). Always
+    // opens a real external browser, never an in-app tab.
+    fun openWithPicker(url: String) {
+        authUrl = url
+        val browsers = installedBrowsers(context)
+        if (browsers.size >= 2) {
+            pendingPickUrl = url
+            showBrowserPicker = true
+        } else {
+            openInBrowser(context, url, browsers.firstOrNull()?.packageName)
+        }
+    }
+
+    fun beginSignIn() {
+        message = null
+        codeInput = ""
+        awaitingCode = true
+        openWithPicker(repo.startSignIn(profile))
+    }
+
+    fun finishSignIn() {
+        scope.launch {
+            busy = true
+            message = null
+            val result = repo.completeSignIn(profile, codeInput)
+            if (result.message == "OK") {
+                Polling.schedulePeriodic(context, repo.cacheSettings().pollIntervalMinutes())
+                message = "${profile.label} signed in — usage fetched, polling started."
+                awaitingCode = false
+                codeInput = ""
+                showBackup = false
+            } else {
+                message = result.message
+            }
+            busy = false
+            stateKey++
+        }
+    }
 
     fun saveToken(text: String) {
         scope.launch {
@@ -231,6 +332,7 @@ private fun TokenCard(
             val result = repo.validateAndSave(profile, text)
             message = if (result.message == "OK") {
                 Polling.schedulePeriodic(context, repo.cacheSettings().pollIntervalMinutes())
+                showBackup = false
                 "${profile.label} token added — usage fetched, polling started."
             } else {
                 result.message
@@ -289,21 +391,55 @@ private fun TokenCard(
                 }
             }
 
+            // The sign-in completion step takes over the card while active, for
+            // either a brand-new sign-in or a re-sign-in of an existing account.
+            if (awaitingCode) {
+                SignInCompletion(
+                    busy = busy,
+                    codeInput = codeInput,
+                    onCodeChange = { codeInput = it },
+                    onPaste = { clipboard.getText()?.text?.let { codeInput = it.trim() } },
+                    onFinish = { finishSignIn() },
+                    onReopen = { authUrl?.let { openWithPicker(it) } ?: beginSignIn() },
+                    onCancel = {
+                        repo.cancelSignIn()
+                        awaitingCode = false
+                        codeInput = ""
+                        message = null
+                    },
+                )
+                message?.let {
+                    Spacer(Modifier.height(10.dp))
+                    Text(it, style = MaterialTheme.typography.bodySmall)
+                }
+                return@Column
+            }
+
             if (!hasToken) {
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    "No token yet",
+                    "Not signed in",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(12.dp))
-                Row {
-                    Button(enabled = !busy, onClick = { pasteAndSave() }) { Text("Paste from clipboard") }
-                    Spacer(Modifier.width(8.dp))
-                    OutlinedButton(enabled = !busy, onClick = { scanAndSave() }) { Text("Scan QR") }
+                Button(enabled = !busy, onClick = { beginSignIn() }) {
+                    Text("Sign in on this phone")
                 }
-                Spacer(Modifier.height(4.dp))
-                TextButton(onClick = onOpenGuide) { Text("How do I get my token?") }
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "Opens Claude's sign-in in your browser — no computer needed.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                BackupOptions(
+                    expanded = showBackup,
+                    onToggle = { showBackup = !showBackup },
+                    busy = busy,
+                    onPaste = { pasteAndSave() },
+                    onScan = { scanAndSave() },
+                    onOpenGuide = onOpenGuide,
+                )
             } else {
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -353,7 +489,10 @@ private fun TokenCard(
                 }
                 if (refreshExpiresAt > now) {
                     Text(
-                        "Sign-in valid until ${Fmt.dateTime(refreshExpiresAt, use24h)} · ${Fmt.dhm(refreshExpiresAt)} to go",
+                        if (refreshEstimated)
+                            "Sign-in expires around ${Fmt.dateTime(refreshExpiresAt, use24h)} · ~${Fmt.dhm(refreshExpiresAt)} left"
+                        else
+                            "Sign-in valid until ${Fmt.dateTime(refreshExpiresAt, use24h)} · ${Fmt.dhm(refreshExpiresAt)} to go",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -371,20 +510,28 @@ private fun TokenCard(
                     )
                 }
                 Spacer(Modifier.height(10.dp))
-                Row {
-                    OutlinedButton(enabled = !busy, onClick = { pasteAndSave() }) { Text("Replace") }
-                    Spacer(Modifier.width(8.dp))
-                    OutlinedButton(enabled = !busy, onClick = { scanAndSave() }) { Text("Scan QR") }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedButton(enabled = !busy, onClick = { beginSignIn() }) { Text("Re-sign in") }
                     Spacer(Modifier.width(8.dp))
                     TextButton(
                         enabled = !busy,
                         onClick = {
                             repo.clearCredentials(profile)
-                            message = "${profile.label} token cleared."
+                            message = "${profile.label} signed out."
+                            showBackup = false
                             stateKey++
                         },
                     ) { Text("Clear", color = MaterialTheme.colorScheme.error) }
                 }
+                BackupOptions(
+                    expanded = showBackup,
+                    onToggle = { showBackup = !showBackup },
+                    busy = busy,
+                    onPaste = { pasteAndSave() },
+                    onScan = { scanAndSave() },
+                    onOpenGuide = onOpenGuide,
+                    replaceLabels = true,
+                )
             }
 
             message?.let {
@@ -392,6 +539,118 @@ private fun TokenCard(
                 Text(it, style = MaterialTheme.typography.bodySmall)
             }
         }
+    }
+
+    if (showBrowserPicker) {
+        val browsers = remember { installedBrowsers(context) }
+        AlertDialog(
+            onDismissRequest = { showBrowserPicker = false },
+            title = { Text("Open sign-in with") },
+            text = {
+                Column {
+                    Text(
+                        "Pick the browser where you're signed in to the ${profile.label} " +
+                            "Claude account.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    for (b in browsers) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable {
+                                    showBrowserPicker = false
+                                    openInBrowser(context, pendingPickUrl ?: authUrl ?: return@clickable, b.packageName)
+                                }
+                                .padding(vertical = 12.dp, horizontal = 4.dp),
+                        ) { Text(b.label, style = MaterialTheme.typography.bodyLarge) }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showBrowserPicker = false }) { Text("Cancel") }
+            },
+        )
+    }
+}
+
+/** Inline "paste the code from the sign-in page" step shown after the browser trip. */
+@Composable
+private fun SignInCompletion(
+    busy: Boolean,
+    codeInput: String,
+    onCodeChange: (String) -> Unit,
+    onPaste: () -> Unit,
+    onFinish: () -> Unit,
+    onReopen: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    Spacer(Modifier.height(10.dp))
+    Text("Finish signing in", style = MaterialTheme.typography.titleSmall)
+    Spacer(Modifier.height(6.dp))
+    Text(
+        "Sign in on the page that opened, then copy the code it shows and paste it here.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Spacer(Modifier.height(10.dp))
+    OutlinedTextField(
+        value = codeInput,
+        onValueChange = onCodeChange,
+        label = { Text("Paste the sign-in code") },
+        singleLine = true,
+        enabled = !busy,
+        modifier = Modifier.fillMaxWidth(),
+        trailingIcon = {
+            TextButton(onClick = onPaste, enabled = !busy) { Text("Paste") }
+        },
+    )
+    Spacer(Modifier.height(8.dp))
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Button(enabled = !busy && codeInput.isNotBlank(), onClick = onFinish) {
+            Text("Finish sign-in")
+        }
+        Spacer(Modifier.width(8.dp))
+        TextButton(enabled = !busy, onClick = onReopen) { Text("Reopen page") }
+        Spacer(Modifier.weight(1f))
+        TextButton(enabled = !busy, onClick = onCancel) { Text("Cancel") }
+    }
+}
+
+/** Collapsible "use a computer token instead" section holding the paste/QR path. */
+@Composable
+private fun BackupOptions(
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    busy: Boolean,
+    onPaste: () -> Unit,
+    onScan: () -> Unit,
+    onOpenGuide: () -> Unit,
+    replaceLabels: Boolean = false,
+) {
+    Spacer(Modifier.height(4.dp))
+    TextButton(onClick = onToggle) {
+        Text(if (expanded) "Hide computer-token options" else "Use a computer token instead")
+    }
+    if (expanded) {
+        Text(
+            "Backup method: copy the sign-in Claude Code uses on your computer. " +
+                "Handy if this phone can't open the sign-in page.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(8.dp))
+        Row {
+            OutlinedButton(enabled = !busy, onClick = onPaste) {
+                Text(if (replaceLabels) "Replace by paste" else "Paste from clipboard")
+            }
+            Spacer(Modifier.width(8.dp))
+            OutlinedButton(enabled = !busy, onClick = onScan) { Text("Scan QR") }
+        }
+        TextButton(onClick = onOpenGuide) { Text("How do I get my token?") }
     }
 }
 
@@ -624,9 +883,16 @@ private fun DebugSection(repo: UsageRepository) {
 
 @Composable
 fun TokenGuideScreen() {
+    NoteCard(
+        "Easiest way: on the account card, tap \"Sign in on this phone\". It opens " +
+            "Claude's sign-in in your browser and needs no computer. This page is the " +
+            "backup method — copying a token from a computer — for when that isn't handy.",
+        positive = true,
+    )
+    Spacer(Modifier.height(16.dp))
     Text(
-        "The app reads your usage with the same sign-in Claude Code uses. " +
-            "You need Claude Code installed and signed in on your computer.",
+        "The backup method reads your usage with the same sign-in Claude Code uses, " +
+            "so you need Claude Code installed and signed in on your computer.",
         style = MaterialTheme.typography.bodyMedium,
     )
     Spacer(Modifier.height(16.dp))
@@ -699,25 +965,24 @@ fun TokenGuideScreen() {
     Spacer(Modifier.height(6.dp))
     Text(
         "The access token only lasts hours, but the app renews it automatically in the " +
-            "background — the account card shows the countdown and when it last renewed. " +
-            "There's one catch: your phone holds a copy of the computer's sign-in. When " +
-            "Claude Code on the computer renews itself (which happens during normal use), " +
-            "Anthropic can rotate the tokens and the phone's copy stops working. The card " +
-            "then shows \"Needs re-auth\" and you'll get a notification (if health alerts " +
-            "are on) — the fix is the same four steps above.",
+            "background — the account card shows the countdown and when it last renewed.",
         style = MaterialTheme.typography.bodyMedium,
     )
     Spacer(Modifier.height(10.dp))
     Text(
-        "Re-pasting often? Give the phone its own sign-in (one-time, works on every OS): " +
-            "quit Claude Code and park the computer's sign-in — on Windows/Linux rename " +
-            ".credentials.json to .credentials.backup.json; on a Mac back up the " +
-            "\"Claude Code-credentials\" Keychain item to a file and delete the item. " +
-            "Run claude, sign in again, and scan/paste that fresh token into this app. " +
-            "Then restore the computer's original sign-in (rename the file back, or " +
-            "delete the new Keychain item and re-add the backup). The phone then renews " +
-            "independently of the computer, permanently. Don't run claude between the " +
-            "scan and the restore. Full copy-paste commands are in the USER-GUIDE.",
+        "If you signed in on the phone, that sign-in is yours alone — nothing on a " +
+            "computer can rotate it away. It lasts about a month, then the card shows " +
+            "\"Needs re-auth\"; just tap \"Re-sign in\" and sign in again. A one-minute, " +
+            "phone-only refresh.",
+        style = MaterialTheme.typography.bodyMedium,
+    )
+    Spacer(Modifier.height(10.dp))
+    Text(
+        "The backup (computer-token) method has a catch: the phone holds a copy of the " +
+            "computer's sign-in, and when Claude Code on the computer renews itself, " +
+            "Anthropic can rotate the tokens so the phone's copy stops working. If that " +
+            "keeps happening, switch to \"Sign in on this phone\" — it avoids the problem " +
+            "entirely.",
         style = MaterialTheme.typography.bodyMedium,
     )
 

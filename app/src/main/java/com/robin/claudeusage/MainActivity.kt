@@ -340,12 +340,12 @@ private fun ProfileScreen(repo: UsageRepository, profile: Profile, use24h: Boole
     if (!repo.hasCredentials(profile)) {
         Card {
             Column(Modifier.padding(16.dp)) {
-                Text("No ${profile.label} token yet", fontWeight = FontWeight.Bold)
+                Text("No ${profile.label} account yet", fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Open Settings, copy the ${profile.label} account's token to your " +
-                        "clipboard, and tap \"Paste from clipboard\". The guide there shows " +
-                        "where to find it.",
+                    "Open Settings and tap \"Sign in on this phone\" for the " +
+                        "${profile.label} account. It opens Claude's sign-in in your " +
+                        "browser — no computer needed.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }

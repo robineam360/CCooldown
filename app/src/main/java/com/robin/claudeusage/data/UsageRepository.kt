@@ -55,6 +55,8 @@ class UsageRepository(private val context: Context) {
 
     fun refreshExpiresAt(profile: Profile): Long = cache.refreshExpiresAt(profile)
 
+    fun refreshExpiryEstimated(profile: Profile): Boolean = cache.refreshExpiryEstimated(profile)
+
     fun plan(profile: Profile): String? = cache.plan(profile)
 
     fun lastRenewedAt(profile: Profile): Long = cache.lastRenewedAt(profile)
@@ -66,10 +68,21 @@ class UsageRepository(private val context: Context) {
         historyStore.clear(profile)
         cache.setAuthState(profile, AuthState.NO_CREDENTIALS)
         cache.setTokenMeta(profile, 0L, null)
+        cache.setRefreshExpiryEstimated(profile, false)
+        cache.setNativeSignIn(profile, false)
         cache.setLastRenewedAt(profile, 0L)
         cache.setFirstRefreshFailAt(profile, 0L)
         cache.setStaleNotified(profile, false)
+        OAuthSignIn.clearPending(context)
     }
+
+    fun hasPendingSignIn(profile: Profile): Boolean =
+        OAuthSignIn.pending(context)?.profile == profile
+
+    /** Begins native sign-in: returns the authorize URL to open in a browser. */
+    fun startSignIn(profile: Profile): String = OAuthSignIn.begin(context, profile)
+
+    fun cancelSignIn() = OAuthSignIn.clearPending(context)
 
     /** Fetch one profile. Manual calls respect a 180s floor since last success. */
     suspend fun refreshNow(profile: Profile, manual: Boolean): FetchResult = withContext(Dispatchers.IO) {
@@ -105,9 +118,81 @@ class UsageRepository(private val context: Context) {
                 credStore.save(profile, pasted.creds, stampAdded = true)
                 cache.setAuthState(profile, AuthState.OK)
                 cache.setTokenMeta(profile, pasted.refreshExpiresAt, pasted.plan)
+                // Desktop copy: exact expiry from the JSON, and rotation means the
+                // family may have moved — keep the legacy (non-native) semantics.
+                cache.setRefreshExpiryEstimated(profile, false)
+                cache.setNativeSignIn(profile, false)
                 cache.setLastRenewedAt(profile, 0L)
                 cache.setFirstRefreshFailAt(profile, 0L)
                 cache.setStaleNotified(profile, false)
+                OAuthSignIn.clearPending(context)
+                val r = doFetch(profile, manual = false, ignoreGates = true)
+                updateWidgets()
+                r
+            }
+            Alerts.evaluate(context, cache)
+            result
+        }
+
+    /**
+     * Completes native sign-in: parses the pasted `code#state` from the callback
+     * page, verifies state, exchanges the code for a phone-owned token family, and
+     * persists it. The estimated ~30-day expiry drives the re-sign-in prompt.
+     */
+    suspend fun completeSignIn(profile: Profile, pastedCode: String): FetchResult =
+        withContext(Dispatchers.IO) {
+            val result = mutex.withLock {
+                val pending = OAuthSignIn.pending(context)
+                    ?: return@withLock FetchResult.Error("Sign-in expired — tap Sign in again")
+                val raw = pastedCode.trim()
+                if (raw.isEmpty()) {
+                    return@withLock FetchResult.Error("Paste the code from the sign-in page first")
+                }
+                val hashIdx = raw.indexOf('#')
+                val code = if (hashIdx >= 0) raw.substring(0, hashIdx) else raw
+                val returnedState = if (hashIdx >= 0) raw.substring(hashIdx + 1) else ""
+                if (returnedState.isNotEmpty() && returnedState != pending.state) {
+                    return@withLock FetchResult.Error("That code is from a different sign-in — start again")
+                }
+                val resp = try {
+                    ApiClient.exchangeCode(code, pending.state, pending.verifier)
+                } catch (e: IOException) {
+                    return@withLock FetchResult.Error(e.message ?: "network error")
+                }
+                if (resp.code != 200) {
+                    // Surface the server's own message + the code length so failures
+                    // are diagnosable from a screenshot (the token endpoint answers
+                    // 429 "rate_limit_error" for any code it won't accept, so the
+                    // HTTP status alone doesn't say why). Kept short for the UI.
+                    val serverMsg = try {
+                        JSONObject(resp.body).optJSONObject("error")?.optString("message")
+                            ?: JSONObject(resp.body).optString("error")
+                    } catch (_: Exception) {
+                        null
+                    }?.takeIf { it.isNotBlank() } ?: resp.body.take(120)
+                    return@withLock FetchResult.Error(
+                        "Sign-in failed (HTTP ${resp.code}) [code ${code.length}ch] — $serverMsg. " +
+                            "Tap Reopen page for a fresh code."
+                    )
+                }
+                val o = JSONObject(resp.body)
+                val access = o.optString("access_token")
+                val refresh = o.optString("refresh_token")
+                if (access.isEmpty() || refresh.isEmpty()) {
+                    return@withLock FetchResult.Error("Sign-in response was missing a token")
+                }
+                val expiresIn = o.optLong("expires_in", 0L)
+                val expiresAt = if (expiresIn > 0) System.currentTimeMillis() + expiresIn * 1000 else 0L
+                credStore.save(profile, Credentials(access, refresh, expiresAt), stampAdded = true)
+                cache.setAuthState(profile, AuthState.OK)
+                val estExpiry = System.currentTimeMillis() + OAuthSignIn.ESTIMATED_FAMILY_MS
+                cache.setTokenMeta(profile, estExpiry, o.optString("subscriptionType").ifEmpty { null })
+                cache.setRefreshExpiryEstimated(profile, true)
+                cache.setNativeSignIn(profile, true)
+                cache.setLastRenewedAt(profile, 0L)
+                cache.setFirstRefreshFailAt(profile, 0L)
+                cache.setStaleNotified(profile, false)
+                OAuthSignIn.clearPending(context)
                 val r = doFetch(profile, manual = false, ignoreGates = true)
                 updateWidgets()
                 r
@@ -203,9 +288,13 @@ class UsageRepository(private val context: Context) {
             cache.setAuthState(profile, AuthState.OK)
             cache.setLastRenewedAt(profile, System.currentTimeMillis())
             cache.setFirstRefreshFailAt(profile, 0L)
-            // A rotated refresh token gets a new, unknown expiry — the stored
-            // date from the paste no longer applies.
-            if (rotatedRefresh.isNotEmpty() && rotatedRefresh != creds.refreshToken) {
+            // A rotated refresh token gets a new, unknown expiry — the exact date
+            // from a pasted desktop token no longer applies. For a native phone
+            // sign-in, rotation is healthy self-renewal and the ~30-day family
+            // clock still holds from sign-in, so the estimate stays put.
+            if (rotatedRefresh.isNotEmpty() && rotatedRefresh != creds.refreshToken &&
+                !cache.nativeSignIn(profile)
+            ) {
                 cache.clearRefreshExpiry(profile)
             }
             newAccess

@@ -3,6 +3,10 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Sideload-only app (never Play Store): allowed to enumerate installed
+         browsers so the sign-in "open with" picker can list them reliably,
+         including on OEM skins where a scoped <queries> under-reports. -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
 
     <application
         android:label="@string/app_name"

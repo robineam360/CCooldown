@@ -158,6 +158,30 @@ class UsageCache(context: Context) {
         prefs.edit().putLong(k(profile, "refreshExpiresAt"), 0L).apply()
     }
 
+    /**
+     * True when the stored refresh-expiry is our own ~30-day estimate from a
+     * native phone sign-in (the token response omits the real date), not an
+     * exact value read from a pasted desktop token. Drives "expires around …".
+     */
+    fun refreshExpiryEstimated(profile: Profile): Boolean =
+        prefs.getBoolean(k(profile, "refreshExpiryEstimated"), false)
+
+    fun setRefreshExpiryEstimated(profile: Profile, estimated: Boolean) {
+        prefs.edit().putBoolean(k(profile, "refreshExpiryEstimated"), estimated).apply()
+    }
+
+    /**
+     * True when this profile was authenticated by native sign-in on the phone.
+     * Its family rotates as normal healthy renewal, so — unlike a shared desktop
+     * copy — a rotated refresh token must NOT clear the estimated expiry.
+     */
+    fun nativeSignIn(profile: Profile): Boolean =
+        prefs.getBoolean(k(profile, "nativeSignIn"), false)
+
+    fun setNativeSignIn(profile: Profile, native: Boolean) {
+        prefs.edit().putBoolean(k(profile, "nativeSignIn"), native).apply()
+    }
+
     fun lastRenewedAt(profile: Profile): Long = prefs.getLong(k(profile, "lastRenewedAt"), 0L)
 
     fun setLastRenewedAt(profile: Profile, at: Long) {
