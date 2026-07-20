@@ -3,12 +3,16 @@
 **A personal home-screen widget for your Claude plan limits — for two accounts.**
 Shows the 5-hour and 7-day rolling windows for your **Personal** and **Work** profiles (including per-model caps like Fable), when each resets, how far into the week you are, forecasts *when* you'll hit a limit at your current pace, and warns you *before* you hit it — and *when* a window resets.
 
-> Version **0.10** · built 18 Jul 2026 · sideloaded personal app, not on any store
+> Version **0.12** · built 20 Jul 2026 · sideloaded personal app, not on any store
 > APK in this folder: [`CCooldown.apk`](CCooldown.apk)
 
 ---
 
 ## What it looks like
+
+| Sign in on this phone 🆕 | Authorize in the browser | Paste the code, done |
+|:---:|:---:|:---:|
+| ![Account cards with Sign in on this phone](screenshots/signin-settings.png) | ![Claude's consent page](screenshots/signin-consent.png) | ![Finish signing in step](screenshots/signin-finish.png) |
 
 | Personal tab | Work tab | Widget (dark) |
 |:---:|:---:|:---:|
@@ -41,7 +45,21 @@ Shows the 5-hour and 7-day rolling windows for your **Personal** and **Work** pr
 
 ## 2 · Connect your Claude accounts (two profiles)
 
-The app has two independent slots — **Personal** and **Work**. Each is fed by the token that the **Claude Code CLI** holds on the machine where that account is signed in. Getting the token depends on the machine's OS, not on which profile it's for:
+The app has two independent slots — **Personal** and **Work**. Since v0.12 each one signs in **right on the phone — no computer needed**:
+
+### Sign in on this phone (the normal way) 🆕
+
+1. Open **⚙ Settings** and tap **"Sign in on this phone"** on the profile's card.
+2. If you have more than one browser, a picker appears — **choose the browser where that account is already logged in to claude.ai** (e.g. Work in Chrome, Personal in Brave). That's how you control *which* account gets connected.
+3. The browser opens Claude's sign-in. Log in if needed, then tap **Authorize**.
+4. The page shows a **code** — tap **Copy**, switch back to the app, tap **Paste**, then **Finish sign-in**.
+5. The card turns **Active** and usage loads: *"signed in — usage fetched, polling started."*
+
+Works for **Personal (Pro / Max)** and **Work (Team)** accounts alike. The sign-in is minted on the phone and is yours alone — no computer shares it, so nothing can rotate it away. It self-renews for about **a month** (the card shows *"Sign-in expires around …"*); when it runs out you'll get 7/3/1-day warnings, and re-signing in is the same one-minute flow via **"Re-sign in"**.
+
+### Backup: use a computer token instead
+
+If the phone can't open the sign-in page, each card also keeps the old method under **"Use a computer token instead"** — copying the token that the **Claude Code CLI** holds on the machine where that account is signed in. Getting the token depends on the machine's OS, not on which profile it's for:
 
 ### Getting the token on Windows
 
@@ -89,11 +107,11 @@ All of these steps are also inside the app: tap **"How do I get my token?"** on 
 
 Tokens are stored **encrypted on the phone only** (Android Keystore) and are never sent anywhere except Anthropic's own API.
 
-> **If a machine's Claude Code ever re-logs-in**, that profile's token may stop working (refresh tokens rotate — the phone and that machine share the token). The app notifies you with a "re-auth needed" alert — just re-copy from that machine and re-paste that one profile. **Or set it up once so this never happens — see below.**
+> **If a machine's Claude Code ever re-logs-in**, that profile's token may stop working (refresh tokens rotate — the phone and that machine share the token). The app notifies you with a "re-auth needed" alert — just re-copy from that machine and re-paste that one profile. **Or simply switch to "Sign in on this phone" (above), which avoids the problem entirely.**
 
-### Recommended: give the phone its own sign-in 🆕
+### Legacy: give the phone its own sign-in *via a computer* (superseded by v0.12)
 
-If you share a token with a machine you actively use, its Claude Code will eventually rotate the tokens and the phone's copy dies (you'll see "Token refresh failed" and then "re-auth needed"). The permanent fix is a one-time ritual: **park the computer's sign-in → sign in fresh (that sign-in becomes the phone's) → scan it → give the computer its original back.** The phone then renews independently, forever. Don't run `claude` between the scan and the restore.
+*You no longer need this — "Sign in on this phone" gives the phone its own independent sign-in with zero computer steps.* It's kept for the rare case where the phone can't complete the browser flow. The idea: **park the computer's sign-in → sign in fresh (that sign-in becomes the phone's) → scan it → give the computer its original back.** The phone then renews independently. Don't run `claude` between the scan and the restore.
 
 **Windows (PowerShell)** — close every Claude Code terminal first:
 
@@ -125,7 +143,7 @@ security add-generic-password -a "$USER" -s "Claude Code-credentials" -w "$(cat 
 rm ~/cc-backup.json
 ```
 
-Afterwards the account card should stay "Active" through refreshes indefinitely. The phone's own sign-in still has a hard expiry months out — the app's 7/3/1-day "sign-in expiring soon" warnings will tell you when to redo this.
+Afterwards the account card should stay "Active" through refreshes indefinitely. The phone's own sign-in still has a hard expiry — the app's 7/3/1-day "sign-in expiring soon" warnings will tell you when to renew (and the easiest renewal is just **"Sign in on this phone"**).
 
 ---
 
@@ -191,7 +209,7 @@ See usage from inside any app: pull down the shade — **"Personal 94% / 7d 14%"
 
 | Setting | What it does |
 |---|---|
-| **Account cards (Personal / Work)** | "Paste from clipboard" or **"Scan QR"** 🆕 adds a token (live test call before saving). Once added: status chip (Active / Needs re-auth), plan badge (Pro / Max / Team), last-checked time with a ↻ check-now button, auto-renew countdown, last auto-renewed time, "sign-in valid until <date> · Xd Xh Xm to go", added date, token tail, rate-limit backoff status, Replace / Scan QR / Clear. "How do I get my token?" opens the in-app guide (now with the QR commands). |
+| **Account cards (Personal / Work)** | **"Sign in on this phone"** 🆕 runs the browser sign-in (with a browser picker when you have several — sign each account in via the browser where it's logged in). The old paste/QR path lives under "Use a computer token instead". Once signed in: status chip (Active / Needs re-auth), plan badge (Pro / Max / Team), last-checked time with a ↻ check-now button, auto-renew countdown, last auto-renewed time, "Sign-in expires around <date>" (≈30-day estimate for phone sign-ins; exact date for pasted tokens), added date, token tail, rate-limit backoff status, Re-sign in / Clear. "How do I get my token?" opens the in-app backup-method guide. |
 | **Check usage every** | Poll cadence presets: 5 / 15 / 30 / 60 min (default 15) — saves on tap |
 | **Usage alerts** | Toggle the threshold notifications |
 | **Reset notifications** | Toggle the "window reset" pings |
@@ -211,9 +229,9 @@ Below the Refresh button the app shows **Last success** and **Last attempt** as 
 | Symptom | Meaning / fix |
 |---|---|
 | Widget footer is **amber** | Data is stale (failed fetch or >45 min old). Usually temporary; self-heals on the next poll. |
-| **"Re-auth needed"** | The token and its refresh both failed. Re-paste from the laptop (§2). |
+| **"Re-auth needed"** | The token and its refresh both failed. Tap **"Re-sign in"** on that card (§2) — or re-paste from a computer if you use the backup method. |
 | **"Rate limited (429)"** status | The API asked us to back off; automatic retries with increasing delays (5 min → 1 h max). |
-| **"Token refresh failed (HTTP 429)"** status 🆕 | Usually a *dead* refresh token, not real rate-limiting — the source machine's Claude Code rotated it (Anthropic answers 429 for dead tokens). Re-export a fresh token from that machine, or better, do the **dedicated sign-in** ritual (§2) so it can't recur. |
+| **"Token refresh failed (HTTP 429)"** status | Usually a *dead* refresh token, not real rate-limiting — the source machine's Claude Code rotated it (Anthropic answers 429 for dead tokens). Fix: **"Sign in on this phone"** (§2), which gives the phone its own sign-in so this can't recur. *(Historical note: through v0.11 the app itself could trigger a deterministic 429 on every renewal — fixed in v0.12, see §9.)* |
 | Widget says **"No data yet"** | No successful fetch so far — tap ↻, or open the app and check the status line. |
 | Alerts never appear | Check notification permission and the **Usage alerts** toggle. |
 | Anything else | Settings → **Show last raw response** + the red status line tell the whole story. |
@@ -222,7 +240,7 @@ Below the Refresh button the app shows **Last success** and **Last attempt** as 
 
 ## 8 · Privacy & good-to-know
 
-- **No servers, no telemetry, no analytics.** The app talks only to `api.anthropic.com` (usage) and `console.anthropic.com` (token refresh) — the same endpoints Claude Code uses.
+- **No servers, no telemetry, no analytics.** The app talks only to `api.anthropic.com` (usage), `platform.claude.com` (sign-in code exchange + token refresh), and `claude.com` (the sign-in page in your browser) — the same endpoints Claude Code uses.
 - Token lives in **Android-Keystore-encrypted storage**; cached usage numbers contain nothing sensitive.
 - Polling is deliberately gentle (15-min default, 3-min manual floor, exponential backoff on 429s).
 - Heads-up: reading the usage API with a Pro token outside Claude Code/claude.ai is not covered by Anthropic's consumer ToS. Personal-use risk was accepted when this was built.
@@ -231,6 +249,7 @@ Below the Refresh button the app shows **Last success** and **Last attempt** as 
 
 ## 9 · Version history
 
+- **0.12** — **Native sign-in release.** Each account card now has **"Sign in on this phone"**: a browser-based sign-in (the same PKCE flow Claude Code uses) that needs **no computer at all** — tap, authorize in the browser of your choice (picker included, so Work and Personal can live in different browsers), paste the code, done. Works for Pro/Max and Team accounts. The sign-in is minted on the phone, so no computer can rotate it away; it self-renews for ~30 days and the card shows *"Sign-in expires around …"* with the usual 7/3/1-day warnings before it lapses. This also fixed the chronic **HTTP 429** on token exchange/renewal: Anthropic's token endpoint sits behind a firewall that rejects requests identifying themselves as `claude-code` — the app no longer sends that identity on token calls (usage calls still require it). The computer-token paste/QR method remains as a backup under "Use a computer token instead", and the desktop-paste renewal may well be steadier now too (same 429 fix applies to renewals). *(0.11 was an internal build, never released.)*
 - **0.10** — QR fixes & diagnostics. The in-app token guide's Windows QR command now extracts just the sign-in object and pipes it (the full credentials file can hold other logins and overflow a QR code's ~2.9 KB capacity; piping also avoids PowerShell 5.1 mangling quotes); Linux switched to a `jq` pipe for the same reason. Refresh failures now say *why* in the status line — e.g. "Token refresh failed (HTTP 429)" (a dead/rotated refresh token) vs. a network error — instead of a blind "token refresh failed". The in-app guide's "Re-pasting often?" section now covers the Mac Keychain variant of the dedicated-sign-in ritual (full commands in this guide, §2).
 - **0.9** — Forecast & QR release. The app now keeps a local history of its own polls (8 days, on-phone only) and each window card shows a **sparkline + burn-rate forecast**: when you'll hit 100% at the current pace and how long before the reset that is, or the projected percent at reset when you're safe. **Per-model weekly caps** (e.g. Fable) now fire their own 90% alert. **"Scan QR"** on the account cards imports a token straight from a QR code rendered in the computer's terminal — no clipboard needed (in-app guide has the commands). Notifications now open the app on the alert's own profile tab. Quieter on the API: the Quick Settings tiles skip their refresh when data is under 3 minutes old, and manual refreshes now also evaluate alerts immediately instead of waiting for the next background poll.
 - **0.8** — Token health release. Account cards now show a plan badge (Pro/Max/Team), an auto-renew countdown, the last auto-renewed time, and "sign-in valid until <date> · Xd Xh Xm to go" (read from the pasted JSON). New notifications: sign-in expiry early warning (7/3/1 days out) and a stale-data alert after 6+ hours of failed polls; the re-auth alert now also fires when renewals have failed continuously for 6+ hours (previously a dead token could look like a permanent "will retry"), and notifications self-dismiss when fixed. Polling section shows the next automatic check; cards show rate-limit backoff. Guide explains why re-pasting happens (token rotation by the source computer) and the dedicated-sign-in workaround.

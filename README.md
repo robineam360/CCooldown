@@ -42,38 +42,62 @@ windows reset. Built for people who live in Claude Code and keep hitting the wal
     <td align="center"><img src="Release/screenshots/notifications.png" width="240" alt="Usage alerts"><br><sub><b>Alerts</b> — near-limit warnings and "window has reset"</sub></td>
     <td align="center"><img src="Release/screenshots/app-tabs-work.png" width="240" alt="Work profile tab"><br><sub><b>Two profiles</b> — Personal and Work, side by side</sub></td>
   </tr>
+  <tr>
+    <td align="center"><img src="Release/screenshots/signin-settings.png" width="240" alt="Sign in on this phone"><br><sub><b>Sign in on this phone</b> 🆕 — no computer needed</sub></td>
+    <td align="center"><img src="Release/screenshots/signin-consent.png" width="240" alt="Authorize in the browser"><br><sub><b>Authorize in your browser</b> — Pro, Max &amp; Team accounts</sub></td>
+    <td align="center"><img src="Release/screenshots/signin-finish.png" width="240" alt="Paste the code to finish"><br><sub><b>Paste the code, done</b> — self-renews for ~a month</sub></td>
+  </tr>
 </table>
 
 More screenshots (settings, themes, widget setup, token guide) in
 [`Release/screenshots/`](Release/screenshots/).
 
-## Get started — about 3 minutes
+## Get started — about 2 minutes, no computer needed
 
-All you need: your Android phone, and the computer where you're already signed in to
-Claude Code.
+All you need is your Android phone.
 
 **1. Install the app.** Grab `CCooldown.apk` from the
 [latest release](../../releases/latest) onto your phone and open it (allow "install
 unknown apps" if your phone asks).
 
-**2. Put your Claude sign-in on the screen as a QR code.** On a Mac, paste this one line
+**2. Sign in on the phone.** In the app: **Settings → tap "Sign in on this phone"** on
+the account card. Your browser opens Claude's sign-in — log in (Pro, Max, and Team
+accounts all work), tap **Authorize**, copy the code the page shows, hop back to the app,
+and tap **Paste → Finish sign-in**. Usage loads immediately.
+
+Tracking two accounts? Do the same on the second card — if you keep each account logged
+in to claude.ai in a different browser, the built-in browser picker lets you route each
+sign-in accordingly (e.g. Work in Chrome, Personal in Brave).
+
+**3. Add a widget.** Long-press your home screen → **Widgets** → pick a **Claude
+Cooldown** widget.
+
+The phone's sign-in renews itself for about a month, then the app reminds you before it
+lapses — re-signing in is the same one-minute flow.
+
+<details>
+<summary><b>Backup method: import a token from a computer (QR / paste)</b></summary>
+
+<br>
+
+If the phone can't complete the browser sign-in, you can copy the sign-in that the
+Claude Code CLI holds on your computer. Each account card keeps these options under
+**"Use a computer token instead"**.
+
+**Put your Claude sign-in on the screen as a QR code.** On a Mac, paste this one line
 into Terminal and press Enter:
 
 ```bash
 npx -y qrcode-terminal "$(security find-generic-password -s 'Claude Code-credentials' -w)"
 ```
 
-A big QR square appears right in the terminal. (On Windows or Linux? Use the one-liners
-below.)
-
-**3. Scan it.** In the app: **Settings → tap "Scan QR" on the account card**, and point
-your phone at the screen. That's it — the app starts tracking immediately.
-
-**4. Add a widget.** Long-press your home screen → **Widgets** → pick a **Claude
-Cooldown** widget.
+A big QR square appears right in the terminal. Then in the app: **Settings → "Use a
+computer token instead" → Scan QR**, and point your phone at the screen.
 
 > 🔑 That QR code carries your Claude sign-in — it's a password in picture form. Show it
 > to your own phone, not to a screenshot, a screen-share, or a colleague.
+
+</details>
 
 <details>
 <summary><b>Windows / Linux QR one-liners</b></summary>
@@ -128,9 +152,10 @@ through channels you don't trust (email, group chats, cloud notes).
 
 ## How it works
 
-The app calls Anthropic's own usage endpoint (`api.anthropic.com/api/oauth/usage`) — the
-same one Claude Code uses — with the OAuth token from your Claude Code sign-in. It polls
-on a battery-friendly interval (15 minutes by default, configurable).
+The app signs in with the same OAuth flow Claude Code uses (browser-based PKCE against
+`claude.com` / `platform.claude.com`) and calls Anthropic's own usage endpoint
+(`api.anthropic.com/api/oauth/usage`) — the same one Claude Code uses. It polls on a
+battery-friendly interval (15 minutes by default, configurable).
 
 **Privacy:** your token stays on your device, encrypted with the Android Keystore
 (EncryptedSharedPreferences, AES-256-GCM). It is sent to Anthropic's API and nowhere else.
