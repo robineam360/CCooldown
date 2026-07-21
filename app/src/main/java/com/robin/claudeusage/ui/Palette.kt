@@ -37,12 +37,16 @@ object Palette {
     fun color(name: String, dark: Boolean): Color =
         byName(name).let { if (dark) it.dark else it.light }
 
-    /** Bars only: theme color normally, yellow above 80%, orange above 90%, red at 100%. */
+    /**
+     * Bars only: theme color normally, yellow above 80%, orange above 90%, red
+     * at 100%. The warning hues are deliberately vivid (saturated orange, true
+     * red) so they never blend into the muted Claude Orange terracotta theme.
+     */
     fun barColor(percent: Double?, theme: Color, dark: Boolean): Color {
         val pct = percent ?: 0.0
         return when {
-            pct >= 100.0 -> if (dark) Color(0xFFF28B82) else Color(0xFFD32F2F)
-            pct > 90.0 -> if (dark) Color(0xFFFFB74D) else Color(0xFFEF6C00)
+            pct >= 100.0 -> if (dark) Color(0xFFFF5252) else Color(0xFFC62828)
+            pct > 90.0 -> if (dark) Color(0xFFFFA726) else Color(0xFFF57C00)
             pct > 80.0 -> if (dark) Color(0xFFFDD663) else Color(0xFFF9A825)
             else -> theme
         }

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Auto Backup keeps usage history, the session log, and settings across reinstall
+  and device migration. The encrypted credentials (secure_credentials) are
+  excluded on purpose: they're sealed with a hardware Android Keystore key that
+  is never backed up, so a restored copy would be undecryptable and could wedge
+  the credential store. After a restore the user simply signs in again.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="secure_credentials.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="secure_credentials.xml" />
+    </device-transfer>
+</data-extraction-rules>

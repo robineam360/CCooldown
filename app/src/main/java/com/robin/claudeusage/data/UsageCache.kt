@@ -24,6 +24,15 @@ data class Snapshot(
  */
 class UsageCache(context: Context) {
 
+    companion object {
+        const val RESET_OFF = "off"
+        const val RESET_SMART = "smart"
+        const val RESET_ALWAYS = "always"
+
+        /** In smart mode a reset ping fires only if the window had reached this. */
+        const val SMART_RESET_MIN_PCT = 80.0
+    }
+
     private val prefs: SharedPreferences =
         context.applicationContext.getSharedPreferences("usage_cache", Context.MODE_PRIVATE)
 
@@ -105,6 +114,99 @@ class UsageCache(context: Context) {
 
     fun setAuthAlertsEnabled(enabled: Boolean) {
         prefs.edit().putBoolean("authAlertsEnabled", enabled).apply()
+    }
+
+    /** Display name for a profile — the fixed key stays, only the label is editable. */
+    fun profileLabel(profile: Profile): String =
+        prefs.getString(k(profile, "customLabel"), null)?.takeIf { it.isNotBlank() }
+            ?: profile.label
+
+    fun setProfileLabel(profile: Profile, label: String) {
+        val trimmed = label.trim().take(16)
+        prefs.edit().apply {
+            if (trimmed.isEmpty() || trimmed == profile.label) remove(k(profile, "customLabel"))
+            else putString(k(profile, "customLabel"), trimmed)
+        }.apply()
+    }
+
+    // --- granular alert settings ---
+
+    fun sessionAlertThresholds(): Set<Int> = thresholdSet("sessionAlertThresholds", setOf(80, 95))
+
+    fun setSessionAlertThresholds(values: Set<Int>) = putThresholdSet("sessionAlertThresholds", values)
+
+    fun weeklyAlertThresholds(): Set<Int> = thresholdSet("weeklyAlertThresholds", setOf(90))
+
+    fun setWeeklyAlertThresholds(values: Set<Int>) = putThresholdSet("weeklyAlertThresholds", values)
+
+    fun modelCapAlertThresholds(): Set<Int> = thresholdSet("modelCapAlertThresholds", setOf(90))
+
+    fun setModelCapAlertThresholds(values: Set<Int>) = putThresholdSet("modelCapAlertThresholds", values)
+
+    private fun thresholdSet(name: String, default: Set<Int>): Set<Int> {
+        // Until the chips are touched, the pre-granularity master switch decides.
+        val raw = prefs.getString(name, null)
+            ?: return if (alertsEnabled()) default else emptySet()
+        return raw.split(',').mapNotNull { it.trim().toIntOrNull() }.toSet()
+    }
+
+    private fun putThresholdSet(name: String, values: Set<Int>) {
+        prefs.edit().putString(name, values.sorted().joinToString(",")).apply()
+    }
+
+    /** Reset-ping behavior per window kind ("Session"/"Weekly"): off, smart, or always. */
+    fun resetPingMode(window: String): String =
+        prefs.getString("resetMode$window", null) ?: when {
+            !resetAlertsEnabled() -> RESET_OFF // pre-granularity toggle carries over
+            window == "Session" -> RESET_SMART
+            else -> RESET_ALWAYS
+        }
+
+    fun setResetPingMode(window: String, mode: String) {
+        prefs.edit().putString("resetMode$window", mode).apply()
+    }
+
+    fun profileAlertsEnabled(profile: Profile): Boolean =
+        prefs.getBoolean(k(profile, "profileAlertsEnabled"), true)
+
+    fun setProfileAlertsEnabled(profile: Profile, enabled: Boolean) {
+        prefs.edit().putBoolean(k(profile, "profileAlertsEnabled"), enabled).apply()
+    }
+
+    fun healthAlertsEnabled(): Boolean = prefs.getBoolean("healthAlertsEnabled", authAlertsEnabled())
+
+    fun setHealthAlertsEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean("healthAlertsEnabled", enabled).apply()
+    }
+
+    // --- highest percent seen in the current window instance (drives smart reset pings) ---
+
+    fun windowPeak(profile: Profile, window: String): Double =
+        prefs.getFloat(k(profile, "peak$window"), 0f).toDouble()
+
+    fun setWindowPeak(profile: Profile, window: String, pct: Double) {
+        prefs.edit().putFloat(k(profile, "peak$window"), pct.toFloat()).apply()
+    }
+
+    // --- pinned (ongoing) usage notification ---
+
+    fun pinnedEnabled(): Boolean = prefs.getBoolean("pinnedEnabled", false)
+
+    fun setPinnedEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean("pinnedEnabled", enabled).apply()
+    }
+
+    fun pinnedProfile(): Profile = Profile.fromKey(prefs.getString("pinnedProfile", null))
+
+    fun setPinnedProfile(profile: Profile) {
+        prefs.edit().putString("pinnedProfile", profile.key).apply()
+    }
+
+    /** Status-bar icon style: "pie", "ring", "battery", or "number". */
+    fun pinnedIconStyle(): String = prefs.getString("pinnedIconStyle", "ring") ?: "ring"
+
+    fun setPinnedIconStyle(style: String) {
+        prefs.edit().putString("pinnedIconStyle", style).apply()
     }
 
     fun use24hTime(): Boolean = prefs.getBoolean("use24hTime", false)

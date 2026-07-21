@@ -27,6 +27,7 @@ class UsageRepository(private val context: Context) {
     private val credStore = CredentialStore(context)
     private val cache = UsageCache(context)
     private val historyStore = HistoryStore(context)
+    private val sessionLogStore = SessionLog(context)
 
     companion object {
         private val mutex = Mutex()
@@ -44,6 +45,8 @@ class UsageRepository(private val context: Context) {
     fun cacheSettings(): UsageCache = cache
 
     fun history(): HistoryStore = historyStore
+
+    fun sessionLog(): SessionLog = sessionLogStore
 
     fun hasCredentials(profile: Profile): Boolean = credStore.load(profile) != null
 

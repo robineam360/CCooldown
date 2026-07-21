@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
@@ -90,7 +91,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Screen { MAIN, SETTINGS, GUIDE }
+private enum class Screen { MAIN, SETTINGS, GUIDE, HISTORY }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -168,6 +169,7 @@ private fun App(startProfile: Profile) {
                                 when (screen) {
                                     Screen.SETTINGS -> "Settings"
                                     Screen.GUIDE -> "Get your token"
+                                    Screen.HISTORY -> "Usage history"
                                     Screen.MAIN -> "Claude Cooldown"
                                 }
                             )
@@ -181,6 +183,9 @@ private fun App(startProfile: Profile) {
                         },
                         actions = {
                             if (screen == Screen.MAIN) {
+                                IconButton(onClick = { screen = Screen.HISTORY }) {
+                                    Icon(Icons.Filled.DateRange, contentDescription = "Usage history")
+                                }
                                 IconButton(onClick = { screen = Screen.SETTINGS }) {
                                     Icon(Icons.Filled.Settings, contentDescription = "Settings")
                                 }
@@ -200,7 +205,9 @@ private fun App(startProfile: Profile) {
                             .verticalScroll(rememberScrollState()),
                     ) {
                         Spacer(Modifier.height(8.dp))
-                        if (screen == Screen.SETTINGS) {
+                        if (screen == Screen.HISTORY) {
+                            HistoryScreen(repo, tick)
+                        } else if (screen == Screen.SETTINGS) {
                             SettingsScreen(
                                 repo = repo,
                                 use24h = use24h,
@@ -252,7 +259,7 @@ private fun ProfileTabs(
                 Tab(
                     selected = pagerState.currentPage == index,
                     onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
-                    text = { Text(profile.label) },
+                    text = { Text(repo.cacheSettings().profileLabel(profile)) },
                 )
             }
         }
@@ -338,13 +345,14 @@ private fun ProfileScreen(repo: UsageRepository, profile: Profile, use24h: Boole
     val history = remember(profile, snapshot.fetchedAt) { repo.history().points(profile) }
 
     if (!repo.hasCredentials(profile)) {
+        val label = repo.cacheSettings().profileLabel(profile)
         Card {
             Column(Modifier.padding(16.dp)) {
-                Text("No ${profile.label} account yet", fontWeight = FontWeight.Bold)
+                Text("No $label account yet", fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(4.dp))
                 Text(
                     "Open Settings and tap \"Sign in on this phone\" for the " +
-                        "${profile.label} account. It opens Claude's sign-in in your " +
+                        "$label account. It opens Claude's sign-in in your " +
                         "browser — no computer needed.",
                     style = MaterialTheme.typography.bodyMedium,
                 )

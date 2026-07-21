@@ -94,7 +94,7 @@ class UsageWidget : GlanceAppWidget() {
         val themeName = cache.themeColorName()
         provideContent {
             GlanceTheme {
-                WidgetContent(profile, snapshot, use24h, themeName)
+                WidgetContent(profile, cache.profileLabel(profile), snapshot, use24h, themeName)
             }
         }
     }
@@ -128,7 +128,7 @@ internal fun widgetCornerRadius(): androidx.compose.ui.unit.Dp {
 }
 
 @Composable
-private fun WidgetContent(profile: Profile, snapshot: Snapshot, use24h: Boolean, themeName: String) {
+private fun WidgetContent(profile: Profile, profileLabel: String, snapshot: Snapshot, use24h: Boolean, themeName: String) {
     val size = LocalSize.current
     val large = size.height >= 190.dp
     val medium = size.height >= 110.dp
@@ -149,14 +149,14 @@ private fun WidgetContent(profile: Profile, snapshot: Snapshot, use24h: Boolean,
 
     Column(modifier = rootModifier, verticalAlignment = Alignment.CenterVertically) {
         when {
-            needsSetup -> CenteredMessage("Claude Cooldown · ${profile.label}", "Tap to set up")
-            needsReauth -> CenteredMessage("${profile.label}: re-auth needed", "Tap to open app")
-            snapshot.data == null -> CenteredMessage("No data yet · ${profile.label}", "Tap to open app")
+            needsSetup -> CenteredMessage("Claude Cooldown · $profileLabel", "Tap to set up")
+            needsReauth -> CenteredMessage("$profileLabel: re-auth needed", "Tap to open app")
+            snapshot.data == null -> CenteredMessage("No data yet · $profileLabel", "Tap to open app")
             // RemoteViews containers allow at most 10 children — every block below
             // is wrapped in its own Column so the root stays small.
             large -> {
                 val data = snapshot.data!!
-                SessionBlock(profile, data.session, use24h, theme, dark, label = "5-hour · ${profile.label}", barHeight = 14.dp)
+                SessionBlock(profile, data.session, use24h, theme, dark, label = "5-hour · $profileLabel", barHeight = 14.dp)
                 Spacer(GlanceModifier.height(12.dp))
                 Column(modifier = GlanceModifier.fillMaxWidth()) {
                     Text(
@@ -181,7 +181,7 @@ private fun WidgetContent(profile: Profile, snapshot: Snapshot, use24h: Boolean,
             }
             medium -> {
                 val data = snapshot.data!!
-                SessionBlock(profile, data.session, use24h, theme, dark, label = "5-hour · ${profile.label}", barHeight = 12.dp)
+                SessionBlock(profile, data.session, use24h, theme, dark, label = "5-hour · $profileLabel", barHeight = 12.dp)
                 Spacer(GlanceModifier.height(8.dp))
                 Column(modifier = GlanceModifier.fillMaxWidth()) {
                     HeaderRow(profile, "7-day", data.weekly?.percent, "% used", showRefresh = false)
@@ -193,7 +193,7 @@ private fun WidgetContent(profile: Profile, snapshot: Snapshot, use24h: Boolean,
             }
             else -> {
                 val data = snapshot.data!!
-                SessionBlock(profile, data.session, use24h, theme, dark, label = "5h · ${profile.label}", barHeight = 12.dp)
+                SessionBlock(profile, data.session, use24h, theme, dark, label = "5h · $profileLabel", barHeight = 12.dp)
             }
         }
     }

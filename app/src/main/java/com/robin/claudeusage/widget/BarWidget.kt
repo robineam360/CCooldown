@@ -57,9 +57,10 @@ class BarWidget : GlanceAppWidget() {
         val snapshot = cache.snapshot(profile)
         val use24h = cache.use24hTime()
         val themeName = cache.themeColorName()
+        val profileLabel = cache.profileLabel(profile)
         provideContent {
             GlanceTheme {
-                BarContent(profile, bar, snapshot, use24h, themeName)
+                BarContent(profile, profileLabel, bar, snapshot, use24h, themeName)
             }
         }
     }
@@ -68,6 +69,7 @@ class BarWidget : GlanceAppWidget() {
 @Composable
 private fun BarContent(
     profile: Profile,
+    profileLabel: String,
     bar: String,
     snapshot: com.robin.claudeusage.data.Snapshot,
     use24h: Boolean,
@@ -97,12 +99,12 @@ private fun BarContent(
     Column(modifier = rootModifier, verticalAlignment = Alignment.CenterVertically) {
         when {
             snapshot.authState == AuthState.NO_CREDENTIALS ->
-                CenteredMessage("${profile.label}: no token", "Tap to set up")
+                CenteredMessage("$profileLabel: no token", "Tap to set up")
             snapshot.authState == AuthState.REAUTH_NEEDED ->
-                CenteredMessage("${profile.label}: re-auth needed", "Tap to open app")
-            data == null -> CenteredMessage("No data yet · ${profile.label}", "Tap to open app")
+                CenteredMessage("$profileLabel: re-auth needed", "Tap to open app")
+            data == null -> CenteredMessage("No data yet · $profileLabel", "Tap to open app")
             else -> {
-                HeaderRow(profile, "$label · ${profile.label}", window?.percent, suffix, showRefresh = true)
+                HeaderRow(profile, "$label · $profileLabel", window?.percent, suffix, showRefresh = true)
                 Spacer(GlanceModifier.height(5.dp))
                 WidgetBar(window?.percent, theme, dark, 12.dp)
                 Spacer(GlanceModifier.height(4.dp))

@@ -21,13 +21,22 @@ forgetting the bump means colleagues can't install over the old build.
 ```bash
 export JAVA_HOME=/opt/homebrew/opt/openjdk@17
 export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
-./gradlew assembleDebug
-cp app/build/outputs/apk/debug/app-debug.apk Release/CCooldown.apk
+./gradlew assembleRelease
+cp app/build/outputs/apk/release/app-release.apk Release/CCooldown.apk
 ```
 
-(The app ships as a debug-signed APK for sideloading. All installs must keep the same
-signing — mixing machines that build the APK changes the debug key and forces users to
-uninstall first.)
+**Signing (since v0.13).** The app is signed with a permanent release keystore, not the
+throwaway debug key. The keystore + its password live in two gitignored files that are
+**never committed**: `ccooldown-release.jks` and `keystore.properties` (both at the repo
+root). `app/build.gradle.kts` reads them automatically.
+
+- **Back these two files up somewhere safe and permanent.** If you lose them you can never
+  publish an update again — every user would have to uninstall and reinstall.
+- Because the keystore is stable, every release from v0.13 onward updates in place and keeps
+  the user's history and settings. (The one-time exception was v0.12 → v0.13: v0.12 was
+  debug-signed with a key that's gone, so that single upgrade required a reinstall.)
+- On a fresh clone without the two files, `assembleRelease` still builds but produces an
+  **unsigned** APK — restore the keystore files before a real release.
 
 ## 3. Update the docs if needed
 

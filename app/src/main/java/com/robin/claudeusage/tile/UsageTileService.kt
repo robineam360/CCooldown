@@ -18,18 +18,20 @@ abstract class BaseUsageTileService(private val profile: Profile) : TileService(
     }
 
     override fun onStartListening() {
-        val snapshot = UsageCache(this).snapshot(profile)
+        val cache = UsageCache(this)
+        val snapshot = cache.snapshot(profile)
+        val profileLabel = cache.profileLabel(profile)
         val session = snapshot.data?.session
         qsTile?.apply {
             when {
                 session?.percent != null -> {
                     state = Tile.STATE_ACTIVE
-                    label = "${profile.label} ${session.percent.toInt()}%"
+                    label = "$profileLabel ${session.percent.toInt()}%"
                     subtitle = "7d ${snapshot.data?.weekly?.percent?.toInt() ?: 0}%"
                 }
                 else -> {
                     state = Tile.STATE_INACTIVE
-                    label = "Claude ${profile.label}"
+                    label = "Claude $profileLabel"
                     subtitle = "no data"
                 }
             }

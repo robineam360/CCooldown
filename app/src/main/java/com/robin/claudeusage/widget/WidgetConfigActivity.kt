@@ -101,6 +101,8 @@ class WidgetConfigActivity : ComponentActivity() {
 private fun ConfigScreen(isBarWidget: Boolean, onDone: (Profile, String?) -> Unit) {
     var profile by remember { mutableStateOf(Profile.PERSONAL) }
     var bar by remember { mutableStateOf("session") }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val cache = remember { com.robin.claudeusage.data.UsageCache(context) }
     rememberCoroutineScope()
 
     Column(
@@ -120,7 +122,7 @@ private fun ConfigScreen(isBarWidget: Boolean, onDone: (Profile, String?) -> Uni
                 FilterChip(
                     selected = profile == p,
                     onClick = { profile = p },
-                    label = { Text(p.label) },
+                    label = { Text(cache.profileLabel(p)) },
                 )
             }
         }

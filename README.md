@@ -18,20 +18,38 @@ windows reset. Built for people who live in Claude Code and keep hitting the wal
 - **Home-screen widgets** (small / medium / large, plus a compact single-bar widget) showing
   the 5-hour session window, the 7-day all-models window, and per-model 7-day caps —
   with countdown and exact local reset time
-- **Two profiles** — track a Personal and a Work account side by side, in swipeable tabs
+- **Pinned notification** 🆕 — an optional always-on, silent notification with a status-bar
+  gauge icon that fills as you use your 5-hour window; expands to show the 7-day and
+  per-model bars, with a one-tap Refresh
+- **Usage history** 🆕 — a scrollable bar per 5-hour session, week by week (and a per-week
+  view across weeks), so you can see how many sessions you ran and which ones hit 100%
+- **Two profiles with editable names** — track a Personal and a Work account side by side in
+  swipeable tabs, and rename them to whatever you like
 - **Quick Settings tiles** — glance at your 5h/7d percentages from the notification shade
-- **Alerts** — notifications at 80% / 95% of the 5-hour window and 90% of the 7-day and
-  per-model windows, plus an optional "window has reset, Claude is fresh again" notification
+- **Granular alerts** 🆕 — pick exactly which thresholds warn you per window (5-hour, 7-day,
+  per-model), turn reset pings off / smart / always, and mute a whole profile — no more
+  all-or-nothing
 - **Burn-rate projection** — a sparkline of each window's usage curve and a plain-words
   forecast ("At this pace: 100% at 2:40 PM — 1h 20m before the reset"), built from a local
   history of your own polls
 - **A "days elapsed" pacing bar** — see whether your weekly usage is running ahead of or
   behind the week itself
-- **13 theme colors** including Material You dynamic color, full light/dark support
+- **13 theme colors** including Material You dynamic color, full light/dark support; usage
+  bars shade amber then a clear warning-red as you approach 100%
 
 ## Screenshots
 
 <table>
+  <tr>
+    <td align="center"><img src="Release/screenshots/history-5h-illustration.svg" width="240" alt="Usage history, per-session bars (illustration)"><br><sub><b>Usage history</b> 🆕 — a bar per 5-hour session <i>(illustration)</i></sub></td>
+    <td align="center"><img src="Release/screenshots/pinned-collapsed.png" width="240" alt="Pinned notification, collapsed"><br><sub><b>Pinned notification</b> 🆕 — always-on gauge in your shade</sub></td>
+    <td align="center"><img src="Release/screenshots/settings-alerts.png" width="240" alt="Granular alert settings"><br><sub><b>Granular alerts</b> 🆕 — pick your thresholds per window</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="Release/screenshots/pinned-expanded.png" width="240" alt="Pinned notification, expanded"><br><sub><b>Expanded</b> — 7-day &amp; per-model bars, one-tap Refresh</sub></td>
+    <td align="center"><img src="Release/screenshots/profile-names.png" width="240" alt="Editable profile names"><br><sub><b>Rename your profiles</b> 🆕 — not just Personal/Work</sub></td>
+    <td align="center"><img src="Release/screenshots/history-7d-illustration.svg" width="240" alt="Per-week history (illustration)"><br><sub><b>Per-week view</b> 🆕 — how each week compared <i>(illustration)</i></sub></td>
+  </tr>
   <tr>
     <td align="center"><img src="Release/screenshots/widget-large-dark.png" width="240" alt="Home-screen widget, dark theme"><br><sub><b>Home-screen widget</b> — 5-hour &amp; 7-day windows at a glance</sub></td>
     <td align="center"><img src="Release/screenshots/widget-large-light.png" width="240" alt="Home-screen widget, light theme"><br><sub><b>Light theme</b> — follows your system setting</sub></td>
@@ -50,7 +68,9 @@ windows reset. Built for people who live in Claude Code and keep hitting the wal
 </table>
 
 More screenshots (settings, themes, widget setup, token guide) in
-[`Release/screenshots/`](Release/screenshots/).
+[`Release/screenshots/`](Release/screenshots/). The two **Usage history** images are marked
+*illustrations* — they show a full week of data; a fresh install starts nearly empty and
+fills in as your windows close, so a real screenshot today would show only a bar or two.
 
 ## Get started — about 2 minutes, no computer needed
 

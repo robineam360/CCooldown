@@ -11,6 +11,7 @@ import com.robin.claudeusage.MainActivity
 import com.robin.claudeusage.R
 import com.robin.claudeusage.data.AuthState
 import com.robin.claudeusage.data.Profile
+import com.robin.claudeusage.data.SessionLog
 import com.robin.claudeusage.data.UsageCache
 import com.robin.claudeusage.data.UsageWindow
 import com.robin.claudeusage.ui.Fmt
@@ -26,9 +27,6 @@ object Alerts {
     private const val CHANNEL_RESET = "reset_alerts"
     private const val CHANNEL_AUTH = "auth_alerts"
     private const val CHANNEL_HEALTH = "health_alerts"
-
-    private val SESSION_THRESHOLDS = listOf(95, 80)
-    private const val WEEKLY_THRESHOLD = 90
 
     /** Notification-id kinds 1–7 are fixed; per-model caps use this base + index. */
     private const val MODEL_CAP_KIND_BASE = 10
@@ -67,10 +65,13 @@ object Alerts {
         for (profile in Profile.entries) {
             evaluateProfile(context, cache, profile)
         }
+        // The always-on notification rides the same cadence so it stays live.
+        com.robin.claudeusage.notify.PinnedNotification.update(context, cache)
     }
 
     private fun evaluateProfile(context: Context, cache: UsageCache, profile: Profile) {
         val snapshot = cache.snapshot(profile)
+        val label = cache.profileLabel(profile)
 
         // Re-auth alert: once per failure episode, cleared (and the notification
         // dismissed) when auth recovers.
@@ -78,7 +79,7 @@ object Alerts {
             if (cache.authAlertsEnabled() && !cache.reauthNotified(profile)) {
                 notify(
                     context, profile, notifId(profile, 3), CHANNEL_AUTH,
-                    "${profile.label}: Claude Cooldown needs re-auth",
+                    "$label: Claude Cooldown needs re-auth",
                     "The saved token stopped working. Open the app and paste a fresh one.",
                 )
                 cache.setReauthNotified(profile, true)
@@ -90,34 +91,28 @@ object Alerts {
             cache.setReauthNotified(profile, false)
         }
 
-        if (cache.authAlertsEnabled() && snapshot.authState == AuthState.OK) {
-            checkUpcomingExpiry(context, cache, profile)
-            checkStaleData(context, cache, profile, snapshot)
+        if (snapshot.authState == AuthState.OK) {
+            if (cache.authAlertsEnabled()) checkUpcomingExpiry(context, cache, profile)
+            if (cache.healthAlertsEnabled()) checkStaleData(context, cache, profile, snapshot)
         }
 
         val data = snapshot.data ?: return
         val use24h = cache.use24hTime()
 
-        // Window-reset detection: the window's identity is its resets_at. When it
-        // changes, the previous window ended — tell the user Claude is fresh again.
-        if (cache.resetAlertsEnabled()) {
-            checkReset(context, cache, profile, "Session", "5-hour", data.session)
-            checkReset(context, cache, profile, "Weekly", "7-day", data.weekly)
-        } else {
-            // Keep tracking identity silently so re-enabling doesn't false-fire.
-            data.session?.resetsAt?.let { cache.setLastSeenWindowKey(profile, "Session", it.toEpochMilli()) }
-            data.weekly?.resetsAt?.let { cache.setLastSeenWindowKey(profile, "Weekly", it.toEpochMilli()) }
-        }
+        // Reset detection always runs (it also tracks window identity and peak);
+        // the per-window ping mode and profile scope decide whether it notifies.
+        checkReset(context, cache, profile, "Session", "5-hour", data.session)
+        checkReset(context, cache, profile, "Weekly", "7-day", data.weekly)
 
-        if (!cache.alertsEnabled()) return
+        if (!cache.profileAlertsEnabled(profile)) return
 
         data.session?.let { w ->
             checkThresholds(
                 context, cache, profile, w,
                 keyName = "sessionAlert",
-                thresholds = SESSION_THRESHOLDS,
+                thresholds = cache.sessionAlertThresholds().sortedDescending(),
                 notificationId = notifId(profile, 1),
-                title = { pct -> "${profile.label}: 5-hour window at $pct%" },
+                title = { pct -> "$label: 5-hour window at $pct%" },
                 use24h = use24h,
             )
         }
@@ -125,9 +120,9 @@ object Alerts {
             checkThresholds(
                 context, cache, profile, w,
                 keyName = "weeklyAlert",
-                thresholds = listOf(WEEKLY_THRESHOLD),
+                thresholds = cache.weeklyAlertThresholds().sortedDescending(),
                 notificationId = notifId(profile, 2),
-                title = { pct -> "${profile.label}: 7-day window at $pct%" },
+                title = { pct -> "$label: 7-day window at $pct%" },
                 use24h = use24h,
             )
         }
@@ -137,9 +132,9 @@ object Alerts {
             checkThresholds(
                 context, cache, profile, cap.window,
                 keyName = "modelAlert.${cap.modelName}",
-                thresholds = listOf(WEEKLY_THRESHOLD),
+                thresholds = cache.modelCapAlertThresholds().sortedDescending(),
                 notificationId = notifId(profile, MODEL_CAP_KIND_BASE + index),
-                title = { pct -> "${profile.label}: ${cap.modelName} 7-day cap at $pct%" },
+                title = { pct -> "$label: ${cap.modelName} 7-day cap at $pct%" },
                 use24h = use24h,
             )
         }
@@ -167,7 +162,7 @@ object Alerts {
         val use24h = cache.use24hTime()
         notify(
             context, profile, notifId(profile, 6), CHANNEL_AUTH,
-            "${profile.label}: sign-in expires in ${Fmt.dhm(expiry)}",
+            "${cache.profileLabel(profile)}: sign-in expires in ${Fmt.dhm(expiry)}",
             "Valid until ${Fmt.dateTime(expiry, use24h)}. Paste a fresh token when convenient.",
         )
         cache.setAlertState(profile, "expiryWarn", expiry, crossed)
@@ -191,7 +186,7 @@ object Alerts {
             if (!cache.staleNotified(profile)) {
                 notify(
                     context, profile, notifId(profile, 7), CHANNEL_HEALTH,
-                    "${profile.label}: usage data is stale",
+                    "${cache.profileLabel(profile)}: usage data is stale",
                     "Nothing fetched since ${Fmt.dayTimeWithAgo(snapshot.fetchedAt, cache.use24hTime())}. " +
                         "Last error: ${snapshot.lastStatus}",
                 )
@@ -212,14 +207,33 @@ object Alerts {
         window: UsageWindow?,
     ) {
         val key = window?.resetsAt?.toEpochMilli() ?: return
+        val pct = window.percent ?: 0.0
         val lastSeen = cache.lastSeenWindowKey(profile, windowName)
         if (lastSeen != 0L && lastSeen != key && Instant.ofEpochMilli(lastSeen).isBefore(Instant.now())) {
-            val pct = (window.percent ?: 0.0).toInt()
-            notify(
-                context, profile, notifId(profile, if (windowName == "Session") 4 else 5), CHANNEL_RESET,
-                "${profile.label}: $windowLabel window reset",
-                "Usage is back at $pct%. Next reset ${Fmt.relIn(window.resetsAt)}.",
+            // The window rolled over. Log the window that just closed to the
+            // long-term session log (its identity is lastSeen, its peak is what
+            // we accumulated while it was open) for the history bars.
+            val peak = cache.windowPeak(profile, windowName)
+            SessionLog(context).record(
+                profile,
+                if (windowName == "Session") SessionLog.SESSION else SessionLog.WEEKLY,
+                lastSeen, peak, peak >= 99.5,
             )
+            // Smart mode only pings when the finished window had actually been
+            // running hot — a reset nobody was waiting for is just noise.
+            val mode = cache.resetPingMode(windowName)
+            val wanted = mode == UsageCache.RESET_ALWAYS ||
+                (mode == UsageCache.RESET_SMART && peak >= UsageCache.SMART_RESET_MIN_PCT)
+            if (wanted && cache.profileAlertsEnabled(profile)) {
+                notify(
+                    context, profile, notifId(profile, if (windowName == "Session") 4 else 5), CHANNEL_RESET,
+                    "${cache.profileLabel(profile)}: $windowLabel window reset",
+                    "Usage is back at ${pct.toInt()}%. Next reset ${Fmt.relIn(window.resetsAt)}.",
+                )
+            }
+            cache.setWindowPeak(profile, windowName, pct)
+        } else {
+            cache.setWindowPeak(profile, windowName, maxOf(cache.windowPeak(profile, windowName), pct))
         }
         cache.setLastSeenWindowKey(profile, windowName, key)
     }

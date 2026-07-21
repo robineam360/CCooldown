@@ -29,6 +29,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -74,6 +75,7 @@ import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import com.robin.claudeusage.data.AuthState
 import com.robin.claudeusage.data.Profile
+import com.robin.claudeusage.data.UsageCache
 import com.robin.claudeusage.data.UsageRepository
 import com.robin.claudeusage.ui.Fmt
 import com.robin.claudeusage.ui.Palette
@@ -98,13 +100,44 @@ fun SettingsScreen(
     refreshWidgets: () -> Unit,
 ) {
     val context = LocalContext.current
+    val cacheSettings = repo.cacheSettings()
+    // Bumped when a profile is renamed so labels elsewhere on this screen refresh.
+    var namesTick by remember { mutableIntStateOf(0) }
+    val labels = remember(namesTick) { Profile.entries.associateWith { cacheSettings.profileLabel(it) } }
 
     SectionLabel("Accounts")
     for (profile in Profile.entries) {
-        TokenCard(repo, profile, use24h, onOpenGuide)
+        TokenCard(repo, profile, use24h, onOpenGuide, label = labels.getValue(profile))
         Spacer(Modifier.height(10.dp))
     }
     Spacer(Modifier.height(14.dp))
+
+    SectionLabel("Profile names")
+    SectionCard {
+        for ((index, profile) in Profile.entries.withIndex()) {
+            if (index > 0) Spacer(Modifier.height(10.dp))
+            var name by remember { mutableStateOf(cacheSettings.profileLabel(profile)) }
+            OutlinedTextField(
+                value = name,
+                onValueChange = {
+                    name = it.take(16)
+                    cacheSettings.setProfileLabel(profile, name)
+                    namesTick++
+                    refreshWidgets()
+                },
+                label = { Text("${profile.label} profile") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "Used everywhere — tabs, widgets, and notifications. Clear a field to go back to the default.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    Spacer(Modifier.height(24.dp))
 
     SectionLabel("Polling")
     PollingSection(repo)
@@ -112,40 +145,137 @@ fun SettingsScreen(
 
     SectionLabel("Notifications")
     SectionCard {
-        var usageAlerts by remember { mutableStateOf(repo.cacheSettings().alertsEnabled()) }
-        ToggleRow(
-            title = "Usage alerts",
-            subtitle = "Notify at 80% and 95% of the 5-hour window, and 90% of the 7-day window",
-            checked = usageAlerts,
-        ) {
-            usageAlerts = it
-            repo.cacheSettings().setAlertsEnabled(it)
+        Text("Usage warnings", style = MaterialTheme.typography.bodyLarge)
+        Text(
+            "Notify when a window crosses these levels. Nothing selected = silent.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(4.dp))
+        ThresholdChipsRow("5-hour window", listOf(80, 90, 95), cacheSettings.sessionAlertThresholds()) {
+            cacheSettings.setSessionAlertThresholds(it)
+        }
+        ThresholdChipsRow("7-day window", listOf(75, 90), cacheSettings.weeklyAlertThresholds()) {
+            cacheSettings.setWeeklyAlertThresholds(it)
+        }
+        ThresholdChipsRow("Per-model caps", listOf(75, 90), cacheSettings.modelCapAlertThresholds()) {
+            cacheSettings.setModelCapAlertThresholds(it)
         }
         RowDivider()
-        var resetAlerts by remember { mutableStateOf(repo.cacheSettings().resetAlertsEnabled()) }
-        ToggleRow(
-            title = "Reset notifications",
-            subtitle = "Notify when a window resets and Claude is fresh again",
-            checked = resetAlerts,
-        ) {
-            resetAlerts = it
-            repo.cacheSettings().setResetAlertsEnabled(it)
+        Text("Reset pings", style = MaterialTheme.typography.bodyLarge)
+        Text(
+            "\"If busy\" pings only when that window had reached 80% before it reset.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(6.dp))
+        ResetModeRow("5-hour reset", "Session", cacheSettings)
+        Spacer(Modifier.height(8.dp))
+        ResetModeRow("7-day reset", "Weekly", cacheSettings)
+        RowDivider()
+        for ((index, profile) in Profile.entries.withIndex()) {
+            if (index > 0) RowDivider()
+            var enabled by remember { mutableStateOf(cacheSettings.profileAlertsEnabled(profile)) }
+            ToggleRow(
+                title = "${labels.getValue(profile)} alerts",
+                subtitle = "Usage warnings and reset pings for this profile",
+                checked = enabled,
+            ) {
+                enabled = it
+                cacheSettings.setProfileAlertsEnabled(profile, it)
+            }
         }
         RowDivider()
-        var authAlerts by remember { mutableStateOf(repo.cacheSettings().authAlertsEnabled()) }
+        var authAlerts by remember { mutableStateOf(cacheSettings.authAlertsEnabled()) }
         ToggleRow(
-            title = "Token & data health alerts",
-            subtitle = "Notify when a token expires soon or stops working, and when data stays stale for hours",
+            title = "Sign-in alerts",
+            subtitle = "Token expiring soon or no longer working",
             checked = authAlerts,
         ) {
             authAlerts = it
-            repo.cacheSettings().setAuthAlertsEnabled(it)
+            cacheSettings.setAuthAlertsEnabled(it)
+        }
+        RowDivider()
+        var healthAlerts by remember { mutableStateOf(cacheSettings.healthAlertsEnabled()) }
+        ToggleRow(
+            title = "Stale data alerts",
+            subtitle = "Usage data hasn't refreshed for hours",
+            checked = healthAlerts,
+        ) {
+            healthAlerts = it
+            cacheSettings.setHealthAlertsEnabled(it)
         }
         RowDivider()
         LinkRow("System notification settings") {
             context.startActivity(
                 Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
                     .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
+            )
+        }
+    }
+    Spacer(Modifier.height(24.dp))
+
+    SectionLabel("Pinned notification")
+    SectionCard {
+        var pinned by remember { mutableStateOf(cacheSettings.pinnedEnabled()) }
+        var pinnedProfile by remember { mutableStateOf(cacheSettings.pinnedProfile()) }
+        var iconStyle by remember { mutableStateOf(cacheSettings.pinnedIconStyle()) }
+        fun refreshPinned() {
+            com.robin.claudeusage.notify.PinnedNotification.update(context, cacheSettings)
+        }
+        ToggleRow(
+            title = "Always-on usage notification",
+            subtitle = "A silent, ongoing notification with a status-bar icon that fills as you use your 5-hour window",
+            checked = pinned,
+        ) {
+            pinned = it
+            cacheSettings.setPinnedEnabled(it)
+            refreshPinned()
+        }
+        if (pinned) {
+            RowDivider()
+            Text("Show profile", style = MaterialTheme.typography.bodyLarge)
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                for (p in Profile.entries) {
+                    FilterChip(
+                        selected = pinnedProfile == p,
+                        onClick = {
+                            pinnedProfile = p
+                            cacheSettings.setPinnedProfile(p)
+                            refreshPinned()
+                        },
+                        label = { Text(labels.getValue(p)) },
+                    )
+                }
+            }
+            RowDivider()
+            Text("Status-bar icon", style = MaterialTheme.typography.bodyLarge)
+            Spacer(Modifier.height(8.dp))
+            val iconStyles = listOf(
+                "ring" to "Ring",
+                "pie" to "Pie",
+                "battery" to "Battery",
+                "number" to "Number",
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                for ((value, text) in iconStyles) {
+                    FilterChip(
+                        selected = iconStyle == value,
+                        onClick = {
+                            iconStyle = value
+                            cacheSettings.setPinnedIconStyle(value)
+                            refreshPinned()
+                        },
+                        label = { Text(text) },
+                    )
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "The colored gauge and bars follow your theme and turn orange, then red, near the limit. The tiny status-bar icon is monochrome — Android renders it that way for every app.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -256,6 +386,7 @@ private fun TokenCard(
     profile: Profile,
     use24h: Boolean,
     onOpenGuide: () -> Unit,
+    label: String,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -313,7 +444,7 @@ private fun TokenCard(
             val result = repo.completeSignIn(profile, codeInput)
             if (result.message == "OK") {
                 Polling.schedulePeriodic(context, repo.cacheSettings().pollIntervalMinutes())
-                message = "${profile.label} signed in — usage fetched, polling started."
+                message = "$label signed in — usage fetched, polling started."
                 awaitingCode = false
                 codeInput = ""
                 showBackup = false
@@ -333,7 +464,7 @@ private fun TokenCard(
             message = if (result.message == "OK") {
                 Polling.schedulePeriodic(context, repo.cacheSettings().pollIntervalMinutes())
                 showBackup = false
-                "${profile.label} token added — usage fetched, polling started."
+                "$label token added — usage fetched, polling started."
             } else {
                 result.message
             }
@@ -369,7 +500,7 @@ private fun TokenCard(
     Card {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(profile.label, style = MaterialTheme.typography.titleMedium)
+                Text(label, style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.width(10.dp))
                 if (hasToken) StatusChip(snapshot.authState)
                 if (hasToken && plan != null) {
@@ -517,7 +648,7 @@ private fun TokenCard(
                         enabled = !busy,
                         onClick = {
                             repo.clearCredentials(profile)
-                            message = "${profile.label} signed out."
+                            message = "$label signed out."
                             showBackup = false
                             stateKey++
                         },
@@ -549,7 +680,7 @@ private fun TokenCard(
             text = {
                 Column {
                     Text(
-                        "Pick the browser where you're signed in to the ${profile.label} " +
+                        "Pick the browser where you're signed in to the $label " +
                             "Claude account.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1062,6 +1193,57 @@ private fun NoteCard(text: String, positive: Boolean) {
 }
 
 // --- shared bits ---
+
+/** One "window kind" line in Usage warnings: label left, multi-select percent chips right. */
+@Composable
+private fun ThresholdChipsRow(
+    label: String,
+    options: List<Int>,
+    initial: Set<Int>,
+    onChange: (Set<Int>) -> Unit,
+) {
+    var selected by remember { mutableStateOf(initial) }
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        for (pct in options) {
+            Spacer(Modifier.width(6.dp))
+            FilterChip(
+                selected = pct in selected,
+                onClick = {
+                    selected = if (pct in selected) selected - pct else selected + pct
+                    onChange(selected)
+                },
+                label = { Text("$pct%") },
+            )
+        }
+    }
+}
+
+@Composable
+private fun ResetModeRow(label: String, window: String, cache: UsageCache) {
+    var mode by remember { mutableStateOf(cache.resetPingMode(window)) }
+    Column(Modifier.fillMaxWidth()) {
+        Text(label, style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.height(6.dp))
+        val options = listOf(
+            UsageCache.RESET_OFF to "Off",
+            UsageCache.RESET_SMART to "If busy",
+            UsageCache.RESET_ALWAYS to "Always",
+        )
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+            options.forEachIndexed { index, (value, text) ->
+                SegmentedButton(
+                    selected = mode == value,
+                    onClick = {
+                        mode = value
+                        cache.setResetPingMode(window, value)
+                    },
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
+                ) { Text(text) }
+            }
+        }
+    }
+}
 
 @Composable
 private fun SectionLabel(text: String) {

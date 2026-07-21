@@ -16,3 +16,11 @@ local.properties
 
 # Claude Code local session settings
 .claude/settings.local.json
+
+# Release signing — NEVER commit these (losing them means you can't update the app)
+keystore.properties
+*.jks
+*.keystore
+
+# Private handover notes — never commit
+HANDOVER.md
