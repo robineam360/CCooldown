@@ -205,8 +205,8 @@ OkHttp. No other dependencies.
 
 ## Feedback
 
-Found a bug or want a feature? Open an issue here, use "Share feedback" in the app's
-About section, or [message me on WhatsApp](mailto:robin@eam360.com).
+Found a bug or want a feature? Open an issue here, or use "Share feedback" in the app's
+About section (it emails <robin@eam360.com>).
 
 ## Credits
 

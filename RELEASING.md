@@ -1,8 +1,10 @@
 # Releasing an update
 
 The routine for shipping a new version of CCooldown to GitHub. Colleagues install by
-downloading `Release/CCooldown.apk` from the repo, so every release is: bump, build,
-copy, commit, push.
+downloading the APK from the **Releases page** (the app's *Check for updates* button and
+the README both link to `releases/latest`). The APK is **no longer committed to the repo**
+— it ships only as a release asset. So every release is: bump, build, commit source, push,
+publish release.
 
 ## 1. Bump the version
 
@@ -22,7 +24,8 @@ forgetting the bump means colleagues can't install over the old build.
 export JAVA_HOME=/opt/homebrew/opt/openjdk@17
 export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
 ./gradlew assembleRelease
-cp app/build/outputs/apk/release/app-release.apk Release/CCooldown.apk
+# Signed APK lands at app/build/outputs/apk/release/app-release.apk — upload it in step 5.
+# (No longer copied into Release/ or committed.)
 ```
 
 **Signing (since v0.13).** The app is signed with a permanent release keystore, not the
@@ -47,7 +50,7 @@ root). `app/build.gradle.kts` reads them automatically.
 ## 4. Commit and push
 
 ```bash
-git add -A
+git add -A          # source + docs only — the APK is gitignored now
 git commit -m "v0.8 — <one line on what changed>"
 git tag v0.8
 git push && git push --tags
@@ -59,9 +62,11 @@ Publish the APK to the Releases page (the README's download link points at
 `releases/latest`, so this is what colleagues actually install from):
 
 ```bash
-gh release create v0.8 Release/CCooldown.apk \
+gh release create v0.8 app/build/outputs/apk/release/app-release.apk \
   --title "CCooldown v0.8" \
   --notes "<one line on what changed>"
 ```
 
-The in-repo `Release/CCooldown.apk` copy still works as a fallback either way.
+The APK is distributed **only** as this release asset — the README, USER-GUIDE, and the
+app's *Check for updates* button all point at `releases/latest`, so publishing the release
+is what actually ships the update to colleagues.

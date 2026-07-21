@@ -75,6 +75,8 @@ import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import com.robin.claudeusage.data.AuthState
 import com.robin.claudeusage.data.Profile
+import com.robin.claudeusage.data.UpdateCheck
+import com.robin.claudeusage.data.UpdateInfo
 import com.robin.claudeusage.data.UsageCache
 import com.robin.claudeusage.data.UsageRepository
 import com.robin.claudeusage.ui.Fmt
@@ -82,9 +84,11 @@ import com.robin.claudeusage.ui.Palette
 import com.robin.claudeusage.widget.BarWidgetReceiver
 import com.robin.claudeusage.widget.UsageWidgetReceiver
 import com.robin.claudeusage.work.Polling
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
-private const val FEEDBACK_URL = "mailto:robin@eam360.com"
+private const val FEEDBACK_EMAIL = "robin@eam360.com"
 private const val DEBUG_UNLOCK_TAPS = 7
 
 @Composable
@@ -911,7 +915,10 @@ private fun ThemeColorPicker(themeName: String, onTheme: (String) -> Unit) {
 @Composable
 private fun AboutCard(debugUnlocked: Boolean, onDebugUnlock: () -> Unit) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var taps by remember { mutableIntStateOf(0) }
+    var checking by remember { mutableStateOf(false) }
+    var updateResult by remember { mutableStateOf<UpdateUi?>(null) }
     val versionName = remember {
         try {
             context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?"
@@ -957,9 +964,54 @@ private fun AboutCard(debugUnlocked: Boolean, onDebugUnlock: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(12.dp))
-            OutlinedButton(onClick = {
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(FEEDBACK_URL)))
-            }) { Text("Share feedback") }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = {
+                    val email = Intent(Intent.ACTION_SENDTO).apply {
+                        data = Uri.parse("mailto:$FEEDBACK_EMAIL")
+                        putExtra(Intent.EXTRA_SUBJECT, "CCooldown feedback (v$versionName)")
+                    }
+                    try {
+                        context.startActivity(
+                            Intent.createChooser(email, "Share feedback")
+                        )
+                    } catch (_: Exception) {
+                        // No email app configured — surface the address instead.
+                        updateResult = UpdateUi.Message(
+                            "Email me at $FEEDBACK_EMAIL"
+                        )
+                    }
+                }) { Text("Share feedback") }
+                OutlinedButton(
+                    enabled = !checking,
+                    onClick = {
+                        checking = true
+                        scope.launch {
+                            updateResult = try {
+                                val info = withContext(Dispatchers.IO) {
+                                    UpdateCheck.fetchLatest(versionName)
+                                }
+                                UpdateUi.Ok(info)
+                            } catch (e: Exception) {
+                                UpdateUi.Message(
+                                    "Couldn't check for updates. Check your connection and try again."
+                                )
+                            }
+                            checking = false
+                        }
+                    },
+                ) {
+                    if (checking) {
+                        CircularProgressIndicator(
+                            Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Checking…")
+                    } else {
+                        Text("Check for updates")
+                    }
+                }
+            }
             Spacer(Modifier.height(12.dp))
             Text(
                 "Not affiliated with or endorsed by Anthropic",
@@ -969,6 +1021,70 @@ private fun AboutCard(debugUnlocked: Boolean, onDebugUnlock: () -> Unit) {
             )
         }
     }
+
+    when (val r = updateResult) {
+        is UpdateUi.Message -> AlertDialog(
+            onDismissRequest = { updateResult = null },
+            confirmButton = {
+                TextButton(onClick = { updateResult = null }) { Text("OK") }
+            },
+            text = { Text(r.text) },
+        )
+        is UpdateUi.Ok -> {
+            val info = r.info
+            AlertDialog(
+                onDismissRequest = { updateResult = null },
+                title = {
+                    Text(
+                        if (info.updateAvailable) "Update available"
+                        else "You're up to date"
+                    )
+                },
+                text = {
+                    Column {
+                        if (info.updateAvailable) {
+                            Text("v${info.latestVersion} is available (you have v${info.currentVersion}).")
+                            if (info.notes.isNotBlank()) {
+                                Spacer(Modifier.height(10.dp))
+                                Text(
+                                    info.notes,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        } else {
+                            Text("You're running the latest version (v${info.currentVersion}).")
+                        }
+                    }
+                },
+                confirmButton = {
+                    if (info.updateAvailable && info.releaseUrl.isNotBlank()) {
+                        TextButton(onClick = {
+                            context.startActivity(
+                                Intent(Intent.ACTION_VIEW, Uri.parse(info.releaseUrl))
+                            )
+                            updateResult = null
+                        }) { Text("Open GitHub") }
+                    } else {
+                        TextButton(onClick = { updateResult = null }) { Text("OK") }
+                    }
+                },
+                dismissButton = {
+                    if (info.updateAvailable) {
+                        TextButton(onClick = { updateResult = null }) { Text("Later") }
+                    }
+                },
+            )
+        }
+        null -> {}
+    }
+}
+
+private sealed interface UpdateUi {
+    /** A successful check with version details. */
+    data class Ok(val info: UpdateInfo) : UpdateUi
+    /** A plain message (error, or fallback when no email app is present). */
+    data class Message(val text: String) : UpdateUi
 }
 
 @Composable

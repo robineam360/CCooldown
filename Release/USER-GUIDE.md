@@ -48,7 +48,7 @@ Shows the 5-hour and 7-day rolling windows for your **Personal** and **Work** pr
 
 ## 1 · Install (Galaxy Fold 7)
 
-1. Get `CCooldown.apk` from this folder onto the phone — the OneDrive app is easiest (browse to *Documents ▸ Apps ▸ ClaudeUsage ▸ Release*), or download it from the GitHub repo.
+1. Download `CCooldown.apk` from the [latest GitHub release](https://github.com/robineam360/CCooldown/releases/latest) onto the phone. (In-app, **Settings → About → Check for updates** links you straight there.)
 2. Tap the APK. When Android warns about unknown apps, **allow installs from the app you opened it with**, then tap **Install**.
    *A Play Protect "scan app?" prompt may appear — scan or install anyway; it's your own app.*
 3. Open **CCooldown** and **allow notifications** when asked (needed for usage alerts).
@@ -260,7 +260,7 @@ See usage from inside any app: pull down the shade — **"Personal 94% / 7d 14%"
 | **24-hour time** | Off = "Thu 11:45 PM" (default) · On = "Thu 23:45" |
 | **Theme color** | 13 choices: Material You (dynamic, first dot), **Claude Orange** (default), Blue, Indigo, Cyan, Teal, Green, Amber, Deep Orange, Red, Pink, Purple, Brown. Applies to the app and the widget bars. |
 | **Widgets** | "Add widget to home screen" shortcuts for both widget types |
-| **About** | Version, credits, Share feedback (WhatsApp). Tap the version 7 times to unlock the debug raw-response viewer until the app is closed. |
+| **About** | Version, credits, **Share feedback** (emails robin@eam360.com), **Check for updates** (asks GitHub for the latest release and links you to it). Tap the version 7 times to unlock the debug raw-response viewer until the app is closed. |
 
 Below the Refresh button the app shows **Last success** and **Last attempt** as "Thu 7:46 PM (12m ago)". A red status line appears only when something's wrong.
 
