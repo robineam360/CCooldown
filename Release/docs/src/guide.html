@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Claude Cooldown — User Guide</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  :root{
+    --cream:#FAF9F5; --card:#F0EEE5; --card2:#EDE9DF; --ink:#201D1A; --muted:#6B6459;
+    --accent:#C96442; --accent-soft:#D97757; --peach:#F5E3DA; --dark:#262624; --dark2:#30302E;
+    --line:#E2DCCF; --green:#5E8D66;
+  }
+  @page { size: A4; margin: 0; }
+  body { font-family:"Avenir Next", Avenir, "Helvetica Neue", sans-serif; color:var(--ink); background:#888; }
+  code, pre { font-family: Menlo, "SF Mono", monospace; }
+
+  .page{
+    width:210mm; height:296.5mm; background:var(--cream);
+    page-break-after:always; overflow:hidden; position:relative;
+    padding:13mm 15mm 16mm; display:flex; flex-direction:column;
+  }
+  .page:last-child{ page-break-after:auto; }
+
+  /* ---------- footer ---------- */
+  .foot{
+    position:absolute; left:15mm; right:15mm; bottom:8mm;
+    display:flex; justify-content:space-between; align-items:center;
+    font-size:7.2pt; letter-spacing:.06em; color:var(--muted);
+    border-top:1px solid var(--line); padding-top:2.4mm;
+  }
+  .foot b{ color:var(--accent); font-weight:600; }
+
+  /* ---------- headers ---------- */
+  .sechead{ display:flex; align-items:center; gap:4.5mm; margin-bottom:5mm; }
+  .secnum{
+    width:11mm; height:11mm; border-radius:3.5mm; background:var(--accent-soft); color:#fff;
+    display:flex; align-items:center; justify-content:center; font-size:15pt; font-weight:700;
+  }
+  .sechead h2{ font-size:19pt; font-weight:700; letter-spacing:-.01em; }
+  .sechead .sub{ font-size:9pt; color:var(--muted); margin-top:.8mm; font-weight:500; }
+
+  h3{ font-size:11pt; font-weight:700; margin:4mm 0 1.6mm; }
+  h3 .tag{ font-size:7pt; background:var(--peach); color:var(--accent); border-radius:2mm; padding:.6mm 2mm; vertical-align:middle; margin-left:1.5mm; letter-spacing:.05em; font-weight:600;}
+  p, li{ font-size:9.2pt; line-height:1.5; }
+  p+p{ margin-top:2mm; }
+  .muted{ color:var(--muted); }
+  b{ font-weight:600; }
+  small{font-size:8pt;}
+
+  ol.steps{ list-style:none; counter-reset:s; }
+  ol.steps li{ counter-increment:s; position:relative; padding-left:8.5mm; margin-bottom:2.6mm; }
+  ol.steps li::before{
+    content:counter(s); position:absolute; left:0; top:.2mm; width:5.6mm; height:5.6mm;
+    background:var(--peach); color:var(--accent); border-radius:50%;
+    display:flex; align-items:center; justify-content:center; font-size:8.5pt; font-weight:700;
+  }
+  ul.dots{ list-style:none; }
+  ul.dots li{ position:relative; padding-left:5mm; margin-bottom:1.8mm; }
+  ul.dots li::before{ content:""; position:absolute; left:.5mm; top:2.1mm; width:2.2mm; height:2.2mm; border-radius:50%; background:var(--accent-soft); }
+
+  pre.cmd{
+    background:var(--dark); color:#EDEAE2; border-radius:2.5mm; padding:2.8mm 3.5mm;
+    font-size:7.6pt; line-height:1.55; margin:1.8mm 0 2.6mm; white-space:pre-wrap; word-break:break-all;
+  }
+  pre.cmd .c{ color:#9A958A; }
+  code.inline{ background:var(--card2); border-radius:1.2mm; padding:.3mm 1.4mm; font-size:8.2pt; }
+
+  .callout{
+    border-left:1.2mm solid var(--accent-soft); background:var(--peach);
+    border-radius:0 2.5mm 2.5mm 0; padding:2.8mm 3.5mm; margin:2.5mm 0; font-size:8.6pt; line-height:1.5;
+  }
+  .callout.green{ border-color:var(--green); background:#E7EFE4; }
+  .callout.dark{ border-color:var(--dark); background:var(--card2); }
+
+  .card{ background:var(--card); border-radius:3.5mm; padding:4mm 4.5mm; }
+
+  /* ---------- screenshots ---------- */
+  .shots{ display:flex; gap:5mm; justify-content:center; align-items:flex-start; }
+  figure{ text-align:center; }
+  figure img{
+    border-radius:3mm; border:1.5px solid #D8D2C4; display:block;
+    box-shadow:0 2mm 5mm rgba(32,29,26,.12);
+  }
+  figcaption{ font-size:7.4pt; color:var(--muted); margin-top:2mm; line-height:1.35; font-weight:500;}
+
+  table{ border-collapse:collapse; width:100%; margin:2mm 0; }
+  th{ text-align:left; font-size:8pt; letter-spacing:.08em; text-transform:uppercase; color:var(--accent); border-bottom:1.5px solid var(--accent-soft); padding:1.6mm 2.5mm; }
+  td{ font-size:8.6pt; line-height:1.45; padding:1.9mm 2.5mm; border-bottom:1px solid var(--line); vertical-align:top; }
+  td:first-child{ font-weight:600; white-space:nowrap; }
+  tr:nth-child(even) td{ background:#F4F1EA; }
+
+  .cols{ display:flex; gap:7mm; }
+  .cols > div{ flex:1; min-width:0; }
+
+  /* ---------- cover ---------- */
+  .cover{ background:var(--dark); color:#EDEAE2; padding:0; }
+  .cover .inner{ padding:18mm 18mm 14mm; display:flex; flex-direction:column; height:100%; }
+  .cover .band{ height:2.5mm; background:linear-gradient(90deg,var(--accent-soft),#E8A87C); border-radius:2mm; width:38mm; margin-bottom:12mm;}
+  .cover h1{ font-size:42pt; font-weight:700; letter-spacing:-.02em; color:#F5F2EA; line-height:1.05; }
+  .cover .tag{ font-size:14.5pt; color:#C9C3B6; margin-top:4mm; font-weight:500; line-height:1.4;}
+  .cover .chips{ display:flex; gap:2.5mm; margin-top:6mm; flex-wrap:wrap;}
+  .chip{ border:1px solid rgba(217,119,87,.65); color:#E8A87C; font-size:8pt; letter-spacing:.12em; padding:1.4mm 3.2mm; border-radius:10mm; font-weight:600;}
+  .cover .shots{ margin-top:11mm; }
+  .cover figure img{ border-color:#4A4845; box-shadow:0 4mm 9mm rgba(0,0,0,.5); }
+  .cover figcaption{ color:#8F8A80; }
+  .cover .bottom{ margin-top:auto; display:flex; justify-content:space-between; align-items:flex-end; border-top:1px solid #3E3C39; padding-top:5mm;}
+  .cover .bottom .l{ font-size:10pt; color:#C9C3B6; font-weight:600; letter-spacing:.14em; }
+  .cover .bottom .r{ font-size:8.4pt; color:#8F8A80; text-align:right; line-height:1.5;}
+  .iconrow{ display:flex; align-items:center; gap:6mm; margin-bottom:9mm; }
+
+  /* ---------- contents ---------- */
+  .toc{ margin-top:2mm; }
+  .toc .row{ display:flex; align-items:baseline; gap:3mm; padding:2.5mm 0; border-bottom:1px dashed var(--line); }
+  .toc .n{ color:var(--accent); font-weight:700; font-size:10pt; width:7mm; }
+  .toc .t{ font-weight:600; font-size:10.5pt; }
+  .toc .d{ color:var(--muted); font-size:8.4pt; margin-left:auto; text-align:right; }
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:3.5mm; }
+  .feat{ background:var(--card); border-radius:3mm; padding:3.2mm 3.8mm; }
+  .feat b{ display:block; font-size:9.3pt; margin-bottom:.8mm; }
+  .feat span{ font-size:8.2pt; color:var(--muted); line-height:1.4; display:block;}
+</style>
+</head>
+<body>
+
+<!-- ================= PAGE 1 · COVER ================= -->
+<div class="page cover">
+  <div class="inner">
+    <div class="band"></div>
+    <div class="iconrow">
+      <svg width="72" height="72" viewBox="-50 -50 100 100">
+        <circle r="48" fill="#D2775A"/>
+        <circle r="31" fill="#F2EFE6"/>
+        <path d="M0 0 L0 -31 A31 31 0 0 0 -27 15.5 Z" fill="#E0A38C"/>
+      </svg>
+      <div>
+        <h1>Claude Cooldown</h1>
+      </div>
+    </div>
+    <div class="tag">Your Claude plan limits on your Android home screen —<br>two accounts, live widgets, alerts before you hit the wall.</div>
+    <div class="chips">
+      <span class="chip">WIDGETS</span><span class="chip">USAGE HISTORY</span><span class="chip">PINNED NOTIFICATION</span><span class="chip">GRANULAR ALERTS</span><span class="chip">PERSONAL + WORK</span><span class="chip">SIGN IN ON THE PHONE</span>
+    </div>
+    <div class="shots">
+      <figure><img src="shots/work-tab-final.png" width="180"><figcaption>Live usage, per profile</figcaption></figure>
+      <figure><img src="shots/widget-large-dark.png" width="180"><figcaption>Home-screen widget</figcaption></figure>
+      <figure><img src="shots/signin-settings.png" width="180"><figcaption>Signs in right on the phone</figcaption></figure>
+    </div>
+    <div class="bottom">
+      <div class="l">USER GUIDE</div>
+      <div class="r">Version 0.13 · July 2026<br>Built by Robin Richard Rajan, with Claude Code<br>Personal sideloaded app — not on any store · not affiliated with Anthropic</div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= PAGE 2 · WHAT IT IS + CONTENTS ================= -->
+<div class="page">
+  <div class="sechead"><div class="secnum">☰</div><div><h2>What it is &amp; what's inside</h2></div></div>
+  <p><b>Claude Cooldown (CCooldown)</b> is a personal home-screen widget app for your Claude plan limits — for <b>two accounts at once</b>. It shows the 5-hour and 7-day rolling windows for your <b>Personal</b> and <b>Work</b> profiles (including per-model caps like Fable), when each resets, how far into the week you are, forecasts <i>when</i> you'll hit a limit at your current pace — and warns you <i>before</i> you hit it, and again the moment a window resets.</p>
+  <div class="grid2" style="margin-top:4mm;">
+    <div class="feat"><b>📊 Both windows, at a glance</b><span>5-hour session bar and the 7-day bars (All models, per-model caps, days elapsed) with exact reset times.</span></div>
+    <div class="feat"><b>📅 Usage history <span style="color:var(--accent);">NEW</span></b><span>A scrollable bar for every 5-hour session, week by week — see how many you ran and which hit 100%.</span></div>
+    <div class="feat"><b>📌 Pinned notification <span style="color:var(--accent);">NEW</span></b><span>An optional always-on, silent notification with a status-bar gauge that fills as you use your 5-hour window.</span></div>
+    <div class="feat"><b>🔔 Granular alerts</b><span>Per-window threshold chips, reset pings set to off / if-busy / always, and a per-profile mute — no more all-or-nothing.</span></div>
+    <div class="feat"><b>📈 Burn-rate forecast</b><span>A sparkline of each window's usage curve plus a plain-words projection: "At this pace: 100% at Thu 2:40 PM."</span></div>
+    <div class="feat"><b>👥 Personal + Work</b><span>Two fully independent profiles — separate sign-ins, tabs, widgets, tiles and alerts — now with editable names.</span></div>
+    <div class="feat"><b>📱 Widgets &amp; tiles</b><span>A full widget, a single-bar mini widget (place as many as you like), and two Quick Settings tiles.</span></div>
+    <div class="feat"><b>🔒 Private, and backed up</b><span>No servers or telemetry; the token is Keystore-encrypted. History &amp; settings now survive a reinstall (token excluded).</span></div>
+  </div>
+  <h3 style="margin-top:5.5mm;">Contents</h3>
+  <div class="toc">
+    <div class="row"><span class="n">★</span><span class="t">New in 0.13</span><span class="d">history, pinned notification, granular alerts · page 3</span></div>
+    <div class="row"><span class="n">1</span><span class="t">Install</span><span class="d">sideload the APK · page 4</span></div>
+    <div class="row"><span class="n">2</span><span class="t">Connect your accounts</span><span class="d">sign in on the phone · page 4–5</span></div>
+    <div class="row"><span class="n">3</span><span class="t">Backup: computer token</span><span class="d">paste / QR from Claude Code · page 6</span></div>
+    <div class="row"><span class="n">4</span><span class="t">Reading the screens</span><span class="d">bars, pacing, forecast · page 7</span></div>
+    <div class="row"><span class="n">5</span><span class="t">Widgets</span><span class="d">full &amp; single-bar · page 8</span></div>
+    <div class="row"><span class="n">6</span><span class="t">Alerts &amp; Quick Settings tiles</span><span class="d">page 9</span></div>
+    <div class="row"><span class="n">7</span><span class="t">Settings reference</span><span class="d">page 10</span></div>
+    <div class="row"><span class="n">8</span><span class="t">Troubleshooting · Privacy</span><span class="d">page 11</span></div>
+    <div class="row"><span class="n">9</span><span class="t">Version history &amp; dev notes</span><span class="d">page 12</span></div>
+  </div>
+  <div class="callout dark" style="margin-top:4mm;"><b>Heads-up (the honest part):</b> reading the usage API with a Pro token outside Claude Code / claude.ai isn't covered by Anthropic's consumer ToS — this is a personal-use tool and that risk was accepted when it was built. It's shared privately, free, for people who already pay for Claude.</div>
+  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v0.13 (July 2026)</span><span>2</span></div>
+</div>
+
+<!-- ================= PAGE 3 · NEW IN 0.13 ================= -->
+<div class="page">
+  <div class="sechead"><div class="secnum">★</div><div><h2>New in 0.13</h2><div class="sub">What changed since v0.12</div></div></div>
+  <div class="shots" style="margin-top:1mm;">
+    <figure><img src="shots/history-5h-illustration.svg" width="140"><figcaption>Usage history — a bar per session<br><i>(illustration of a full week)</i></figcaption></figure>
+    <figure><img src="shots/pinned-expanded.png" width="140"><figcaption>Pinned notification — always-on,<br>expands to 7-day &amp; Refresh</figcaption></figure>
+    <figure><img src="shots/settings-alerts.png" width="140"><figcaption>Granular alert controls —<br>chips &amp; reset-ping modes</figcaption></figure>
+  </div>
+  <div class="cols" style="margin-top:6mm;">
+    <div>
+      <h3 style="margin-top:0;">📅 Usage history</h3>
+      <p style="font-size:8.8pt;">A new screen (calendar icon, top bar) shows a <b>scrollable bar for every 5-hour session</b> — newest first, labelled with day and start time, coloured by peak, and <b style="color:#B0483A;">red when a session hit 100%</b>. Page back through earlier weeks; a summary counts the sessions and how many maxed out. Switch to <b>7-day</b> for one bar per week. Recorded as each window closes (kept a year), so it fills in over time.</p>
+      <h3>📌 Pinned notification</h3>
+      <p style="font-size:8.8pt;">An optional <b>always-on, silent</b> notification with a <b>status-bar gauge that fills</b> as you burn your 5-hour window. Collapsed shows the reset countdown and 7-day %; expanded adds the 7-day and per-model bars with one-tap <b>Refresh</b>. Follows your theme, turning orange then red near the limit. Enable it in <b>Settings → Pinned notification</b> and pick the icon (Ring / Pie / Battery / Number).</p>
+    </div>
+    <div>
+      <h3 style="margin-top:0;">🔔 Granular alerts</h3>
+      <p style="font-size:8.8pt;">No more all-or-nothing: tap <b>threshold chips</b> to choose exactly which levels warn you per window (5-hour 80/90/95, 7-day &amp; per-model 75/90), set reset pings to <b>Off / If busy / Always</b> (<i>If busy</i> only pings when that window had reached 80%), and mute a whole profile with one switch.</p>
+      <h3>✏️ Also new</h3>
+      <ul class="dots" style="font-size:8.6pt;">
+        <li><b>Editable profile names</b> — rename Personal / Work; it flows through tabs, widgets, tiles and notifications.</li>
+        <li><b>Clearer warning colours</b> — a true red at 100%, distinct from the Claude Orange theme.</li>
+        <li><b>Auto Backup</b> — history &amp; settings survive a reinstall or new phone (the encrypted token is excluded).</li>
+      </ul>
+    </div>
+  </div>
+  <div class="callout" style="margin-top:5mm;"><b>One-time reinstall for this update.</b> v0.13 moves to a permanent app-signing key, so updating from v0.12 needs an <b>uninstall + reinstall</b> (Android blocks an in-place update when the signature changes) — you'll sign in once more. Every update <i>after</i> v0.13 installs in place and keeps your data.</div>
+  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v0.13 (July 2026)</span><span>3</span></div>
+</div>
+
+<!-- ================= PAGE 4 · INSTALL + SIGN-IN OVERVIEW ================= -->
+<div class="page">
+  <div class="sechead"><div class="secnum">1</div><div><h2>Install</h2><div class="sub">Android 12+ · sideloaded APK · about a minute</div></div></div>
+  <ol class="steps">
+    <li>Get <code class="inline">CCooldown.apk</code> onto the phone — from the <b>GitHub Releases page</b> of the repo, or straight from the shared <i>Release</i> folder (OneDrive app → <i>Documents ▸ Apps ▸ ClaudeUsage ▸ Release</i>).</li>
+    <li>Tap the APK. When Android warns about unknown apps, <b>allow installs from the app you opened it with</b>, then tap <b>Install</b>. <span class="muted">A Play Protect "scan app?" prompt may appear — scan or install anyway; you know where this one came from.</span></li>
+    <li>Open <b>CCooldown</b> and <b>allow notifications</b> when asked — that's what powers the usage alerts.</li>
+  </ol>
+  <div class="callout green"><b>Updating from v0.13 onward?</b> Just install the new APK over it — token, settings, history and widgets survive. <b>Coming from v0.12?</b> This one update needs an uninstall + reinstall (signing-key change) — see <i>New in 0.13</i>.</div>
+
+  <div class="sechead" style="margin-top:7mm;"><div class="secnum">2</div><div><h2>Connect your accounts</h2><div class="sub">Two independent slots — Personal and Work</div></div></div>
+  <p>The app has two profile slots, <b>Personal</b> and <b>Work</b> — each with its own sign-in, polling, widgets, tiles and alerts. Set up one or both. Since v0.12, each profile signs in <b>right on the phone — no computer needed</b>:</p>
+  <ol class="steps" style="margin-top:3mm;">
+    <li>Open <b>⚙ Settings</b> and tap <b>"Sign in on this phone"</b> on the profile's card.</li>
+    <li>If you have several browsers, a picker appears — <b>choose the browser where that account is already logged in</b> to claude.ai (e.g. Work in Chrome, Personal in Brave). That's how you control <i>which</i> account gets connected.</li>
+    <li>The browser opens Claude's sign-in. Log in if needed, then tap <b>Authorize</b>.</li>
+    <li>The page shows a <b>code</b> — tap <b>Copy</b>, switch back to the app, tap <b>Paste</b>, then <b>Finish sign-in</b>.</li>
+    <li>The card turns <b>Active</b> and usage loads: <i>"signed in — usage fetched, polling started."</i></li>
+  </ol>
+  <p>Works for <b>Personal (Pro / Max)</b> and <b>Work (Team)</b> accounts alike. The sign-in is minted on the phone and is yours alone — no computer shares it, so nothing can rotate it away. It self-renews for about <b>a month</b> (the card shows <i>"Sign-in expires around …"</i>); you'll get 7 / 3 / 1-day warnings before it lapses, and renewing is the same one-minute flow via <b>"Re-sign in"</b>.</p>
+  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v0.13 (July 2026)</span><span>4</span></div>
+</div>
+
+<!-- ================= PAGE 4 · SIGN-IN SCREENS ================= -->
+<div class="page">
+  <div class="sechead"><div class="secnum">2</div><div><h2>Sign-in, step by step</h2><div class="sub">What you'll see on screen</div></div></div>
+  <div class="shots" style="margin-top:2mm;">
+    <figure><img src="shots/signin-settings.png" width="150"><figcaption><b>1 —</b> Each account card has<br>"Sign in on this phone"</figcaption></figure>
+    <figure><img src="shots/signin-consent.png" width="150"><figcaption><b>2 —</b> Authorize in the browser<br>(the standard Claude consent page)</figcaption></figure>
+    <figure><img src="shots/signin-finish.png" width="150"><figcaption><b>3 —</b> Copy the code, Paste,<br>Finish sign-in</figcaption></figure>
+  </div>
+  <div class="shots" style="margin-top:6mm;">
+    <figure><img src="shots/signin-usage.png" width="150"><figcaption><b>4 —</b> Usage loads immediately —<br>done, polling runs on its own</figcaption></figure>
+    <div style="max-width:88mm; align-self:center;">
+      <h3 style="margin-top:0;">Why the browser picker matters</h3>
+      <p style="font-size:8.8pt;">The sign-in lands on whatever claude.ai account that browser is logged into. Keeping <b>Work in Chrome</b> and <b>Personal in another browser</b> gives you a clean, repeatable way to connect each profile to the right account — no logging in and out.</p>
+      <h3>What the card shows afterwards</h3>
+      <ul class="dots" style="font-size:8.8pt;">
+        <li>Status chip — <b style="color:var(--green)">Active</b> / Needs re-auth</li>
+        <li>Plan badge — Pro, Max or Team</li>
+        <li>Last checked, with a one-tap "check now" button</li>
+        <li>Auto-renew countdown &amp; last auto-renewed time</li>
+        <li>"Sign-in expires around …" (≈30-day estimate)</li>
+      </ul>
+    </div>
+  </div>
+  <div class="callout" style="margin-top:5mm;"><b>Token safety:</b> the sign-in is stored <b>encrypted on the phone only</b> (Android Keystore) and is never sent anywhere except Anthropic's own API. No servers, no telemetry, no analytics — nothing else ever sees it.</div>
+  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v0.13 (July 2026)</span><span>5</span></div>
+</div>
+
+<!-- ================= PAGE 5 · BACKUP TOKEN METHOD ================= -->
+<div class="page">
+  <div class="sechead"><div class="secnum">3</div><div><h2>Backup: use a computer token</h2><div class="sub">Only needed if the phone can't run the browser sign-in</div></div></div>
+  <div class="cols">
+    <div style="flex:1.35;">
+      <p>Each card keeps the old method under <b>"Use a computer token instead"</b>: copying the token that the <b>Claude Code CLI</b> holds on the machine where that account is signed in.</p>
+      <h3>Windows</h3>
+      <p style="font-size:8.6pt;">Open <code class="inline">C:\Users\&lt;you&gt;\.claude\.credentials.json</code> in Notepad, select all, copy.</p>
+      <h3>macOS</h3>
+      <p style="font-size:8.6pt;">The CLI keeps it in the Keychain. In Terminal:</p>
+      <pre class="cmd">security find-generic-password -s "Claude Code-credentials" -w</pre>
+      <h3>Fastest transfer: QR code <span class="tag">NO CLIPBOARD</span></h3>
+      <p style="font-size:8.6pt;">If the computer has Node.js, show the token as a QR in the terminal, then tap <b>"Scan QR"</b> on the profile's card:</p>
+      <pre class="cmd"><span class="c"># Mac</span>
+npx -y qrcode-terminal "$(security find-generic-password -s 'Claude Code-credentials' -w)"
+<span class="c"># Windows (PowerShell)</span>
+(Get-Content "$env:USERPROFILE\.claude\.credentials.json" -Raw | ConvertFrom-Json).claudeAiOauth | ConvertTo-Json -Compress | npx -y qrcode-terminal</pre>
+      <p style="font-size:8.6pt;">Or the clipboard way: get the JSON onto the phone's clipboard privately (Link to Windows, Quick Share, a synced note — <b>delete it afterwards</b>) and tap <b>"Paste from clipboard"</b>. Either way the app validates the token with a live call and starts polling.</p>
+      <div class="callout" style="font-size:8.2pt;"><b>If the command finds nothing:</b> the Claude Code CLI isn't installed or signed in on that machine (the desktop app's login is stored separately and can't be used). Install the CLI, run <code class="inline">claude</code>, sign in with the right account, retry.</div>
+      <div class="callout dark" style="font-size:8.2pt;"><b>Why phone sign-in is better:</b> a pasted token is <i>shared</i> with that computer — if its Claude Code re-logs-in, the token rotates and the app asks for a re-paste. "Sign in on this phone" gives the phone its own token, so that can't happen.</div>
+    </div>
+    <div style="flex:1; display:flex; flex-direction:column; gap:5mm; align-items:center;">
+      <figure><img src="shots/personal-expanded.png" width="152"><figcaption>"Use a computer token instead" reveals<br>Paste from clipboard &amp; Scan QR</figcaption></figure>
+      <figure><img src="shots/token-guide-light.png" width="152"><figcaption>The full walkthrough also lives in-app:<br>"How do I get my token?" (macOS / Windows / Linux)</figcaption></figure>
+    </div>
+  </div>
+  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v0.13 (July 2026)</span><span>6</span></div>
+</div>
+
+<!-- ================= PAGE 6 · READING THE SCREENS ================= -->
+<div class="page">
+  <div class="sechead"><div class="secnum">4</div><div><h2>Reading the screens</h2><div class="sub">Two tabs — Personal | Work — swipe or tap to switch</div></div></div>
+  <div class="cols">
+    <div style="flex:1.3;">
+      <h3 style="margin-top:0;">5-hour window card</h3>
+      <p style="font-size:8.8pt;">"X% used", the bar, and a split reset line — <i>left:</i> <code class="inline">Resets in 3h 27m</code> · <i>right:</i> <code class="inline">Resets at Mon 9:40 PM</code>.</p>
+      <h3>7-day window card</h3>
+      <ul class="dots" style="font-size:8.8pt;">
+        <li><b>All models</b> — your total weekly usage</li>
+        <li><b>Fable</b> (and any other per-model cap the API reports)</li>
+        <li><b>Days elapsed</b> — how far through the 7-day window you are (time, not usage). All three share one reset footer — they reset together.</li>
+      </ul>
+      <h3>The pacing trick</h3>
+      <p style="font-size:8.8pt;">Compare <b>Days elapsed</b> against the usage bars. Usage <b>behind</b> Days elapsed → you have headroom. Usage <b>ahead</b> of it → you may run out before the weekly reset.</p>
+      <h3>Burn-rate forecast <span class="tag">v0.9+</span></h3>
+      <p style="font-size:8.8pt;">Once a window has ~20 minutes of history, each card grows a <b>sparkline</b> of that window's usage curve (solid = what happened, dashed = where it's heading) and a plain-words projection — <i style="color:#B0483A;">"At this pace: 100% at Thu 2:40 PM — 1h 20m before the reset"</i> in red when you're on course to hit the wall, or <i>"At this pace: ~62% when the window resets"</i> in grey when you're safe. History comes from the app's own polls and stays on the phone.</p>
+      <h3>Bar colors</h3>
+      <p style="font-size:8.8pt;">Your theme color normally → <b style="color:#C79A22;">yellow</b> above 80% → <b style="color:#C4701D;">orange</b> above 90% → <b style="color:#B0483A;">red</b> at 100%. Only the bars shift; text stays neutral.</p>
+      <p class="muted" style="font-size:8.4pt; margin-top:3mm;">Data refreshes automatically every 15 minutes (configurable, minimum 5). "Last success / Last attempt" under the Refresh button always tell you how fresh the numbers are.</p>
+    </div>
+    <div style="flex:1; display:flex; flex-direction:column; gap:5mm; align-items:center;">
+      <figure><img src="shots/work-tab-yellow.png" width="152"><figcaption>Dark theme, live data — at 91% the 5-hour bar<br>has shifted to its above-80% yellow</figcaption></figure>
+      <figure><img src="shots/work-tab-light.png" width="152"><figcaption>Light theme — same layout, same story</figcaption></figure>
+    </div>
+  </div>
+  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v0.13 (July 2026)</span><span>7</span></div>
+</div>
+
+<!-- ================= PAGE 7 · WIDGETS ================= -->
+<div class="page">
+  <div class="sechead"><div class="secnum">5</div><div><h2>Widgets</h2><div class="sub">The whole point — usage without opening anything</div></div></div>
+  <div class="shots">
+    <figure><img src="shots/widget-large-dark.png" width="150"><figcaption>Full widget, dark — 5-hour, all 7-day bars,<br>days elapsed and reset times</figcaption></figure>
+    <figure><img src="shots/widget-large-light.png" width="150"><figcaption>Full widget, light — follows the system<br>theme and your accent color</figcaption></figure>
+    <figure><img src="shots/widget-setup.png" width="150"><figcaption>Drop a widget → setup screen asks<br>which profile it should show</figcaption></figure>
+  </div>
+  <div class="cols" style="margin-top:5mm;">
+    <div>
+      <h3 style="margin-top:0;">Two widget types</h3>
+      <ul class="dots">
+        <li><b>Full widget (4×3 default)</b> — everything: 5-hour, 7-day bars, days elapsed, reset times.</li>
+        <li><b>Single-bar widget (2×1)</b> — one bar of your choice: 5-hour, 7-day all-models, per-model (Fable), or days elapsed. Place as many as you like, mixing profiles freely.</li>
+      </ul>
+      <h3>Resizing</h3>
+      <p style="font-size:8.8pt;">Long-press → drag the handles: <b>small</b> = 5-hour only · <b>medium</b> = 5-hour + 7-day total · <b>large</b> (default) = everything.</p>
+    </div>
+    <div>
+      <h3 style="margin-top:0;">Widget behavior</h3>
+      <ul class="dots">
+        <li><b>Refresh icon (top-right)</b> = refresh now — rate-limited to once per 3 minutes; the API forbids faster polling.</li>
+        <li><b>Tapping anywhere else</b> opens the app on that profile.</li>
+        <li><b>Footer</b> = weekly reset (left) and "updated Xm ago" (right). If it turns <b style="color:#C4701D;">amber</b>, the last fetch failed or data is &gt;45 min old — you're seeing the last known good numbers, never a blank.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v0.13 (July 2026)</span><span>8</span></div>
+</div>
+
+<!-- ================= PAGE 8 · ALERTS + TILES ================= -->
+<div class="page">
+  <div class="sechead"><div class="secnum">6</div><div><h2>Alerts &amp; Quick Settings tiles</h2><div class="sub">The app taps you on the shoulder — you never babysit it</div></div></div>
+  <div class="cols">
+    <div style="flex:1.5;">
+      <table>
+        <tr><th>Alert</th><th>When it fires</th></tr>
+        <tr><td>5-hour at 80%</td><td>Time to pace yourself</td></tr>
+        <tr><td>5-hour at 95%</td><td>You're about to be cut off</td></tr>
+        <tr><td>7-day at 90%</td><td>Weekly budget nearly spent</td></tr>
+        <tr><td>Per-model cap at 90%</td><td>A model's own weekly cap (e.g. Fable) is nearly spent — these used to fill up silently</td></tr>
+        <tr><td>Window reset</td><td>The 5-hour or 7-day window just reset — Claude is fresh again (scheduled at the known reset moment, lands within ~2 min)</td></tr>
+        <tr><td>Re-auth needed</td><td>The profile's token stopped working — or renewals have failed 6+ hours straight</td></tr>
+        <tr><td>Sign-in expiring</td><td>7 / 3 / 1 days before the known expiry — renew at your convenience</td></tr>
+        <tr><td>Usage data stale</td><td>Polls failing for 6+ hours — the widget numbers are old and nothing else would tell you</td></tr>
+      </table>
+      <p style="font-size:8.6pt; margin-top:2mm;">Every alert is prefixed with its profile ("Personal: …" / "Work: …"), fires <b>once per window/episode</b> and re-arms afterwards. Tapping one opens the app <b>on that profile's tab</b>; re-auth and stale alerts dismiss themselves once fixed. <b>Granular now:</b> threshold chips per window, reset pings set Off / If busy / Always, and a per-profile mute (Settings → Notifications).</p>
+      <h3>Quick Settings tiles — one per profile</h3>
+      <p style="font-size:8.6pt;">Usage from inside any app: pull down the shade — <b>"Personal 94% / 7d 14%"</b> and <b>"Work 37% / 7d 62%"</b> are separate tiles. Add them once: shade fully down → ✏ edit → drag <b>Claude Personal</b> / <b>Claude Work</b> in. Tapping a tile opens that profile's tab; opening the shade nudges a background refresh (skipped if data is under 3 minutes old, so shade-flicking doesn't spam the API).</p>
+    </div>
+    <div style="flex:1; display:flex; flex-direction:column; gap:5mm; align-items:center;">
+      <figure><img src="shots/notifications-crop.png" width="172"><figcaption>Threshold + reset notifications,<br>prefixed per profile</figcaption></figure>
+      <figure><img src="shots/quick-settings-tiles.png" width="150"><figcaption>Two tiles in the shade —<br>Personal and Work</figcaption></figure>
+    </div>
+  </div>
+  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v0.13 (July 2026)</span><span>9</span></div>
+</div>
+
+<!-- ================= PAGE 9 · SETTINGS ================= -->
+<div class="page">
+  <div class="sechead"><div class="secnum">7</div><div><h2>Settings reference</h2><div class="sub">Everything lives on one screen</div></div></div>
+  <div class="cols">
+    <div style="flex:1.55;">
+      <table>
+        <tr><th>Setting</th><th>What it does</th></tr>
+        <tr><td>Account cards</td><td>"Sign in on this phone" (with browser picker) — or the paste / QR backup. Once signed in: status chip, plan badge (Pro / Max / Team), last-checked with check-now, auto-renew countdown, "Sign-in expires around …", added date, token tail, backoff status, Re-sign in / Clear.</td></tr>
+        <tr><td>Profile names</td><td>Rename Personal / Work to anything — flows through tabs, widgets, tiles and notifications</td></tr>
+        <tr><td>Check usage every</td><td>5 / 15 / 30 / 60 min presets (default 15) — saves on tap</td></tr>
+        <tr><td>Usage warnings</td><td>Per-window threshold chips (5-hour 80/90/95, 7-day &amp; per-model 75/90)</td></tr>
+        <tr><td>Reset pings</td><td>Per window: Off / If busy (only if it reached 80%) / Always</td></tr>
+        <tr><td>Profile / sign-in / stale alerts</td><td>Per-profile mute, plus separate sign-in and stale-data toggles</td></tr>
+        <tr><td>Pinned notification</td><td>Always-on usage notification: on/off, which profile, status-bar icon style</td></tr>
+        <tr><td>System notif. settings</td><td>Opens Android's per-channel controls</td></tr>
+        <tr><td>24-hour time</td><td>Off = "Thu 11:45 PM" (default) · On = "Thu 23:45"</td></tr>
+        <tr><td>Theme color</td><td>13 choices: Material You (dynamic), <b>Claude Orange</b> (default), Blue, Indigo, Cyan, Teal, Green, Amber, Deep Orange, Red, Pink, Purple, Brown — applies to app and widget bars</td></tr>
+        <tr><td>Widgets</td><td>"Add widget to home screen" shortcuts for both types</td></tr>
+        <tr><td>About</td><td>Version, credits, Share feedback (WhatsApp). Tap the version 7× to unlock the debug raw-response viewer.</td></tr>
+      </table>
+      <p class="muted" style="font-size:8.4pt; margin-top:2mm;">Below the Refresh button the app shows <b>Last success</b> and <b>Last attempt</b> as "Mon 6:14 PM (2m ago)". A red status line appears only when something's wrong.</p>
+    </div>
+    <div style="flex:1; display:flex; flex-direction:column; gap:5mm; align-items:center;">
+      <figure><img src="shots/settings-light-1.png" width="150"><figcaption>Accounts &amp; polling — light theme</figcaption></figure>
+      <figure><img src="shots/settings-bottom-light.png" width="150"><figcaption>Theme colors, widget shortcuts, About</figcaption></figure>
+    </div>
+  </div>
+  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v0.13 (July 2026)</span><span>10</span></div>
+</div>
+
+<!-- ================= PAGE 10 · TROUBLESHOOTING + PRIVACY ================= -->
+<div class="page">
+  <div class="sechead"><div class="secnum">8</div><div><h2>Troubleshooting &amp; privacy</h2></div></div>
+  <table>
+    <tr><th>Symptom</th><th>Meaning / fix</th></tr>
+    <tr><td>Widget footer is amber</td><td>Data is stale (failed fetch or &gt;45 min old). Usually temporary; self-heals on the next poll.</td></tr>
+    <tr><td>"Re-auth needed"</td><td>The token and its refresh both failed. Tap <b>"Re-sign in"</b> on that card — or re-paste from a computer if you use the backup method.</td></tr>
+    <tr><td>"Rate limited (429)"</td><td>The API asked us to back off; automatic retries with increasing delays (5 min → 1 h max).</td></tr>
+    <tr><td>"Token refresh failed (HTTP 429)"</td><td>Usually a <i>dead</i> refresh token, not real rate-limiting — the source machine's Claude Code rotated it. Fix: <b>"Sign in on this phone"</b>, which gives the phone its own sign-in so this can't recur. <span class="muted">(Through v0.11 the app itself could trigger this on every renewal — fixed in v0.12.)</span></td></tr>
+    <tr><td>Widget says "No data yet"</td><td>No successful fetch so far — tap the widget refresh icon, or open the app and check the status line.</td></tr>
+    <tr><td>Alerts never appear</td><td>Check notification permission and the <b>Usage alerts</b> toggle.</td></tr>
+    <tr><td>Anything else</td><td>Settings → <b>Show last raw response</b> (7 taps on the version) + the red status line tell the whole story.</td></tr>
+  </table>
+  <h3 style="margin-top:5mm;">Privacy &amp; good-to-know</h3>
+  <ul class="dots">
+    <li><b>No servers, no telemetry, no analytics.</b> The app talks only to <code class="inline">api.anthropic.com</code> (usage), <code class="inline">platform.claude.com</code> (sign-in code exchange + token refresh) and <code class="inline">claude.com</code> (the sign-in page in your browser) — the same endpoints Claude Code uses.</li>
+    <li>The token lives in <b>Android-Keystore-encrypted storage</b>; cached usage numbers contain nothing sensitive.</li>
+    <li>Polling is deliberately gentle — 15-minute default, 3-minute manual floor, exponential backoff on 429s.</li>
+    <li>Reading the usage API with a Pro token outside Claude Code / claude.ai is not covered by Anthropic's consumer ToS; personal-use risk was accepted when this was built.</li>
+    <li>Not affiliated with or endorsed by Anthropic. Sideload-only, free, no accounts, no strings.</li>
+  </ul>
+  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v0.13 (July 2026)</span><span>11</span></div>
+</div>
+
+<!-- ================= PAGE 11 · HISTORY + CREDITS ================= -->
+<div class="page">
+  <div class="sechead"><div class="secnum">9</div><div><h2>Version history &amp; dev notes</h2></div></div>
+  <table>
+    <tr><th style="width:14mm;">Ver.</th><th>Highlights</th></tr>
+    <tr><td>0.13</td><td><b>History, pinned notification &amp; finer alerts.</b> New Usage history screen (per-session and per-week bars, backed by a year-long session log); optional always-on pinned notification with a status-bar usage gauge; granular alerts (per-window threshold chips, off/if-busy/always resets, per-profile mute); editable profile names; true warning-red at 100%; Android Auto Backup for history + settings (token excluded). Now signed with a permanent key, so updates from here on retain data — the one-time cost was this upgrade needing a reinstall.</td></tr>
+    <tr><td>0.12</td><td><b>Native sign-in release.</b> "Sign in on this phone" — the same PKCE flow Claude Code uses, no computer at all, browser picker included; works for Pro/Max and Team. Also fixed the chronic HTTP 429 on token exchange/renewal (Anthropic's token endpoint rejects requests identifying as <code class="inline">claude-code</code> — the app no longer sends that identity on token calls). Computer-token paste/QR stays as backup.</td></tr>
+    <tr><td>0.10</td><td>QR fixes &amp; diagnostics — Windows QR command extracts just the sign-in object; refresh failures now say <i>why</i> in the status line.</td></tr>
+    <tr><td>0.9</td><td>Forecast &amp; QR release — on-phone poll history (8 days) with sparkline + burn-rate forecast per window; per-model 90% alerts; "Scan QR" token import; notifications open the right profile tab.</td></tr>
+    <tr><td>0.8</td><td>Token health — plan badge, auto-renew countdown, sign-in expiry warnings (7/3/1 days), stale-data alert, self-dismissing notifications.</td></tr>
+    <tr><td>0.7</td><td>Renamed to <b>Claude Cooldown</b>, new launcher icon, grouped Settings, in-app token guide, poll presets, About &amp; feedback.</td></tr>
+    <tr><td>0.6</td><td>Two profiles (Personal + Work), widget setup screen, single-bar widget, reset notifications at the exact moment, two Quick Settings tiles.</td></tr>
+    <tr><td>0.5</td><td>Redesign — grouped 7-day card with days-elapsed pacing bar, Claude-style bars, split reset rows, 13 theme colors, widget polish.</td></tr>
+    <tr><td>0.4</td><td>Usage alerts, Quick Settings tile, auto-refresh on open.</td></tr>
+    <tr><td>0.1–0.3</td><td>First working app + widget; large widget layout; Material You polish.</td></tr>
+  </table>
+  <h3 style="margin-top:5mm;">For future rebuilds</h3>
+  <ul class="dots">
+    <li>Single-module Android project — Kotlin · Jetpack Compose · Glance 1.1.1 · WorkManager · OkHttp · min SDK 31, target 36.</li>
+    <li>Build (signed release): <code class="inline">JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew :app:assembleRelease</code> → APK in <code class="inline">app/build/outputs/apk/release/</code>. Signing reads a gitignored <code class="inline">keystore.properties</code> + <code class="inline">.jks</code> at the repo root — back them up; losing them means no more updates.</li>
+    <li>Glance gotcha: RemoteViews containers max out at 10 children — keep widget blocks in nested Columns.</li>
+    <li>If Anthropic changes the undocumented response schema, the parser ignores unknown fields; if bars go blank, check the raw JSON in the debug view first.</li>
+  </ul>
+  <div class="card" style="margin-top:auto; margin-bottom:8mm; display:flex; align-items:center; gap:6mm;">
+    <svg width="52" height="52" viewBox="-50 -50 100 100" style="flex-shrink:0;">
+      <circle r="48" fill="#D2775A"/><circle r="31" fill="#F2EFE6"/><path d="M0 0 L0 -31 A31 31 0 0 0 -27 15.5 Z" fill="#E0A38C"/>
+    </svg>
+    <div>
+      <p style="font-weight:700; font-size:10.5pt;">Built by Robin Richard Rajan — written end-to-end with Claude Code.</p>
+      <p class="muted" style="font-size:8.6pt; margin-top:1mm;">Every line of Kotlin, every screenshot, this guide and the release pipeline were produced in Claude Code sessions — including reverse-engineering the sign-in flow the app now uses. If you'd like the APK or want to build something like this, just ask.</p>
+    </div>
+  </div>
+  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v0.13 (July 2026)</span><span>12</span></div>
+</div>
+
+</body>
+</html>
