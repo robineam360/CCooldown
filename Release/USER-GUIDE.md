@@ -36,13 +36,13 @@ Shows the 5-hour and 7-day rolling windows for your **Personal** and **Work** pr
 |:---:|:---:|:---:|
 | ![Widget setup screen](screenshots/widget-setup.png) | ![Threshold and reset notifications](screenshots/notifications.png) | ![Personal and Work tiles](screenshots/quick-settings-tiles.png) |
 
-| Settings (dark) | Settings (light) | Widget (light) |
+| Settings — accounts | Settings — About (v1.0) | Themeable (13 colors) |
 |:---:|:---:|:---:|
-| ![Settings, dark](screenshots/settings-dark.png) | ![Settings, light](screenshots/settings-light.png) | ![Widget, light mode](screenshots/widget-large-light.png) |
+| ![Accounts and profile names](screenshots/settings-top-dark.png) | ![About, version 1.0](screenshots/settings-bottom-dark.png) | ![Blue-theme widgets](screenshots/widget-theme-blue.png) |
 
-| In-app token guide | About & credits |
+| Granular alerts | In-app token guide |
 |:---:|:---:|
-| ![Get your token screen](screenshots/token-guide.png) | ![About section](screenshots/settings-about.png) |
+| ![Alert controls](screenshots/settings-alerts.png) | ![Get your token screen](screenshots/token-guide.png) |
 
 ---
 
