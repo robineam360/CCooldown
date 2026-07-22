@@ -71,6 +71,7 @@
   }
   .callout.green{ border-color:var(--green); background:#E7EFE4; }
   .callout.dark{ border-color:var(--dark); background:var(--card2); }
+  .callout.warn{ border-color:#B0483A; background:#F7E7E2; }
 
   .card{ background:var(--card); border-radius:3.5mm; padding:4mm 4.5mm; }
 
@@ -145,9 +146,10 @@
       <figure><img src="shots/widget-large-dark.png" width="180"><figcaption>Home-screen widget</figcaption></figure>
       <figure><img src="shots/signin-settings.png" width="180"><figcaption>Signs in right on the phone</figcaption></figure>
     </div>
+    <div class="callout warn" style="margin-top:7mm; font-size:8.6pt; color:var(--ink);"><b>Before you install:</b> this is an <b>unofficial</b> personal tool — to read your usage it signs in as the <b>Claude Code CLI</b> against an <b>undocumented</b> Anthropic endpoint, so there's a small risk Anthropic could <b>revoke the token or flag the account</b>. It's read-only and signs in once; full detail on <b>page 4</b>. Use it at your own discretion.</div>
     <div class="bottom">
       <div class="l">USER GUIDE</div>
-      <div class="r">Version 0.13 · July 2026<br>Built by Robin Richard Rajan, with Claude Code<br>Personal sideloaded app — not on any store · not affiliated with Anthropic</div>
+      <div class="r">Version 1.0 · July 2026<br>Built by Robin Richard Rajan — with Claude Code (Fable 5 + Opus 4.8)<br>Personal sideloaded app — not on any store · not affiliated with Anthropic</div>
     </div>
   </div>
 </div>
@@ -168,7 +170,7 @@
   </div>
   <h3 style="margin-top:5.5mm;">Contents</h3>
   <div class="toc">
-    <div class="row"><span class="n">★</span><span class="t">New in 0.13</span><span class="d">history, pinned notification, granular alerts · page 3</span></div>
+    <div class="row"><span class="n">★</span><span class="t">Highlights</span><span class="d">history, pinned notification, granular alerts · page 3</span></div>
     <div class="row"><span class="n">1</span><span class="t">Install</span><span class="d">sideload the APK · page 4</span></div>
     <div class="row"><span class="n">2</span><span class="t">Connect your accounts</span><span class="d">sign in on the phone · page 4–5</span></div>
     <div class="row"><span class="n">3</span><span class="t">Backup: computer token</span><span class="d">paste / QR from Claude Code · page 6</span></div>
@@ -179,15 +181,14 @@
     <div class="row"><span class="n">8</span><span class="t">Troubleshooting · Privacy</span><span class="d">page 11</span></div>
     <div class="row"><span class="n">9</span><span class="t">Version history &amp; dev notes</span><span class="d">page 12</span></div>
   </div>
-  <div class="callout dark" style="margin-top:4mm;"><b>Heads-up (the honest part):</b> reading the usage API with a Pro token outside Claude Code / claude.ai isn't covered by Anthropic's consumer ToS — this is a personal-use tool and that risk was accepted when it was built. It's shared privately, free, for people who already pay for Claude.</div>
-  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v0.13 (July 2026)</span><span>2</span></div>
+  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v1.0 (July 2026)</span><span>2</span></div>
 </div>
 
 <!-- ================= PAGE 3 · NEW IN 0.13 ================= -->
 <div class="page">
-  <div class="sechead"><div class="secnum">★</div><div><h2>New in 0.13</h2><div class="sub">What changed since v0.12</div></div></div>
+  <div class="sechead"><div class="secnum">★</div><div><h2>Highlights</h2><div class="sub">the features that define v1.0</div></div></div>
   <div class="shots" style="margin-top:1mm;">
-    <figure><img src="shots/history-5h-illustration.svg" width="140"><figcaption>Usage history — a bar per session<br><i>(illustration of a full week)</i></figcaption></figure>
+    <figure><img src="shots/history-5h-dark.png" width="140"><figcaption>Usage history — a bar per session<br>(red = a session that hit 100%)</figcaption></figure>
     <figure><img src="shots/pinned-expanded.png" width="140"><figcaption>Pinned notification — always-on,<br>expands to 7-day &amp; Refresh</figcaption></figure>
     <figure><img src="shots/settings-alerts.png" width="140"><figcaption>Granular alert controls —<br>chips &amp; reset-ping modes</figcaption></figure>
   </div>
@@ -206,22 +207,24 @@
         <li><b>Editable profile names</b> — rename Personal / Work; it flows through tabs, widgets, tiles and notifications.</li>
         <li><b>Clearer warning colours</b> — a true red at 100%, distinct from the Claude Orange theme.</li>
         <li><b>Auto Backup</b> — history &amp; settings survive a reinstall or new phone (the encrypted token is excluded).</li>
+        <li><b>v0.14</b> — feedback now opens an email; new <b>Check for updates</b> in About; the APK ships from GitHub Releases.</li>
       </ul>
     </div>
   </div>
   <div class="callout" style="margin-top:5mm;"><b>One-time reinstall for this update.</b> v0.13 moves to a permanent app-signing key, so updating from v0.12 needs an <b>uninstall + reinstall</b> (Android blocks an in-place update when the signature changes) — you'll sign in once more. Every update <i>after</i> v0.13 installs in place and keeps your data.</div>
-  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v0.13 (July 2026)</span><span>3</span></div>
+  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v1.0 (July 2026)</span><span>3</span></div>
 </div>
 
 <!-- ================= PAGE 4 · INSTALL + SIGN-IN OVERVIEW ================= -->
 <div class="page">
   <div class="sechead"><div class="secnum">1</div><div><h2>Install</h2><div class="sub">Android 12+ · sideloaded APK · about a minute</div></div></div>
+  <div class="callout warn"><b>Before you install — the honest part.</b> To read your usage, CCooldown signs in with the <b>same OAuth client as the Claude Code CLI</b> (identical client ID and scopes) and identifies itself as <code class="inline">claude-code</code> when it calls an <b>undocumented</b> endpoint — deliberately, since otherwise it's routed to an aggressively rate-limited bucket. In effect it <b>impersonates the official CLI</b>. This isn't sanctioned by Anthropic, and their consumer terms restrict using consumer tokens in third-party tools, so installing means accepting a small but real risk that Anthropic could <b>revoke the token or flag the account</b>. What limits it: the app is <b>read-only</b> (never sends prompts or spends quota), signs in <b>once per install</b> (no repeated logins, no CLI subprocess), and is shared privately — never on a store. Use it at your own discretion.</div>
   <ol class="steps">
-    <li>Get <code class="inline">CCooldown.apk</code> onto the phone — from the <b>GitHub Releases page</b> of the repo, or straight from the shared <i>Release</i> folder (OneDrive app → <i>Documents ▸ Apps ▸ ClaudeUsage ▸ Release</i>).</li>
+    <li>Download <code class="inline">CCooldown.apk</code> onto the phone from the <b>latest GitHub release</b> (<i>github.com/robineam360/CCooldown/releases/latest</i>). In-app, <b>Settings → About → Check for updates</b> links you straight to it.</li>
     <li>Tap the APK. When Android warns about unknown apps, <b>allow installs from the app you opened it with</b>, then tap <b>Install</b>. <span class="muted">A Play Protect "scan app?" prompt may appear — scan or install anyway; you know where this one came from.</span></li>
     <li>Open <b>CCooldown</b> and <b>allow notifications</b> when asked — that's what powers the usage alerts.</li>
   </ol>
-  <div class="callout green"><b>Updating from v0.13 onward?</b> Just install the new APK over it — token, settings, history and widgets survive. <b>Coming from v0.12?</b> This one update needs an uninstall + reinstall (signing-key change) — see <i>New in 0.13</i>.</div>
+  <div class="callout green"><b>Updating an existing install?</b> From v0.13 onward, just install the new APK over it — token, settings, history and widgets survive. (Coming from v0.12 or earlier needs a one-time uninstall + reinstall — the signing key is permanent from v0.13 on.)</div>
 
   <div class="sechead" style="margin-top:7mm;"><div class="secnum">2</div><div><h2>Connect your accounts</h2><div class="sub">Two independent slots — Personal and Work</div></div></div>
   <p>The app has two profile slots, <b>Personal</b> and <b>Work</b> — each with its own sign-in, polling, widgets, tiles and alerts. Set up one or both. Since v0.12, each profile signs in <b>right on the phone — no computer needed</b>:</p>
@@ -233,20 +236,19 @@
     <li>The card turns <b>Active</b> and usage loads: <i>"signed in — usage fetched, polling started."</i></li>
   </ol>
   <p>Works for <b>Personal (Pro / Max)</b> and <b>Work (Team)</b> accounts alike. The sign-in is minted on the phone and is yours alone — no computer shares it, so nothing can rotate it away. It self-renews for about <b>a month</b> (the card shows <i>"Sign-in expires around …"</i>); you'll get 7 / 3 / 1-day warnings before it lapses, and renewing is the same one-minute flow via <b>"Re-sign in"</b>.</p>
-  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v0.13 (July 2026)</span><span>4</span></div>
+  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v1.0 (July 2026)</span><span>4</span></div>
 </div>
 
 <!-- ================= PAGE 4 · SIGN-IN SCREENS ================= -->
 <div class="page">
   <div class="sechead"><div class="secnum">2</div><div><h2>Sign-in, step by step</h2><div class="sub">What you'll see on screen</div></div></div>
   <div class="shots" style="margin-top:2mm;">
-    <figure><img src="shots/signin-settings.png" width="150"><figcaption><b>1 —</b> Each account card has<br>"Sign in on this phone"</figcaption></figure>
+    <figure><img src="shots/signin-settings.png" width="150"><figcaption><b>1 —</b> Tap "Sign in on this phone",<br>then pick your browser</figcaption></figure>
     <figure><img src="shots/signin-consent.png" width="150"><figcaption><b>2 —</b> Authorize in the browser<br>(the standard Claude consent page)</figcaption></figure>
-    <figure><img src="shots/signin-finish.png" width="150"><figcaption><b>3 —</b> Copy the code, Paste,<br>Finish sign-in</figcaption></figure>
+    <figure><img src="shots/signin-usage.png" width="150"><figcaption><b>3 —</b> Paste the code, Finish —<br>signed in, usage loads, polling runs</figcaption></figure>
   </div>
   <div class="shots" style="margin-top:6mm;">
-    <figure><img src="shots/signin-usage.png" width="150"><figcaption><b>4 —</b> Usage loads immediately —<br>done, polling runs on its own</figcaption></figure>
-    <div style="max-width:88mm; align-self:center;">
+    <div style="max-width:120mm; align-self:center;">
       <h3 style="margin-top:0;">Why the browser picker matters</h3>
       <p style="font-size:8.8pt;">The sign-in lands on whatever claude.ai account that browser is logged into. Keeping <b>Work in Chrome</b> and <b>Personal in another browser</b> gives you a clean, repeatable way to connect each profile to the right account — no logging in and out.</p>
       <h3>What the card shows afterwards</h3>
@@ -260,7 +262,7 @@
     </div>
   </div>
   <div class="callout" style="margin-top:5mm;"><b>Token safety:</b> the sign-in is stored <b>encrypted on the phone only</b> (Android Keystore) and is never sent anywhere except Anthropic's own API. No servers, no telemetry, no analytics — nothing else ever sees it.</div>
-  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v0.13 (July 2026)</span><span>5</span></div>
+  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v1.0 (July 2026)</span><span>5</span></div>
 </div>
 
 <!-- ================= PAGE 5 · BACKUP TOKEN METHOD ================= -->
@@ -289,7 +291,7 @@ npx -y qrcode-terminal "$(security find-generic-password -s 'Claude Code-credent
       <figure><img src="shots/token-guide-light.png" width="152"><figcaption>The full walkthrough also lives in-app:<br>"How do I get my token?" (macOS / Windows / Linux)</figcaption></figure>
     </div>
   </div>
-  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v0.13 (July 2026)</span><span>6</span></div>
+  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v1.0 (July 2026)</span><span>6</span></div>
 </div>
 
 <!-- ================= PAGE 6 · READING THE SCREENS ================= -->
@@ -314,20 +316,20 @@ npx -y qrcode-terminal "$(security find-generic-password -s 'Claude Code-credent
       <p class="muted" style="font-size:8.4pt; margin-top:3mm;">Data refreshes automatically every 15 minutes (configurable, minimum 5). "Last success / Last attempt" under the Refresh button always tell you how fresh the numbers are.</p>
     </div>
     <div style="flex:1; display:flex; flex-direction:column; gap:5mm; align-items:center;">
-      <figure><img src="shots/work-tab-yellow.png" width="152"><figcaption>Dark theme, live data — at 91% the 5-hour bar<br>has shifted to its above-80% yellow</figcaption></figure>
-      <figure><img src="shots/work-tab-light.png" width="152"><figcaption>Light theme — same layout, same story</figcaption></figure>
+      <figure><img src="shots/work-tab-yellow.png" width="152"><figcaption>The Work tab, live — 5-hour, 7-day (All models)<br>and the Days-elapsed pacing bar</figcaption></figure>
+      <figure><img src="shots/work-tab-final.png" width="152"><figcaption>The Personal tab — same layout,<br>your other account</figcaption></figure>
     </div>
   </div>
-  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v0.13 (July 2026)</span><span>7</span></div>
+  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v1.0 (July 2026)</span><span>7</span></div>
 </div>
 
 <!-- ================= PAGE 7 · WIDGETS ================= -->
 <div class="page">
   <div class="sechead"><div class="secnum">5</div><div><h2>Widgets</h2><div class="sub">The whole point — usage without opening anything</div></div></div>
   <div class="shots">
-    <figure><img src="shots/widget-large-dark.png" width="150"><figcaption>Full widget, dark — 5-hour, all 7-day bars,<br>days elapsed and reset times</figcaption></figure>
-    <figure><img src="shots/widget-large-light.png" width="150"><figcaption>Full widget, light — follows the system<br>theme and your accent color</figcaption></figure>
-    <figure><img src="shots/widget-setup.png" width="150"><figcaption>Drop a widget → setup screen asks<br>which profile it should show</figcaption></figure>
+    <figure><img src="shots/widget-large-dark.png" width="150"><figcaption>On the home screen — the full 4×3 widget<br>plus two single-bar widgets</figcaption></figure>
+    <figure><img src="shots/widget-theme-blue.png" width="150"><figcaption>Themeable — the same widgets in a<br>blue accent (13 colors to pick)</figcaption></figure>
+    <figure><img src="shots/widget-setup.png" width="150"><figcaption>Setup screen — pick the profile<br>and which window it shows</figcaption></figure>
   </div>
   <div class="cols" style="margin-top:5mm;">
     <div>
@@ -348,7 +350,7 @@ npx -y qrcode-terminal "$(security find-generic-password -s 'Claude Code-credent
       </ul>
     </div>
   </div>
-  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v0.13 (July 2026)</span><span>8</span></div>
+  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v1.0 (July 2026)</span><span>8</span></div>
 </div>
 
 <!-- ================= PAGE 8 · ALERTS + TILES ================= -->
@@ -376,7 +378,7 @@ npx -y qrcode-terminal "$(security find-generic-password -s 'Claude Code-credent
       <figure><img src="shots/quick-settings-tiles.png" width="150"><figcaption>Two tiles in the shade —<br>Personal and Work</figcaption></figure>
     </div>
   </div>
-  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v0.13 (July 2026)</span><span>9</span></div>
+  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v1.0 (July 2026)</span><span>9</span></div>
 </div>
 
 <!-- ================= PAGE 9 · SETTINGS ================= -->
@@ -397,16 +399,16 @@ npx -y qrcode-terminal "$(security find-generic-password -s 'Claude Code-credent
         <tr><td>24-hour time</td><td>Off = "Thu 11:45 PM" (default) · On = "Thu 23:45"</td></tr>
         <tr><td>Theme color</td><td>13 choices: Material You (dynamic), <b>Claude Orange</b> (default), Blue, Indigo, Cyan, Teal, Green, Amber, Deep Orange, Red, Pink, Purple, Brown — applies to app and widget bars</td></tr>
         <tr><td>Widgets</td><td>"Add widget to home screen" shortcuts for both types</td></tr>
-        <tr><td>About</td><td>Version, credits, Share feedback (WhatsApp). Tap the version 7× to unlock the debug raw-response viewer.</td></tr>
+        <tr><td>About</td><td>Version, credits, <b>Share feedback</b> (emails robin@eam360.com), <b>Check for updates</b> (asks GitHub for the latest release and links you to it). Tap the version 7× to unlock the debug raw-response viewer.</td></tr>
       </table>
       <p class="muted" style="font-size:8.4pt; margin-top:2mm;">Below the Refresh button the app shows <b>Last success</b> and <b>Last attempt</b> as "Mon 6:14 PM (2m ago)". A red status line appears only when something's wrong.</p>
     </div>
     <div style="flex:1; display:flex; flex-direction:column; gap:5mm; align-items:center;">
-      <figure><img src="shots/settings-light-1.png" width="150"><figcaption>Accounts &amp; polling — light theme</figcaption></figure>
-      <figure><img src="shots/settings-bottom-light.png" width="150"><figcaption>Theme colors, widget shortcuts, About</figcaption></figure>
+      <figure><img src="shots/settings-top-dark.png" width="150"><figcaption>Accounts &amp; profile names</figcaption></figure>
+      <figure><img src="shots/settings-bottom-dark.png" width="150"><figcaption>Theme colors, widget shortcuts, About</figcaption></figure>
     </div>
   </div>
-  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v0.13 (July 2026)</span><span>10</span></div>
+  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v1.0 (July 2026)</span><span>10</span></div>
 </div>
 
 <!-- ================= PAGE 10 · TROUBLESHOOTING + PRIVACY ================= -->
@@ -430,7 +432,7 @@ npx -y qrcode-terminal "$(security find-generic-password -s 'Claude Code-credent
     <li>Reading the usage API with a Pro token outside Claude Code / claude.ai is not covered by Anthropic's consumer ToS; personal-use risk was accepted when this was built.</li>
     <li>Not affiliated with or endorsed by Anthropic. Sideload-only, free, no accounts, no strings.</li>
   </ul>
-  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v0.13 (July 2026)</span><span>11</span></div>
+  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v1.0 (July 2026)</span><span>11</span></div>
 </div>
 
 <!-- ================= PAGE 11 · HISTORY + CREDITS ================= -->
@@ -438,34 +440,45 @@ npx -y qrcode-terminal "$(security find-generic-password -s 'Claude Code-credent
   <div class="sechead"><div class="secnum">9</div><div><h2>Version history &amp; dev notes</h2></div></div>
   <table>
     <tr><th style="width:14mm;">Ver.</th><th>Highlights</th></tr>
-    <tr><td>0.13</td><td><b>History, pinned notification &amp; finer alerts.</b> New Usage history screen (per-session and per-week bars, backed by a year-long session log); optional always-on pinned notification with a status-bar usage gauge; granular alerts (per-window threshold chips, off/if-busy/always resets, per-profile mute); editable profile names; true warning-red at 100%; Android Auto Backup for history + settings (token excluded). Now signed with a permanent key, so updates from here on retain data — the one-time cost was this upgrade needing a reinstall.</td></tr>
-    <tr><td>0.12</td><td><b>Native sign-in release.</b> "Sign in on this phone" — the same PKCE flow Claude Code uses, no computer at all, browser picker included; works for Pro/Max and Team. Also fixed the chronic HTTP 429 on token exchange/renewal (Anthropic's token endpoint rejects requests identifying as <code class="inline">claude-code</code> — the app no longer sends that identity on token calls). Computer-token paste/QR stays as backup.</td></tr>
+    <tr><td><b>1.0</b></td><td><b>First official release.</b> The v0.1–v0.14 beta, now official: live 5-hour &amp; 7-day windows for Personal + Work, usage history, pinned notification, granular alerts, burn-rate forecast, home-screen widgets &amp; Quick Settings tiles, on-phone sign-in — private, no servers, backed up. Prototyped and built in a weekend by <b>Claude Fable 5</b>; the native sign-in Fable declined, and all the docs, finished by <b>Claude Opus 4.8</b>.</td></tr>
+    <tr><td>0.14</td><td><b>Feedback, updates &amp; distribution.</b> Share feedback now opens an email to robin@eam360.com (was WhatsApp); new <b>Check for updates</b> in About queries the public GitHub Releases API; the APK ships only as a GitHub Release asset.</td></tr>
+    <tr><td>0.13</td><td><b>History, pinned notification &amp; finer alerts.</b> Usage history screen (per-session &amp; per-week bars, year-long log); always-on pinned notification with a status-bar gauge; granular alerts (threshold chips, off/if-busy/always resets, per-profile mute); editable profile names; true warning-red at 100%; Android Auto Backup. Now signed with a permanent key (this upgrade needed a reinstall).</td></tr>
+    <tr><td>0.12</td><td><b>Native sign-in release.</b> "Sign in on this phone" — the PKCE flow Claude Code uses, no computer, browser picker included; Pro/Max and Team. Fixed the chronic HTTP 429 on token exchange/renewal (the app no longer identifies as <code class="inline">claude-code</code> on token calls). Computer-token paste/QR stays as backup.</td></tr>
+    <tr><td>0.11</td><td><i>Internal build — never released.</i></td></tr>
     <tr><td>0.10</td><td>QR fixes &amp; diagnostics — Windows QR command extracts just the sign-in object; refresh failures now say <i>why</i> in the status line.</td></tr>
-    <tr><td>0.9</td><td>Forecast &amp; QR release — on-phone poll history (8 days) with sparkline + burn-rate forecast per window; per-model 90% alerts; "Scan QR" token import; notifications open the right profile tab.</td></tr>
+    <tr><td>0.9</td><td>Forecast &amp; QR — on-phone poll history (8 days) with sparkline + burn-rate forecast per window; per-model 90% alerts; "Scan QR" token import; notifications open the right profile tab.</td></tr>
     <tr><td>0.8</td><td>Token health — plan badge, auto-renew countdown, sign-in expiry warnings (7/3/1 days), stale-data alert, self-dismissing notifications.</td></tr>
     <tr><td>0.7</td><td>Renamed to <b>Claude Cooldown</b>, new launcher icon, grouped Settings, in-app token guide, poll presets, About &amp; feedback.</td></tr>
     <tr><td>0.6</td><td>Two profiles (Personal + Work), widget setup screen, single-bar widget, reset notifications at the exact moment, two Quick Settings tiles.</td></tr>
     <tr><td>0.5</td><td>Redesign — grouped 7-day card with days-elapsed pacing bar, Claude-style bars, split reset rows, 13 theme colors, widget polish.</td></tr>
     <tr><td>0.4</td><td>Usage alerts, Quick Settings tile, auto-refresh on open.</td></tr>
-    <tr><td>0.1–0.3</td><td>First working app + widget; large widget layout; Material You polish.</td></tr>
+    <tr><td>0.3</td><td>Material You polish — system corner radius, dynamic colors, dark-mode-aware statuses.</td></tr>
+    <tr><td>0.2</td><td>Large widget layout with exact reset date-times.</td></tr>
+    <tr><td>0.1</td><td>First working app + widget.</td></tr>
   </table>
-  <h3 style="margin-top:5mm;">For future rebuilds</h3>
+  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v1.0 (July 2026)</span><span>12</span></div>
+</div>
+
+<!-- ================= PAGE 12 · DEV NOTES + CREDITS ================= -->
+<div class="page">
+  <div class="sechead"><div class="secnum">✦</div><div><h2>For the curious</h2><div class="sub">how it's built — and how to rebuild it</div></div></div>
+  <h3 style="margin-top:2mm;">For future rebuilds</h3>
   <ul class="dots">
     <li>Single-module Android project — Kotlin · Jetpack Compose · Glance 1.1.1 · WorkManager · OkHttp · min SDK 31, target 36.</li>
     <li>Build (signed release): <code class="inline">JAVA_HOME=/opt/homebrew/opt/openjdk@17 ./gradlew :app:assembleRelease</code> → APK in <code class="inline">app/build/outputs/apk/release/</code>. Signing reads a gitignored <code class="inline">keystore.properties</code> + <code class="inline">.jks</code> at the repo root — back them up; losing them means no more updates.</li>
     <li>Glance gotcha: RemoteViews containers max out at 10 children — keep widget blocks in nested Columns.</li>
     <li>If Anthropic changes the undocumented response schema, the parser ignores unknown fields; if bars go blank, check the raw JSON in the debug view first.</li>
   </ul>
-  <div class="card" style="margin-top:auto; margin-bottom:8mm; display:flex; align-items:center; gap:6mm;">
+  <div class="card" style="margin-top:6mm; margin-bottom:8mm; display:flex; align-items:center; gap:6mm;">
     <svg width="52" height="52" viewBox="-50 -50 100 100" style="flex-shrink:0;">
       <circle r="48" fill="#D2775A"/><circle r="31" fill="#F2EFE6"/><path d="M0 0 L0 -31 A31 31 0 0 0 -27 15.5 Z" fill="#E0A38C"/>
     </svg>
     <div>
-      <p style="font-weight:700; font-size:10.5pt;">Built by Robin Richard Rajan — written end-to-end with Claude Code.</p>
-      <p class="muted" style="font-size:8.6pt; margin-top:1mm;">Every line of Kotlin, every screenshot, this guide and the release pipeline were produced in Claude Code sessions — including reverse-engineering the sign-in flow the app now uses. If you'd like the APK or want to build something like this, just ask.</p>
+      <p style="font-weight:700; font-size:10.5pt;">Built by Robin Richard Rajan — with Claude Code, by two Claude models.</p>
+      <p class="muted" style="font-size:8.6pt; margin-top:1mm;">Prototyped and built in a weekend by <b>Claude Fable 5</b> — the app, the widgets, this guide's first drafts. When the OAuth sign-in tripped Fable's cybersecurity guardrails, <b>Claude Opus 4.8</b> built that handshake and finished the docs. If you'd like the APK or want to build something like this, just ask.</p>
     </div>
   </div>
-  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v0.13 (July 2026)</span><span>12</span></div>
+  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v1.0 (July 2026)</span><span>13</span></div>
 </div>
 
 </body>
