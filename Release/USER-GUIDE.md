@@ -14,11 +14,11 @@ Shows the 5-hour and 7-day rolling windows for your **Personal** and **Work** pr
 
 | Usage history *(illustration)* | Pinned notification | Granular alerts |
 |:---:|:---:|:---:|
-| ![Usage history bars, illustration](screenshots/history-5h-illustration.svg) | ![Pinned notification collapsed](screenshots/pinned-collapsed.png) | ![Granular alert settings](screenshots/settings-alerts.png) |
+| ![Usage history bars](screenshots/history-5h-dark.png) | ![Pinned notification collapsed](screenshots/pinned-collapsed.png) | ![Granular alert settings](screenshots/settings-alerts.png) |
 
 | Pinned (expanded) | Editable profile names | Per-week history *(illustration)* |
 |:---:|:---:|:---:|
-| ![Pinned notification expanded](screenshots/pinned-expanded.png) | ![Profile name fields](screenshots/profile-names.png) | ![Per-week history, illustration](screenshots/history-7d-illustration.svg) |
+| ![Pinned notification expanded](screenshots/pinned-expanded.png) | ![Profile name fields](screenshots/profile-names.png) | ![Per-week history](screenshots/history-7d-dark.png) |
 
 > The two **Usage history** images are **illustrations** showing a full week of data. History
 > is recorded as each window closes, so a fresh install starts nearly empty and fills in over
