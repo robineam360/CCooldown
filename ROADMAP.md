@@ -48,9 +48,12 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
   the rendered strings against the captured 2026-07-27 payload, both payload shapes,
   and the no-credits case. Needed a real `org.json` on the test classpath (Android's
   is a stub in unit tests).
+- **Also shipped:** `BarWidget` offers **Usage credits (pay-as-you-go)** at placement,
+  rendering the rounded percentage, the bar, and `$5.99 / $100.00 · $94.01 left`. Not
+  gated on `creditsOnWidgets` — that switch is about crowding layouts that show
+  something else, and this content was chosen explicitly.
 - **Not done:** the pinned notification still shows windows only — it's already tight
-  on space (see CCRM-3). `BarWidget` has no credits option either; adding one to
-  `BAR_OPTIONS` would give a dedicated credits widget if that's wanted later.
+  on space (see CCRM-3).
 - **Open question:** `spend.enabled` / `extra_usage.is_enabled` are parsed past, not
   acted on. If someone turns extra usage off while keeping a non-zero limit, we still
   draw the bar. Revisit if that state turns out to be reachable.
@@ -73,7 +76,22 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
 ## Needs design — decide the shape before building
 
 ### CCRM-3 · Unified theming system for widgets & notifications
-- **Status:** Needs design
+- **Status:** Phase 1 done (2026-07-27) · phases 2-3 still need design
+- **Phase 1 shipped — notification styles.** `pinnedStyle` pref, chip selector under
+  **Settings → Pinned notification**, four options, default unchanged (`gauge`) so
+  nobody's notification moves under them:
+  - `gauge` — the original ring.
+  - `number` — `drawNumberTile()` puts a solid plate in the large-icon slot with the
+    digits at 58% of the bitmap (44% at three digits so `100%` still fits). Roughly
+    twice the old number for no platform risk.
+  - `progress` — no bitmap: `setProgress()` plus the percentage leading the title.
+  - `big` — `notif_big_number{,_expanded}.xml` under `DecoratedCustomViewStyle`, 32sp
+    collapsed / 44sp expanded. **32, not the 40 first sketched:** the collapsed content
+    area is short and taller text clips on some skins. The bar is a drawn bitmap rather
+    than a tinted `ProgressBar`, which sidesteps the RemoteViews tint API differences.
+    This is the one style that wants testing on more than one phone.
+  - Rejected: a giant-number *expanded-only* panel. It spent the most space on the
+    7-day window, which matters less than the 5-hour one.
 - **Combines the old "widget themes", "5h widget", and "bigger notification" items.**
   They were three overlapping asks; building theming three separate times is how we'd
   end up with three inconsistent looks. Define **one** set of theme tokens (palette +
@@ -99,6 +117,25 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
 ---
 
 ## Later — larger, still on the path
+
+### CCRM-11 · Quick Settings tile shows the 5-hour reset
+- **Status:** Done (2026-07-27)
+- **Why:** The tile spent its one subtitle line on the 7-day percentage. The 5-hour
+  reset is the number that changes what you do next.
+- **Shipped:** `tileSubtitle` pref — `countdown` ("resets in 2h 14m", default) or
+  `clock` ("resets 4:12 PM"), chips under **Settings → Quick Settings tile**. The
+  countdown reads better; the clock can't go stale, because the tile only recomputes
+  in `onStartListening()` and a shade left open freezes the countdown. `Fmt.timeOnly()`
+  added for the day-less rendering, honouring the 24-hour setting.
+- **Dynamic icon:** the tile icon is now drawn per-reading and fills as the window
+  burns, in whichever status-bar icon style is set. The drawing moved to
+  `ui/UsageIcon.kt`, shared with `PinnedNotification`.
+- **No theme colour on the tile:** Android tints QS tile icons itself, exactly as it
+  does status-bar icons, so the icon is an alpha mask — level shows through fill only.
+  The theme and warning colours can't reach it. Left to the system default.
+- **Also fixed:** the `startActivityAndCollapse(Intent)` lint error — the deprecated
+  overload is still the only option below API 34 and minSdk is 31, so it's suppressed
+  with a note rather than removed.
 
 ### CCRM-4 · Widget long-press quick-edit
 - **Status:** Planned

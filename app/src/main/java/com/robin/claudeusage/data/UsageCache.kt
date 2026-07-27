@@ -210,6 +210,18 @@ class UsageCache(context: Context) {
     }
 
     /**
+     * What the Quick Settings tile puts in its subtitle: "countdown" ("resets in
+     * 2h 14m", the default) or "clock" ("resets 4:12 PM"). The tile only recomputes
+     * when the shade opens, so the countdown drifts while the panel stays open —
+     * the clock reading never does.
+     */
+    fun tileSubtitle(): String = prefs.getString("tileSubtitle", "countdown") ?: "countdown"
+
+    fun setTileSubtitle(mode: String) {
+        prefs.edit().putString("tileSubtitle", mode).apply()
+    }
+
+    /**
      * How the pinned notification renders the 5-hour percentage (CCRM-3 phase 1):
      * "gauge" (the original ring, default), "number" (a big number tile in the
      * large-icon slot), "progress" (system progress bar, percentage in the title),

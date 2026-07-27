@@ -64,6 +64,16 @@ object Fmt {
         return DateTimeFormatter.ofPattern(pattern).withZone(ZoneId.systemDefault()).format(instant)
     }
 
+    /**
+     * "11:45 PM" or "23:45" — no day part. Only for the 5-hour window, which is
+     * always a few hours out at most, so the day is never in question.
+     */
+    fun timeOnly(instant: Instant?, use24h: Boolean): String {
+        instant ?: return ""
+        val pattern = if (use24h) "HH:mm" else "h:mm a"
+        return DateTimeFormatter.ofPattern(pattern).withZone(ZoneId.systemDefault()).format(instant)
+    }
+
     /** "in 4h 47m" */
     fun relIn(instant: Instant?): String {
         instant ?: return "unknown"

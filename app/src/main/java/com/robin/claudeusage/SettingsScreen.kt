@@ -352,6 +352,50 @@ fun SettingsScreen(
     }
     Spacer(Modifier.height(24.dp))
 
+    SectionLabel("Quick Settings tile")
+    SectionCard {
+        Text(
+            "The tile in the notification shade / Control Center. It shows the 5-hour " +
+                "percentage; this picks what sits under it.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(8.dp))
+        var tileSubtitle by remember { mutableStateOf(cacheSettings.tileSubtitle()) }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            for ((value, text) in listOf("countdown" to "Countdown", "clock" to "Clock time")) {
+                FilterChip(
+                    selected = tileSubtitle == value,
+                    onClick = {
+                        tileSubtitle = value
+                        cacheSettings.setTileSubtitle(value)
+                    },
+                    label = { Text(text) },
+                )
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            if (tileSubtitle == "clock")
+                "Shows \"resets 4:12 PM\". The tile only updates when you open the shade, " +
+                    "so a clock time can't go stale while it sits open."
+            else
+                "Shows \"resets in 2h 14m\". Reads more naturally, but drifts if the " +
+                    "shade stays open a while.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "The tile icon fills as the window burns, following the status-bar icon " +
+                "style above. Android tints tile icons itself, so it can't carry the " +
+                "theme or warning colors.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    Spacer(Modifier.height(24.dp))
+
     SectionLabel("Usage credits")
     SectionCard {
         Text(

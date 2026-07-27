@@ -1,13 +1,17 @@
 package com.robin.claudeusage.tile
 
+import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.Intent
+import android.graphics.drawable.Icon
 import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 import com.robin.claudeusage.MainActivity
 import com.robin.claudeusage.data.Profile
 import com.robin.claudeusage.data.UsageCache
+import com.robin.claudeusage.ui.Fmt
+import com.robin.claudeusage.ui.UsageIcon
 import com.robin.claudeusage.work.Polling
 
 /** Quick Settings tile: 5-hour utilization at a glance from any screen. */
@@ -27,7 +31,20 @@ abstract class BaseUsageTileService(private val profile: Profile) : TileService(
                 session?.percent != null -> {
                     state = Tile.STATE_ACTIVE
                     label = "$profileLabel ${session.percent.toInt()}%"
-                    subtitle = "7d ${snapshot.data?.weekly?.percent?.toInt() ?: 0}%"
+                    // The 5-hour reset earns the subtitle over the 7-day number:
+                    // it's the one that changes what you do next.
+                    subtitle = when {
+                        session.resetsAt == null -> "not started"
+                        cache.tileSubtitle() == "clock" ->
+                            "resets ${Fmt.timeOnly(session.resetsAt, cache.use24hTime())}"
+                        else -> "resets ${Fmt.relIn(session.resetsAt)}"
+                    }
+                    // Fills as the window burns, in whichever icon style is set.
+                    // The system tints tile icons like status-bar icons, so this is
+                    // an alpha mask — level shows through fill, never through colour.
+                    icon = Icon.createWithBitmap(
+                        UsageIcon.draw(this@BaseUsageTileService, session.percent, cache.pinnedIconStyle())
+                    )
                 }
                 else -> {
                     state = Tile.STATE_INACTIVE
@@ -44,7 +61,10 @@ abstract class BaseUsageTileService(private val profile: Profile) : TileService(
         }
     }
 
+    // The Intent overload is deprecated but still the only option below API 34,
+    // and minSdk is 31.
     @Suppress("DEPRECATION")
+    @SuppressLint("StartActivityAndCollapseDeprecated")
     override fun onClick() {
         val intent = Intent(this, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
