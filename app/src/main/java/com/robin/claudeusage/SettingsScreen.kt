@@ -225,6 +225,7 @@ fun SettingsScreen(
         var pinnedProfile by remember { mutableStateOf(cacheSettings.pinnedProfile()) }
         var iconStyle by remember { mutableStateOf(cacheSettings.pinnedIconStyle()) }
         var tapTarget by remember { mutableStateOf(cacheSettings.pinnedTapTarget()) }
+        var pinnedStyle by remember { mutableStateOf(cacheSettings.pinnedStyle()) }
         fun refreshPinned() {
             com.robin.claudeusage.notify.PinnedNotification.update(context, cacheSettings)
         }
@@ -254,6 +255,44 @@ fun SettingsScreen(
                     )
                 }
             }
+            RowDivider()
+            Text("Notification style", style = MaterialTheme.typography.bodyLarge)
+            Spacer(Modifier.height(8.dp))
+            val styles = listOf(
+                "gauge" to "Gauge",
+                "number" to "Number tile",
+                "progress" to "Progress bar",
+                "big" to "Huge number",
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                for (row in styles.chunked(2)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        for ((value, text) in row) {
+                            FilterChip(
+                                selected = pinnedStyle == value,
+                                onClick = {
+                                    pinnedStyle = value
+                                    cacheSettings.setPinnedStyle(value)
+                                    refreshPinned()
+                                },
+                                label = { Text(text) },
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                when (pinnedStyle) {
+                    "number" -> "The percentage fills the icon slot — about twice the size of the gauge."
+                    "progress" -> "A plain system progress bar with the percentage in the title."
+                    "big" -> "The largest number a collapsed notification allows. Uses a custom " +
+                        "layout, so a few phone skins may style it differently."
+                    else -> "A ring around the percentage, the original look."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             RowDivider()
             Text("Tapping the notification opens", style = MaterialTheme.typography.bodyLarge)
             Spacer(Modifier.height(8.dp))

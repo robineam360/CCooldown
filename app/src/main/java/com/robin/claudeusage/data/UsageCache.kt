@@ -210,6 +210,18 @@ class UsageCache(context: Context) {
     }
 
     /**
+     * How the pinned notification renders the 5-hour percentage (CCRM-3 phase 1):
+     * "gauge" (the original ring, default), "number" (a big number tile in the
+     * large-icon slot), "progress" (system progress bar, percentage in the title),
+     * or "big" (a custom view with the largest number the collapsed row allows).
+     */
+    fun pinnedStyle(): String = prefs.getString("pinnedStyle", "gauge") ?: "gauge"
+
+    fun setPinnedStyle(style: String) {
+        prefs.edit().putString("pinnedStyle", style).apply()
+    }
+
+    /**
      * Where tapping the notification body goes: "app" (this app's breakdown, the
      * default) or "claude" (the Claude app, falling back to us if it isn't there).
      */
