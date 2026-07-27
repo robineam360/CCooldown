@@ -224,6 +224,7 @@ fun SettingsScreen(
         var pinned by remember { mutableStateOf(cacheSettings.pinnedEnabled()) }
         var pinnedProfile by remember { mutableStateOf(cacheSettings.pinnedProfile()) }
         var iconStyle by remember { mutableStateOf(cacheSettings.pinnedIconStyle()) }
+        var tapTarget by remember { mutableStateOf(cacheSettings.pinnedTapTarget()) }
         fun refreshPinned() {
             com.robin.claudeusage.notify.PinnedNotification.update(context, cacheSettings)
         }
@@ -252,6 +253,33 @@ fun SettingsScreen(
                         label = { Text(labels.getValue(p)) },
                     )
                 }
+            }
+            RowDivider()
+            Text("Tapping the notification opens", style = MaterialTheme.typography.bodyLarge)
+            Spacer(Modifier.height(8.dp))
+            val claudeInstalled = remember {
+                com.robin.claudeusage.notify.PinnedNotification.claudeLaunchIntent(context) != null
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                for ((value, text) in listOf("app" to "Claude Cooldown", "claude" to "Claude app")) {
+                    FilterChip(
+                        selected = tapTarget == value,
+                        onClick = {
+                            tapTarget = value
+                            cacheSettings.setPinnedTapTarget(value)
+                            refreshPinned()
+                        },
+                        label = { Text(text) },
+                    )
+                }
+            }
+            if (tapTarget == "claude" && !claudeInstalled) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "The Claude app isn't installed — taps will open Claude Cooldown instead.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             RowDivider()
             Text("Status-bar icon", style = MaterialTheme.typography.bodyLarge)

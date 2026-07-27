@@ -42,6 +42,13 @@ object PinnedNotification {
     private const val NOTIF_ID = 9100
     const val ACTION_REFRESH = "com.robin.claudeusage.PINNED_REFRESH"
 
+    /** The official Claude Android app — the optional tap target (CCRM-2). */
+    const val CLAUDE_PACKAGE = "com.anthropic.claude"
+
+    /** Resolves Claude's launcher intent, or null when it isn't installed. */
+    fun claudeLaunchIntent(context: Context): Intent? =
+        context.packageManager.getLaunchIntentForPackage(CLAUDE_PACKAGE)
+
     fun ensureChannel(context: Context) {
         val nm = context.getSystemService(NotificationManager::class.java)
         // LOW is fully silent (no sound, no vibration, no heads-up) but, unlike
@@ -88,11 +95,7 @@ object PinnedNotification {
             data?.weekly?.percent?.let { append(" · 7-day ${it.toInt()}%") }
         }
 
-        val openApp = PendingIntent.getActivity(
-            context, NOTIF_ID,
-            Intent(context, MainActivity::class.java).putExtra("profile", profile.key),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-        )
+        val openApp = tapIntent(context, cache, profile)
         val refresh = PendingIntent.getBroadcast(
             context, NOTIF_ID,
             Intent(context, PinnedRefreshReceiver::class.java).setAction(ACTION_REFRESH),
@@ -129,6 +132,28 @@ object PinnedNotification {
         } catch (_: SecurityException) {
             // POST_NOTIFICATIONS not granted — nothing to show.
         }
+    }
+
+    /**
+     * Where a tap on the notification body goes (CCRM-2). "claude" jumps straight
+     * into the Claude app; anything else — including "claude" when it isn't
+     * installed — opens our own breakdown on the pinned profile.
+     */
+    private fun tapIntent(context: Context, cache: UsageCache, profile: Profile): PendingIntent {
+        val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        if (cache.pinnedTapTarget() == "claude") {
+            val launch = claudeLaunchIntent(context)
+            if (launch != null) {
+                // Launched from a notification, so it needs its own task.
+                launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                return PendingIntent.getActivity(context, NOTIF_ID + 1, launch, flags)
+            }
+        }
+        return PendingIntent.getActivity(
+            context, NOTIF_ID,
+            Intent(context, MainActivity::class.java).putExtra("profile", profile.key),
+            flags,
+        )
     }
 
     // --- drawing ---

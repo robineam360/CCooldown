@@ -209,6 +209,16 @@ class UsageCache(context: Context) {
         prefs.edit().putString("pinnedIconStyle", style).apply()
     }
 
+    /**
+     * Where tapping the notification body goes: "app" (this app's breakdown, the
+     * default) or "claude" (the Claude app, falling back to us if it isn't there).
+     */
+    fun pinnedTapTarget(): String = prefs.getString("pinnedTapTarget", "app") ?: "app"
+
+    fun setPinnedTapTarget(target: String) {
+        prefs.edit().putString("pinnedTapTarget", target).apply()
+    }
+
     fun use24hTime(): Boolean = prefs.getBoolean("use24hTime", false)
 
     fun setUse24hTime(enabled: Boolean) {
