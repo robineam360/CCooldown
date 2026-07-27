@@ -6,6 +6,8 @@ import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Currency
+import java.util.Locale
 
 data class ThemeOption(val name: String, val light: Color, val dark: Color)
 
@@ -74,6 +76,22 @@ object Fmt {
             h > 0 -> "in ${h}h ${m}m"
             else -> "in ${m}m"
         }
+    }
+
+    /**
+     * "$9.57" — an amount in minor units rendered with its currency symbol.
+     * Deliberately not locale-formatted: these are Anthropic's billing figures, so
+     * they should read the same way they do in Claude's own UI wherever you are.
+     */
+    fun money(minorUnits: Long, exponent: Int, currencyCode: String): String {
+        val exp = exponent.coerceIn(0, 6)
+        val amount = minorUnits / Math.pow(10.0, exp.toDouble())
+        val symbol = try {
+            Currency.getInstance(currencyCode).getSymbol(Locale.US)
+        } catch (_: Exception) {
+            "$currencyCode "
+        }
+        return symbol + String.format(Locale.US, "%,.${exp}f", amount)
     }
 
     /** "Jul 16, 2026" */

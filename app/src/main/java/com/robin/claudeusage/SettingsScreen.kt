@@ -313,6 +313,43 @@ fun SettingsScreen(
     }
     Spacer(Modifier.height(24.dp))
 
+    SectionLabel("Usage credits")
+    SectionCard {
+        Text(
+            "Pay-as-you-go credits that cover you once a plan window runs out. The " +
+                "section only appears for accounts that actually have a credit budget.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(4.dp))
+        for (profile in Profile.entries) {
+            RowDivider()
+            var visible by remember { mutableStateOf(cacheSettings.creditsVisible(profile)) }
+            ToggleRow(
+                title = "Show for ${labels.getValue(profile)}",
+                subtitle = "Credits card on this profile's screen",
+                checked = visible,
+            ) {
+                visible = it
+                cacheSettings.setCreditsVisible(profile, it)
+                refreshWidgets()
+            }
+        }
+        RowDivider()
+        var creditsOnWidgets by remember { mutableStateOf(cacheSettings.creditsOnWidgets()) }
+        ToggleRow(
+            title = "Show on widgets",
+            subtitle = "Adds a credits bar to the tall usage widget. Needs the room, " +
+                "so smaller widgets stay as they are.",
+            checked = creditsOnWidgets,
+        ) {
+            creditsOnWidgets = it
+            cacheSettings.setCreditsOnWidgets(it)
+            refreshWidgets()
+        }
+    }
+    Spacer(Modifier.height(24.dp))
+
     SectionLabel("Appearance")
     SectionCard {
         ToggleRow(

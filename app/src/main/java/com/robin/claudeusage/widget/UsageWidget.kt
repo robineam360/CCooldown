@@ -92,9 +92,12 @@ class UsageWidget : GlanceAppWidget() {
         val snapshot = cache.snapshot(profile)
         val use24h = cache.use24hTime()
         val themeName = cache.themeColorName()
+        // Both gates: the per-profile switch decides whether credits exist for this
+        // account at all, the widget switch whether they're worth the height here.
+        val showCredits = cache.creditsOnWidgets() && cache.creditsVisible(profile)
         provideContent {
             GlanceTheme {
-                WidgetContent(profile, cache.profileLabel(profile), snapshot, use24h, themeName)
+                WidgetContent(profile, cache.profileLabel(profile), snapshot, use24h, themeName, showCredits)
             }
         }
     }
@@ -128,7 +131,14 @@ internal fun widgetCornerRadius(): androidx.compose.ui.unit.Dp {
 }
 
 @Composable
-private fun WidgetContent(profile: Profile, profileLabel: String, snapshot: Snapshot, use24h: Boolean, themeName: String) {
+private fun WidgetContent(
+    profile: Profile,
+    profileLabel: String,
+    snapshot: Snapshot,
+    use24h: Boolean,
+    themeName: String,
+    showCredits: Boolean,
+) {
     val size = LocalSize.current
     val large = size.height >= 190.dp
     val medium = size.height >= 110.dp
@@ -156,6 +166,8 @@ private fun WidgetContent(profile: Profile, profileLabel: String, snapshot: Snap
             // is wrapped in its own Column so the root stays small.
             large -> {
                 val data = snapshot.data!!
+                // Only the large bucket has the height for a fourth bar.
+                val credits = data.credits?.takeIf { showCredits && it.limitMinor > 0L }
                 SessionBlock(profile, data.session, use24h, theme, dark, label = "5-hour · $profileLabel", barHeight = 14.dp)
                 Spacer(GlanceModifier.height(12.dp))
                 Column(modifier = GlanceModifier.fillMaxWidth()) {
@@ -174,6 +186,14 @@ private fun WidgetContent(profile: Profile, profileLabel: String, snapshot: Snap
                     }
                     daysElapsedWindow(data.weekly)?.let {
                         LabeledBar("Days elapsed", it.percent, "%", theme, dark)
+                    }
+                    credits?.let {
+                        LabeledBar(
+                            "Credits · ${Fmt.money(it.usedMinor, it.exponent, it.currency)} / " +
+                                Fmt.money(it.limitMinor, it.exponent, it.currency),
+                            it.percent, "%", theme, dark,
+                            valueText = "${it.percentDisplay}%",
+                        )
                     }
                     Spacer(GlanceModifier.height(4.dp))
                     FooterRow(snapshot, data.weekly, use24h)
@@ -273,8 +293,19 @@ internal fun WidgetBar(percent: Double?, theme: Color, dark: Boolean, height: an
     )
 }
 
+/**
+ * One labelled bar. [valueText] overrides the default truncated percentage — credits
+ * pass a rounded one, since their percentage is computed from money.
+ */
 @Composable
-internal fun LabeledBar(label: String, percent: Double?, suffix: String, theme: Color, dark: Boolean) {
+internal fun LabeledBar(
+    label: String,
+    percent: Double?,
+    suffix: String,
+    theme: Color,
+    dark: Boolean,
+    valueText: String? = null,
+) {
     Column(modifier = GlanceModifier.fillMaxWidth()) {
         Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -284,7 +315,7 @@ internal fun LabeledBar(label: String, percent: Double?, suffix: String, theme: 
                 maxLines = 1,
             )
             Text(
-                "${(percent ?: 0.0).toInt()}$suffix",
+                valueText ?: "${(percent ?: 0.0).toInt()}$suffix",
                 style = TextStyle(
                     color = GlanceTheme.colors.onSurface,
                     fontSize = 13.sp,

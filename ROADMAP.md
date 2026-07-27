@@ -13,24 +13,47 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
 ## Next — small, high value, ready to build
 
 ### CCRM-1 · Show usage credits used / total available
-- **Status:** Blocked — needs one raw payload to confirm the fields exist
-- **Why:** Percentages answer "how close am I to the limit"; raw credits answer "how
-  much have I actually spent".
-- **Spike result (2026-07-27):** the assumption that "the numbers are likely already in
-  the API response we parse" is **not confirmed**. `UsageParser` reads only `percent`,
-  `resets_at`, `severity` (from `limits[]`) and `utilization` (from the `five_hour` /
-  `seven_day` fallback shapes) — nothing credit-shaped is parsed today. Whether credits
-  are *present in the payload but ignored* is still unknown and can't be checked from
-  the dev machine (no token here, by design).
-- **How to unblock — no code needed:** the full response body is already cached per
-  profile (`UsageCache.rawJson`) and Settings already renders it: tap the version
-  number in **About** 7× to unlock **Debug → "Show last raw response"**. Read off
-  whether any credit/quota fields exist, then either build against them or drop this
-  item as unserveable.
-- **Approach (once confirmed):** parse the fields in `data/Models.kt`, surface used /
-  total on the main screen and pinned notification. **Only render when total-remaining
-  is non-zero** (hide for unlimited/plan-less states so we never show a misleading
-  "0 of 0").
+- **Status:** Done (2026-07-27)
+- **Why:** Percentages answer "how close am I to the limit"; credits answer "how much
+  have I actually spent". They're **currency, not a token count** — Claude Code renders
+  the same thing as `Usage credits · $9.57 of $50.00` with a bar.
+- **Spike result:** the fields were in the payload all along, just never parsed — the
+  spike was worth running, since the roadmap's guess at *which* fields was wrong. The
+  response carries the figures **twice**:
+  - `spend` — `used`/`limit` as `{amount_minor, currency, exponent}`, plus a rounded
+    integer `percent`, a `severity`, and an `enabled` flag. Richer; preferred.
+  - `extra_usage` — `{monthly_limit, used_credits, currency, decimal_places}`, the same
+    numbers in minor units with one shared exponent. Kept as a fallback.
+- **Shipped:** `SpendCredits` in `data/Models.kt` (+ `UsageData.credits`), parsed by
+  `UsageParser.creditsFrom()` preferring `spend`; `Fmt.money()` in `ui/Palette.kt`;
+  its own card on the main screen directly below the 7-day card.
+- **Card layout** — deliberately the same shape as the 5-hour card: `Usage credits`
+  and `$5.99 / $100.00` on the left, `6% used` bold on the right, themed bar under
+  them, remaining-balance line below. The middle amount takes the row's weight so it
+  ellipsizes on narrow screens rather than pushing the percentage off.
+- **Percentage** is computed from the minor units and **rounded, not truncated** —
+  $5.99 of $100 reads 6%, where the window bars' `toInt()` would say 5%. The server's
+  own `spend.percent` agrees (6).
+- **Visibility rule:** render whenever `limit > 0`. A spent-out balance still shows a
+  full bar, with the trailing line switching to red; only accounts with no credit
+  budget at all hide the section.
+- **Toggles:** `creditsVisible(profile)` (per-profile, default on) and
+  `creditsOnWidgets()` (global, default **off**) in `UsageCache`, both under a
+  **Usage credits** settings section. Widgets need both — hiding a profile's credits
+  hides them everywhere.
+- **Widgets:** a `Credits · $5.99 / $100.00 — 6%` bar in the **large** `UsageWidget`
+  bucket only. Medium and small are already full; a fourth bar there would clip.
+  `LabeledBar` gained an optional `valueText` so credits can pass the rounded figure.
+- **Tests:** `UsageParserTest` pins the parse, the rounding, over-limit clamping, and
+  the rendered strings against the captured 2026-07-27 payload, both payload shapes,
+  and the no-credits case. Needed a real `org.json` on the test classpath (Android's
+  is a stub in unit tests).
+- **Not done:** the pinned notification still shows windows only — it's already tight
+  on space (see CCRM-3). `BarWidget` has no credits option either; adding one to
+  `BAR_OPTIONS` would give a dedicated credits widget if that's wanted later.
+- **Open question:** `spend.enabled` / `extra_usage.is_enabled` are parsed past, not
+  acted on. If someone turns extra usage off while keeping a non-zero limit, we still
+  draw the bar. Revisit if that state turns out to be reachable.
 
 ### CCRM-2 · Configurable persistent-notification tap action
 - **Status:** Done (2026-07-27)

@@ -219,6 +219,31 @@ class UsageCache(context: Context) {
         prefs.edit().putString("pinnedTapTarget", target).apply()
     }
 
+    // --- usage credits (CCRM-1) ---
+
+    /**
+     * Whether the pay-as-you-go credits section shows for this profile. Per-profile
+     * because the two accounts can be on very different billing setups — credits may
+     * be meaningful on one and noise on the other.
+     */
+    fun creditsVisible(profile: Profile): Boolean =
+        prefs.getBoolean(k(profile, "creditsVisible"), true)
+
+    fun setCreditsVisible(profile: Profile, visible: Boolean) {
+        prefs.edit().putBoolean(k(profile, "creditsVisible"), visible).apply()
+    }
+
+    /**
+     * Whether widgets carry credits too. Off by default: widget height is scarce and
+     * the existing layouts are already full. Gated by [creditsVisible] as well, so
+     * hiding a profile's credits hides them everywhere.
+     */
+    fun creditsOnWidgets(): Boolean = prefs.getBoolean("creditsOnWidgets", false)
+
+    fun setCreditsOnWidgets(enabled: Boolean) {
+        prefs.edit().putBoolean("creditsOnWidgets", enabled).apply()
+    }
+
     fun use24hTime(): Boolean = prefs.getBoolean("use24hTime", false)
 
     fun setUse24hTime(enabled: Boolean) {
