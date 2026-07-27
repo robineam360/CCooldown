@@ -28,6 +28,7 @@ import com.robin.claudeusage.data.Profile
 import com.robin.claudeusage.data.UsageCache
 import com.robin.claudeusage.data.UsageWindow
 import com.robin.claudeusage.data.WidgetPrefs
+import com.robin.claudeusage.ui.Fmt
 import com.robin.claudeusage.ui.daysElapsedWindow
 
 class BarWidgetReceiver : GlanceAppWidgetReceiver() {
@@ -45,6 +46,7 @@ class BarWidget : GlanceAppWidget() {
             "weekly" to "7-day all models",
             "model" to "7-day per-model (e.g. Fable)",
             "days" to "Days elapsed",
+            "credits" to "Usage credits (pay-as-you-go)",
         )
     }
 
@@ -96,6 +98,10 @@ private fun BarContent(
         else -> Triple(data?.session, "5-hour", "% used")
     }
 
+    // Credits were picked explicitly at placement, so they aren't gated on the
+    // "show on widgets" setting — that one is about crowding *other* layouts.
+    val credits = if (bar == "credits") data?.credits?.takeIf { it.limitMinor > 0L } else null
+
     Column(modifier = rootModifier, verticalAlignment = Alignment.CenterVertically) {
         when {
             snapshot.authState == AuthState.NO_CREDENTIALS ->
@@ -103,6 +109,24 @@ private fun BarContent(
             snapshot.authState == AuthState.REAUTH_NEEDED ->
                 CenteredMessage("$profileLabel: re-auth needed", "Tap to open app")
             data == null -> CenteredMessage("No data yet · $profileLabel", "Tap to open app")
+            bar == "credits" && credits == null ->
+                CenteredMessage("No credits · $profileLabel", "This account has no credit budget")
+            credits != null -> {
+                HeaderRow(
+                    profile, "Credits · $profileLabel", credits.percent, "%",
+                    showRefresh = true, valueText = "${credits.percentDisplay}%",
+                )
+                Spacer(GlanceModifier.height(5.dp))
+                WidgetBar(credits.percent, theme, dark, 12.dp)
+                Spacer(GlanceModifier.height(4.dp))
+                SubTextRow(
+                    "${Fmt.money(credits.usedMinor, credits.exponent, credits.currency)} / " +
+                        Fmt.money(credits.limitMinor, credits.exponent, credits.currency),
+                    if (credits.remainingMinor > 0L)
+                        "${Fmt.money(credits.remainingMinor, credits.exponent, credits.currency)} left"
+                    else "spent",
+                )
+            }
             else -> {
                 HeaderRow(profile, "$label · $profileLabel", window?.percent, suffix, showRefresh = true)
                 Spacer(GlanceModifier.height(5.dp))

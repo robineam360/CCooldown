@@ -246,7 +246,14 @@ internal fun ResetSubText(window: UsageWindow?, use24h: Boolean) {
 }
 
 @Composable
-internal fun HeaderRow(profile: Profile, label: String, percent: Double?, suffix: String, showRefresh: Boolean) {
+internal fun HeaderRow(
+    profile: Profile,
+    label: String,
+    percent: Double?,
+    suffix: String,
+    showRefresh: Boolean,
+    valueText: String? = null,
+) {
     Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         // Weighted label: it truncates on narrow widgets so the percentage and
         // refresh icon always stay visible.
@@ -261,7 +268,7 @@ internal fun HeaderRow(profile: Profile, label: String, percent: Double?, suffix
             maxLines = 1,
         )
         Text(
-            "${(percent ?: 0.0).toInt()}$suffix",
+            valueText ?: "${(percent ?: 0.0).toInt()}$suffix",
             style = TextStyle(
                 color = GlanceTheme.colors.onSurface,
                 fontSize = 15.sp,
