@@ -66,9 +66,15 @@ class UsageRepository(private val context: Context) {
 
     fun configuredProfiles(): List<Profile> = Profile.entries.filter { hasCredentials(it) }
 
+    /**
+     * Forgets the token for this slot. Deliberately leaves the local trend data
+     * (`HistoryStore` + `SessionLog`) alone: clearing credentials is nearly always
+     * a re-sign-in of the *same* account, and wiping the history made that silent
+     * data loss (CCBG-1). Points self-identify by their window's `resetsAt`, so
+     * anything genuinely stale ages out through the 8-day prune on its own.
+     */
     fun clearCredentials(profile: Profile) {
         credStore.clear(profile)
-        historyStore.clear(profile)
         cache.setAuthState(profile, AuthState.NO_CREDENTIALS)
         cache.setTokenMeta(profile, 0L, null)
         cache.setRefreshExpiryEstimated(profile, false)
