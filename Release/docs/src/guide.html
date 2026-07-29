@@ -139,17 +139,17 @@
     </div>
     <div class="tag">Your Claude plan limits on your Android home screen —<br>two accounts, live widgets, alerts before you hit the wall.</div>
     <div class="chips">
-      <span class="chip">WIDGETS</span><span class="chip">USAGE HISTORY</span><span class="chip">PINNED NOTIFICATION</span><span class="chip">GRANULAR ALERTS</span><span class="chip">PERSONAL + WORK</span><span class="chip">SIGN IN ON THE PHONE</span>
+      <span class="chip">PACE CHART</span><span class="chip">USAGE CREDITS</span><span class="chip">WIDGETS</span><span class="chip">NOTIFICATION STYLES</span><span class="chip">GRANULAR ALERTS</span><span class="chip">PERSONAL + WORK</span>
     </div>
     <div class="shots">
-      <figure><img src="shots/work-tab-final.png" width="180"><figcaption>Live usage, per profile</figcaption></figure>
+      <figure><img src="shots/v11-chart-credits.png" width="180"><figcaption>Pace chart &amp; usage credits</figcaption></figure>
       <figure><img src="shots/widget-large-dark.png" width="180"><figcaption>Home-screen widget</figcaption></figure>
       <figure><img src="shots/signin-settings.png" width="180"><figcaption>Signs in right on the phone</figcaption></figure>
     </div>
     <div class="callout warn" style="margin-top:7mm; font-size:8.6pt; color:var(--ink);"><b>Before you install:</b> this is an <b>unofficial</b> personal tool — to read your usage it signs in as the <b>Claude Code CLI</b> against an <b>undocumented</b> Anthropic endpoint, so there's a small risk Anthropic could <b>revoke the token or flag the account</b>. It's read-only and signs in once; full detail on <b>page 4</b>. Use it at your own discretion.</div>
     <div class="bottom">
       <div class="l">USER GUIDE</div>
-      <div class="r">Version 1.0 · July 2026<br>Built by Robin Richard Rajan — with Claude Code (Fable 5 + Opus 4.8)<br>Personal sideloaded app — not on any store · not affiliated with Anthropic</div>
+      <div class="r">Version 1.1 · July 2026<br>Built by Robin Richard Rajan — with Claude Code (Fable 5 · Opus 4.8 · Opus 5)<br>Personal sideloaded app — not on any store · not affiliated with Anthropic</div>
     </div>
   </div>
 </div>
@@ -159,60 +159,66 @@
   <div class="sechead"><div class="secnum">☰</div><div><h2>What it is &amp; what's inside</h2></div></div>
   <p><b>Claude Cooldown (CCooldown)</b> is a personal home-screen widget app for your Claude plan limits — for <b>two accounts at once</b>. It shows the 5-hour and 7-day rolling windows for your <b>Personal</b> and <b>Work</b> profiles (including per-model caps like Fable), when each resets, how far into the week you are, forecasts <i>when</i> you'll hit a limit at your current pace — and warns you <i>before</i> you hit it, and again the moment a window resets.</p>
   <div class="grid2" style="margin-top:4mm;">
-    <div class="feat"><b>📊 Both windows, at a glance</b><span>5-hour session bar and the 7-day bars (All models, per-model caps, days elapsed) with exact reset times.</span></div>
-    <div class="feat"><b>📅 Usage history <span style="color:var(--accent);">NEW</span></b><span>A scrollable bar for every 5-hour session, week by week — see how many you ran and which hit 100%.</span></div>
-    <div class="feat"><b>📌 Pinned notification <span style="color:var(--accent);">NEW</span></b><span>An optional always-on, silent notification with a status-bar gauge that fills as you use your 5-hour window.</span></div>
+    <div class="feat"><b>📅 Usage history</b><span>A scrollable bar for every 5-hour session, week by week — see how many you ran and which hit 100%.</span></div>
+    <div class="feat"><b>📌 Pinned notification <span style="color:var(--accent);">4 STYLES</span></b><span>An always-on, silent notification with a status-bar gauge that fills — now in four layouts, including a big-number one.</span></div>
     <div class="feat"><b>🔔 Granular alerts</b><span>Per-window threshold chips, reset pings set to off / if-busy / always, and a per-profile mute — no more all-or-nothing.</span></div>
-    <div class="feat"><b>📈 Burn-rate forecast</b><span>A sparkline of each window's usage curve plus a plain-words projection: "At this pace: 100% at Thu 2:40 PM."</span></div>
+    <div class="feat"><b>📈 Pace chart <span style="color:var(--accent);">NEW</span></b><span>Every reading plotted against an <i>even-pace</i> line — stay below it and you finish the window inside your limit.</span></div>
     <div class="feat"><b>👥 Personal + Work</b><span>Two fully independent profiles — separate sign-ins, tabs, widgets, tiles and alerts — now with editable names.</span></div>
     <div class="feat"><b>📱 Widgets &amp; tiles</b><span>A full widget, a single-bar mini widget (place as many as you like), and two Quick Settings tiles.</span></div>
+    <div class="feat"><b>💳 Usage credits <span style="color:var(--accent);">NEW</span></b><span>Pay-as-you-go credits as their own card — spent, total and what's left. Hidden if your plan has none.</span></div>
     <div class="feat"><b>🔒 Private, and backed up</b><span>No servers or telemetry; the token is Keystore-encrypted. History &amp; settings now survive a reinstall (token excluded).</span></div>
   </div>
   <h3 style="margin-top:5.5mm;">Contents</h3>
   <div class="toc">
-    <div class="row"><span class="n">★</span><span class="t">Highlights</span><span class="d">history, pinned notification, granular alerts · page 3</span></div>
+    <div class="row"><span class="n">★</span><span class="t">New in v1.1</span><span class="d">credits, notification styles, pace chart · page 3</span></div>
     <div class="row"><span class="n">1</span><span class="t">Install</span><span class="d">sideload the APK · page 4</span></div>
     <div class="row"><span class="n">2</span><span class="t">Connect your accounts</span><span class="d">sign in on the phone · page 4–5</span></div>
     <div class="row"><span class="n">3</span><span class="t">Backup: computer token</span><span class="d">paste / QR from Claude Code · page 6</span></div>
-    <div class="row"><span class="n">4</span><span class="t">Reading the screens</span><span class="d">bars, pacing, forecast · page 7</span></div>
+    <div class="row"><span class="n">4</span><span class="t">Reading the screens</span><span class="d">bars, pace chart, credits · page 7</span></div>
     <div class="row"><span class="n">5</span><span class="t">Widgets</span><span class="d">full &amp; single-bar · page 8</span></div>
     <div class="row"><span class="n">6</span><span class="t">Alerts &amp; Quick Settings tiles</span><span class="d">page 9</span></div>
     <div class="row"><span class="n">7</span><span class="t">Settings reference</span><span class="d">page 10</span></div>
     <div class="row"><span class="n">8</span><span class="t">Troubleshooting · Privacy</span><span class="d">page 11</span></div>
     <div class="row"><span class="n">9</span><span class="t">Version history &amp; dev notes</span><span class="d">page 12</span></div>
   </div>
-  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v1.0 (July 2026)</span><span>2</span></div>
+  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v1.1 (July 2026)</span><span>2</span></div>
 </div>
 
 <!-- ================= PAGE 3 · NEW IN 0.13 ================= -->
 <div class="page">
-  <div class="sechead"><div class="secnum">★</div><div><h2>Highlights</h2><div class="sub">the features that define v1.0</div></div></div>
+  <div class="sechead"><div class="secnum">★</div><div><h2>New in v1.1</h2><div class="sub">what changed since the first release</div></div></div>
   <div class="shots" style="margin-top:1mm;">
-    <figure><img src="shots/history-5h-dark.png" width="140"><figcaption>Usage history — a bar per session<br>(red = a session that hit 100%)</figcaption></figure>
-    <figure><img src="shots/pinned-expanded.png" width="140"><figcaption>Pinned notification — always-on,<br>expands to 7-day &amp; Refresh</figcaption></figure>
-    <figure><img src="shots/settings-alerts.png" width="140"><figcaption>Granular alert controls —<br>chips &amp; reset-ping modes</figcaption></figure>
+    <figure><img src="shots/v11-chart-credits.png" width="140"><figcaption>The pace chart and the<br>usage-credits card</figcaption></figure>
+    <figure><img src="shots/v11-notif-styles.png" width="140"><figcaption>Four notification styles —<br>pick how big the % gets</figcaption></figure>
+    <figure><img src="shots/v11-pinned-big.png" width="140"><figcaption>"Huge number" — the largest a<br>collapsed notification allows</figcaption></figure>
   </div>
   <div class="cols" style="margin-top:6mm;">
     <div>
-      <h3 style="margin-top:0;">📅 Usage history</h3>
-      <p style="font-size:8.8pt;">A new screen (calendar icon, top bar) shows a <b>scrollable bar for every 5-hour session</b> — newest first, labelled with day and start time, coloured by peak, and <b style="color:#B0483A;">red when a session hit 100%</b>. Page back through earlier weeks; a summary counts the sessions and how many maxed out. Switch to <b>7-day</b> for one bar per week. Recorded as each window closes (kept a year), so it fills in over time.</p>
-      <h3>📌 Pinned notification</h3>
-      <p style="font-size:8.8pt;">An optional <b>always-on, silent</b> notification with a <b>status-bar gauge that fills</b> as you burn your 5-hour window. Collapsed shows the reset countdown and 7-day %; expanded adds the 7-day and per-model bars with one-tap <b>Refresh</b>. Follows your theme, turning orange then red near the limit. Enable it in <b>Settings → Pinned notification</b> and pick the icon (Ring / Pie / Battery / Number).</p>
+      <h3 style="margin-top:0;">📈 The pace chart</h3>
+      <p style="font-size:8.8pt;">Each card's chart is <b>twice as tall</b> and plots <b>a dot for every reading</b>, with dashed guides at 80 / 90 / 100%. Running corner to corner is the <b>even-pace line</b>: <b>stay below it</b> and you'll finish the window inside your limit — cross it and you're on course to run out early, so the overshoot <b style="color:#C4701D;">shades amber</b>. Underneath, in plain words: <i>"33 points below even pace · at this pace ~61% when the window resets · 0.4%/h"</i>.</p>
+      <h3>💳 Usage credits</h3>
+      <p style="font-size:8.8pt;">If your plan carries <b>pay-as-you-go credits</b>, they get their own card below the 7-day window — <code class="inline">$5.99 / $100.00</code>, a themed bar, and what's left. Accounts without a credit budget never see it. Switch it off per profile in <b>Settings → Usage credits</b>, opt into showing it on widgets, or place a single-bar widget dedicated to it.</p>
+      <h3>🔔 A percentage you can actually read</h3>
+      <p style="font-size:8.8pt;">The pinned notification's figure used to be drawn about <b>13dp</b> tall. <b>Settings → Pinned notification → Notification style</b> now offers <b>Gauge</b> (the original), <b>Number tile</b> (roughly double), <b>Progress bar</b> (a themed system bar) and <b>Huge number</b> (a custom layout, the largest a collapsed row allows). Collapsed now shows the <b>5-hour window only</b> — the 7-day window moved to the expanded panel instead of appearing in both.</p>
     </div>
     <div>
-      <h3 style="margin-top:0;">🔔 Granular alerts</h3>
-      <p style="font-size:8.8pt;">No more all-or-nothing: tap <b>threshold chips</b> to choose exactly which levels warn you per window (5-hour 80/90/95, 7-day &amp; per-model 75/90), set reset pings to <b>Off / If busy / Always</b> (<i>If busy</i> only pings when that window had reached 80%), and mute a whole profile with one switch.</p>
-      <h3>✏️ Also new</h3>
+      <h3 style="margin-top:0;">⚡ Two more touches</h3>
       <ul class="dots" style="font-size:8.6pt;">
-        <li><b>Editable profile names</b> — rename Personal / Work; it flows through tabs, widgets, tiles and notifications.</li>
-        <li><b>Clearer warning colours</b> — a true red at 100%, distinct from the Claude Orange theme.</li>
-        <li><b>Auto Backup</b> — history &amp; settings survive a reinstall or new phone (the encrypted token is excluded).</li>
-        <li><b>v0.14</b> — feedback now opens an email; new <b>Check for updates</b> in About; the APK ships from GitHub Releases.</li>
+        <li><b>Tapping the notification</b> can open the <b>Claude app</b> instead of this one — your choice, in Settings.</li>
+        <li><b>The Quick Settings tile</b> spent its subtitle on the 7-day number; it now shows the <b>5-hour reset</b>, as a countdown or a clock time. Its icon fills as the window burns.</li>
       </ul>
+      <h3>🐞 Fixed</h3>
+      <ul class="dots" style="font-size:8.6pt;">
+        <li><b>The chart and forecast almost never appeared.</b> Readings were matched to a window by an exact reset timestamp — but the server nudges that value forward on nearly every check: <b>561 different values across 672 readings</b>, one matching. A chart needs two. They're now matched by proximity, which also rescues the history already on your phone.</li>
+        <li><b>Usage history was wiped on sign-out</b>, even when you were simply signing back in to the same account. It no longer depends on the token.</li>
+        <li><b>The forecast fitted only the first and last reading</b>, so one early burst set the pace for the whole window. It now fits across every one.</li>
+      </ul>
+      <h3>➖ Removed</h3>
+      <p style="font-size:8.8pt;">The <b>Days elapsed</b> bar — the even-pace line makes the same comparison visually.</p>
     </div>
   </div>
-  <div class="callout" style="margin-top:5mm;"><b>One-time reinstall for this update.</b> v0.13 moves to a permanent app-signing key, so updating from v0.12 needs an <b>uninstall + reinstall</b> (Android blocks an in-place update when the signature changes) — you'll sign in once more. Every update <i>after</i> v0.13 installs in place and keeps your data.</div>
-  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v1.0 (July 2026)</span><span>3</span></div>
+  <div class="callout" style="margin-top:3mm;"><b>Updating from v1.0 is in place</b> — same signing key, so your sign-ins, history, settings and widgets all survive.</div>
+  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v1.1 (July 2026)</span><span>3</span></div>
 </div>
 
 <!-- ================= PAGE 4 · INSTALL + SIGN-IN OVERVIEW ================= -->
@@ -236,7 +242,7 @@
     <li>The card turns <b>Active</b> and usage loads: <i>"signed in — usage fetched, polling started."</i></li>
   </ol>
   <p>Works for <b>Personal (Pro / Max)</b> and <b>Work (Team)</b> accounts alike. The sign-in is minted on the phone and is yours alone — no computer shares it, so nothing can rotate it away. It self-renews for about <b>a month</b> (the card shows <i>"Sign-in expires around …"</i>); you'll get 7 / 3 / 1-day warnings before it lapses, and renewing is the same one-minute flow via <b>"Re-sign in"</b>.</p>
-  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v1.0 (July 2026)</span><span>4</span></div>
+  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v1.1 (July 2026)</span><span>4</span></div>
 </div>
 
 <!-- ================= PAGE 4 · SIGN-IN SCREENS ================= -->
@@ -262,7 +268,7 @@
     </div>
   </div>
   <div class="callout" style="margin-top:5mm;"><b>Token safety:</b> the sign-in is stored <b>encrypted on the phone only</b> (Android Keystore) and is never sent anywhere except Anthropic's own API. No servers, no telemetry, no analytics — nothing else ever sees it.</div>
-  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v1.0 (July 2026)</span><span>5</span></div>
+  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v1.1 (July 2026)</span><span>5</span></div>
 </div>
 
 <!-- ================= PAGE 5 · BACKUP TOKEN METHOD ================= -->
@@ -291,7 +297,7 @@ npx -y qrcode-terminal "$(security find-generic-password -s 'Claude Code-credent
       <figure><img src="shots/token-guide-light.png" width="152"><figcaption>The full walkthrough also lives in-app:<br>"How do I get my token?" (macOS / Windows / Linux)</figcaption></figure>
     </div>
   </div>
-  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v1.0 (July 2026)</span><span>6</span></div>
+  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v1.1 (July 2026)</span><span>6</span></div>
 </div>
 
 <!-- ================= PAGE 6 · READING THE SCREENS ================= -->
@@ -304,23 +310,28 @@ npx -y qrcode-terminal "$(security find-generic-password -s 'Claude Code-credent
       <h3>7-day window card</h3>
       <ul class="dots" style="font-size:8.8pt;">
         <li><b>All models</b> — your total weekly usage</li>
-        <li><b>Fable</b> (and any other per-model cap the API reports)</li>
-        <li><b>Days elapsed</b> — how far through the 7-day window you are (time, not usage). All three share one reset footer — they reset together.</li>
+        <li><b>Fable</b> (and any other per-model cap the API reports). Both share one reset footer — they reset together.</li>
       </ul>
-      <h3>The pacing trick</h3>
-      <p style="font-size:8.8pt;">Compare <b>Days elapsed</b> against the usage bars. Usage <b>behind</b> Days elapsed → you have headroom. Usage <b>ahead</b> of it → you may run out before the weekly reset.</p>
-      <h3>Burn-rate forecast <span class="tag">v0.9+</span></h3>
-      <p style="font-size:8.8pt;">Once a window has ~20 minutes of history, each card grows a <b>sparkline</b> of that window's usage curve (solid = what happened, dashed = where it's heading) and a plain-words projection — <i style="color:#B0483A;">"At this pace: 100% at Thu 2:40 PM — 1h 20m before the reset"</i> in red when you're on course to hit the wall, or <i>"At this pace: ~62% when the window resets"</i> in grey when you're safe. History comes from the app's own polls and stays on the phone.</p>
+      <h3>The pace chart <span class="tag">v1.1</span></h3>
+      <p style="font-size:8.8pt;">Every card carries a chart of that window: a <b>dot for each reading</b> the app has taken, dashed guides at <b>80 / 90 / 100%</b>, a marker on the latest figure, and the forecast as a <b>dashed tail</b> to where you'll land. The x axis spans the whole window — start on the left, reset on the right, <code class="inline">now</code> marked in between.</p>
+      <h3>The even-pace line — the one to watch</h3>
+      <p style="font-size:8.8pt;">The dashed <b style="color:#C79A22;">yellow diagonal</b> runs from 0% at the window's start to 100% at its reset: spend evenly and you'd track it exactly. So <b>below the line = you'll finish inside your limit</b>; above it you're on course to run out early, and the overshoot <b style="color:#C4701D;">shades amber</b> to show when you crossed and by how much. The readout says it in words too — <i>"33 points below even pace"</i>, or <i style="color:#C4701D;">"13 points above even pace"</i>.</p>
+      <h3>Burn-rate forecast</h3>
+      <p style="font-size:8.8pt;">After ~20 minutes of history and some movement: <i style="color:#B0483A;">"100% at Thu 2:40 PM — 1h 20m before the reset"</i> in red when you're heading for the wall, or <i>"~62% when the window resets · 0.4%/h"</i> when you're safe. It fits a line across <b>every</b> reading, so one early burst won't skew it — and if it can't say anything honest yet, it tells you why instead of showing nothing.</p>
+      <h3>Usage credits <span class="tag">v1.1</span></h3>
+      <p style="font-size:8.8pt;">Plans with <b>pay-as-you-go credits</b> get a third card: <code class="inline">$5.99 / $100.00</code> with the percentage spent and what's left. No credit budget, no card.</p>
       <h3>Bar colors</h3>
       <p style="font-size:8.8pt;">Your theme color normally → <b style="color:#C79A22;">yellow</b> above 80% → <b style="color:#C4701D;">orange</b> above 90% → <b style="color:#B0483A;">red</b> at 100%. Only the bars shift; text stays neutral.</p>
+      <h3>Usage history</h3>
+      <p style="font-size:8.8pt;">The <b>calendar icon</b> in the top bar opens a bar for <b>every 5-hour session</b> — newest first, coloured by its peak and <b style="color:#B0483A;">red when one hit 100%</b>. Page back through earlier weeks, or switch to <b>7-day</b> for one bar per week. Written as each window closes and kept a year.</p>
       <p class="muted" style="font-size:8.4pt; margin-top:3mm;">Data refreshes automatically every 15 minutes (configurable, minimum 5). "Last success / Last attempt" under the Refresh button always tell you how fresh the numbers are.</p>
     </div>
     <div style="flex:1; display:flex; flex-direction:column; gap:5mm; align-items:center;">
-      <figure><img src="shots/work-tab-yellow.png" width="152"><figcaption>The Work tab, live — 5-hour, 7-day (All models)<br>and the Days-elapsed pacing bar</figcaption></figure>
-      <figure><img src="shots/work-tab-final.png" width="152"><figcaption>The Personal tab — same layout,<br>your other account</figcaption></figure>
+      <figure><img src="shots/v11-charts-top.png" width="152"><figcaption>Both windows charted, each<br>against its even-pace line</figcaption></figure>
+      <figure><img src="shots/v11-chart-credits.png" width="152"><figcaption>The 7-day chart and the<br>usage-credits card below it</figcaption></figure>
     </div>
   </div>
-  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v1.0 (July 2026)</span><span>7</span></div>
+  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v1.1 (July 2026)</span><span>7</span></div>
 </div>
 
 <!-- ================= PAGE 7 · WIDGETS ================= -->
@@ -329,14 +340,13 @@ npx -y qrcode-terminal "$(security find-generic-password -s 'Claude Code-credent
   <div class="shots">
     <figure><img src="shots/widget-large-dark.png" width="150"><figcaption>On the home screen — the full 4×3 widget<br>plus two single-bar widgets</figcaption></figure>
     <figure><img src="shots/widget-theme-blue.png" width="150"><figcaption>Themeable — the same widgets in a<br>blue accent (13 colors to pick)</figcaption></figure>
-    <figure><img src="shots/widget-setup.png" width="150"><figcaption>Setup screen — pick the profile<br>and which window it shows</figcaption></figure>
   </div>
   <div class="cols" style="margin-top:5mm;">
     <div>
       <h3 style="margin-top:0;">Two widget types</h3>
       <ul class="dots">
-        <li><b>Full widget (4×3 default)</b> — everything: 5-hour, 7-day bars, days elapsed, reset times.</li>
-        <li><b>Single-bar widget (2×1)</b> — one bar of your choice: 5-hour, 7-day all-models, per-model (Fable), or days elapsed. Place as many as you like, mixing profiles freely.</li>
+        <li><b>Full widget (4×3 default)</b> — everything: 5-hour, the 7-day bars, per-model caps, reset times (and usage credits if you opt in).</li>
+        <li><b>Single-bar widget (2×1)</b> — one bar of your choice: 5-hour, 7-day all-models, per-model (Fable), or <b>usage credits</b>. Place as many as you like, mixing profiles freely.</li>
       </ul>
       <h3>Resizing</h3>
       <p style="font-size:8.8pt;">Long-press → drag the handles: <b>small</b> = 5-hour only · <b>medium</b> = 5-hour + 7-day total · <b>large</b> (default) = everything.</p>
@@ -350,7 +360,7 @@ npx -y qrcode-terminal "$(security find-generic-password -s 'Claude Code-credent
       </ul>
     </div>
   </div>
-  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v1.0 (July 2026)</span><span>8</span></div>
+  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v1.1 (July 2026)</span><span>8</span></div>
 </div>
 
 <!-- ================= PAGE 8 · ALERTS + TILES ================= -->
@@ -378,7 +388,7 @@ npx -y qrcode-terminal "$(security find-generic-password -s 'Claude Code-credent
       <figure><img src="shots/quick-settings-tiles.png" width="150"><figcaption>Two tiles in the shade —<br>Personal and Work</figcaption></figure>
     </div>
   </div>
-  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v1.0 (July 2026)</span><span>9</span></div>
+  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v1.1 (July 2026)</span><span>9</span></div>
 </div>
 
 <!-- ================= PAGE 9 · SETTINGS ================= -->
@@ -388,27 +398,28 @@ npx -y qrcode-terminal "$(security find-generic-password -s 'Claude Code-credent
     <div style="flex:1.55;">
       <table>
         <tr><th>Setting</th><th>What it does</th></tr>
-        <tr><td>Account cards</td><td>"Sign in on this phone" (with browser picker) — or the paste / QR backup. Once signed in: status chip, plan badge (Pro / Max / Team), last-checked with check-now, auto-renew countdown, "Sign-in expires around …", added date, token tail, backoff status, Re-sign in / Clear.</td></tr>
+        <tr><td>Account cards</td><td>"Sign in on this phone" (with browser picker) — or the paste / QR backup. Once signed in: status chip, plan badge, last-checked, auto-renew and sign-in-expiry countdowns, token tail, Re-sign in / Clear.</td></tr>
         <tr><td>Profile names</td><td>Rename Personal / Work to anything — flows through tabs, widgets, tiles and notifications</td></tr>
         <tr><td>Check usage every</td><td>5 / 15 / 30 / 60 min presets (default 15) — saves on tap</td></tr>
         <tr><td>Usage warnings</td><td>Per-window threshold chips (5-hour 80/90/95, 7-day &amp; per-model 75/90)</td></tr>
         <tr><td>Reset pings</td><td>Per window: Off / If busy (only if it reached 80%) / Always</td></tr>
         <tr><td>Profile / sign-in / stale alerts</td><td>Per-profile mute, plus separate sign-in and stale-data toggles</td></tr>
-        <tr><td>Pinned notification</td><td>Always-on usage notification: on/off, which profile, status-bar icon style</td></tr>
+        <tr><td>Pinned notification</td><td>Always-on usage notification: on/off, which profile, <b>notification style</b> (Gauge / Number tile / Progress bar / Huge number), what a tap opens (this app or the <b>Claude app</b>), and the status-bar icon style</td></tr>
+        <tr><td>Quick Settings tile</td><td>What the tile's subtitle shows: <b>Countdown</b> ("resets in 2h 14m") or <b>Clock time</b> ("resets 4:12 PM")</td></tr>
+        <tr><td>Usage credits</td><td>Show the pay-as-you-go credits card, per profile — plus an opt-in to add it to the tall widget</td></tr>
         <tr><td>System notif. settings</td><td>Opens Android's per-channel controls</td></tr>
         <tr><td>24-hour time</td><td>Off = "Thu 11:45 PM" (default) · On = "Thu 23:45"</td></tr>
-        <tr><td>Theme color</td><td>13 choices: Material You (dynamic), <b>Claude Orange</b> (default), Blue, Indigo, Cyan, Teal, Green, Amber, Deep Orange, Red, Pink, Purple, Brown — applies to app and widget bars</td></tr>
+        <tr><td>Theme color</td><td>13 choices — Material You (dynamic), <b>Claude Orange</b> (default) and 11 more; applies to the app and the widget bars</td></tr>
         <tr><td>Widgets</td><td>"Add widget to home screen" shortcuts for both types</td></tr>
-        <tr><td>About</td><td>Version, credits, <b>Share feedback</b> (emails robin@eam360.com), <b>Check for updates</b> (asks GitHub for the latest release and links you to it). Tap the version 7× to unlock the debug raw-response viewer.</td></tr>
+        <tr><td>About</td><td>Version, credits, <b>Share feedback</b>, <b>Check for updates</b> (asks GitHub for the latest release). Tap the version 7× for the debug viewer.</td></tr>
       </table>
-      <p class="muted" style="font-size:8.4pt; margin-top:2mm;">Below the Refresh button the app shows <b>Last success</b> and <b>Last attempt</b> as "Mon 6:14 PM (2m ago)". A red status line appears only when something's wrong.</p>
     </div>
     <div style="flex:1; display:flex; flex-direction:column; gap:5mm; align-items:center;">
       <figure><img src="shots/settings-top-dark.png" width="150"><figcaption>Accounts &amp; profile names</figcaption></figure>
       <figure><img src="shots/settings-bottom-dark.png" width="150"><figcaption>Theme colors, widget shortcuts, About</figcaption></figure>
     </div>
   </div>
-  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v1.0 (July 2026)</span><span>10</span></div>
+  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v1.1 (July 2026)</span><span>10</span></div>
 </div>
 
 <!-- ================= PAGE 10 · TROUBLESHOOTING + PRIVACY ================= -->
@@ -432,7 +443,7 @@ npx -y qrcode-terminal "$(security find-generic-password -s 'Claude Code-credent
     <li>Reading the usage API with a Pro token outside Claude Code / claude.ai is not covered by Anthropic's consumer ToS; personal-use risk was accepted when this was built.</li>
     <li>Not affiliated with or endorsed by Anthropic. Sideload-only, free, no accounts, no strings.</li>
   </ul>
-  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v1.0 (July 2026)</span><span>11</span></div>
+  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v1.1 (July 2026)</span><span>11</span></div>
 </div>
 
 <!-- ================= PAGE 11 · HISTORY + CREDITS ================= -->
@@ -440,6 +451,7 @@ npx -y qrcode-terminal "$(security find-generic-password -s 'Claude Code-credent
   <div class="sechead"><div class="secnum">9</div><div><h2>Version history &amp; dev notes</h2></div></div>
   <table>
     <tr><th style="width:14mm;">Ver.</th><th>Highlights</th></tr>
+    <tr><td><b>1.1</b></td><td><b>Credits, a readable chart, and a notification you can read at a glance.</b> Pay-as-you-go <b>usage credits</b> on the main screen and as a widget; <b>four notification styles</b> including a big-number layout; the Quick Settings tile now shows the 5-hour reset; a rebuilt <b>pace chart</b> with an even-pace line, per-reading dots and threshold guides. Fixed: the chart and forecast almost never appeared (readings were matched to a window by an exact reset timestamp the server keeps nudging forward), usage history was wiped on sign-out, and the forecast fitted only the first and last reading. Retired the Days-elapsed bar. Built with <b>Claude Opus 5</b>.</td></tr>
     <tr><td><b>1.0</b></td><td><b>First official release.</b> The v0.1–v0.14 beta, now official: live 5-hour &amp; 7-day windows for Personal + Work, usage history, pinned notification, granular alerts, burn-rate forecast, home-screen widgets &amp; Quick Settings tiles, on-phone sign-in — private, no servers, backed up. Prototyped and built in a weekend by <b>Claude Fable 5</b>; the native sign-in Fable declined, and all the docs, finished by <b>Claude Opus 4.8</b>.</td></tr>
     <tr><td>0.14</td><td><b>Feedback, updates &amp; distribution.</b> Share feedback now opens an email to robin@eam360.com (was WhatsApp); new <b>Check for updates</b> in About queries the public GitHub Releases API; the APK ships only as a GitHub Release asset.</td></tr>
     <tr><td>0.13</td><td><b>History, pinned notification &amp; finer alerts.</b> Usage history screen (per-session &amp; per-week bars, year-long log); always-on pinned notification with a status-bar gauge; granular alerts (threshold chips, off/if-busy/always resets, per-profile mute); editable profile names; true warning-red at 100%; Android Auto Backup. Now signed with a permanent key (this upgrade needed a reinstall).</td></tr>
@@ -456,7 +468,7 @@ npx -y qrcode-terminal "$(security find-generic-password -s 'Claude Code-credent
     <tr><td>0.2</td><td>Large widget layout with exact reset date-times.</td></tr>
     <tr><td>0.1</td><td>First working app + widget.</td></tr>
   </table>
-  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v1.0 (July 2026)</span><span>12</span></div>
+  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v1.1 (July 2026)</span><span>12</span></div>
 </div>
 
 <!-- ================= PAGE 12 · DEV NOTES + CREDITS ================= -->
@@ -478,7 +490,7 @@ npx -y qrcode-terminal "$(security find-generic-password -s 'Claude Code-credent
       <p class="muted" style="font-size:8.6pt; margin-top:1mm;">Prototyped and built in a weekend by <b>Claude Fable 5</b> — the app, the widgets, this guide's first drafts. When the OAuth sign-in tripped Fable's cybersecurity guardrails, <b>Claude Opus 4.8</b> built that handshake and finished the docs. If you'd like the APK or want to build something like this, just ask.</p>
     </div>
   </div>
-  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v1.0 (July 2026)</span><span>13</span></div>
+  <div class="foot"><span><b>Claude Cooldown</b> · User Guide · v1.1 (July 2026)</span><span>13</span></div>
 </div>
 
 </body>

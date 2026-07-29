@@ -50,7 +50,7 @@
   .feat b{ display:block; font-size:9.2pt; margin-bottom:1mm; }
   .feat span{ font-size:7.9pt; color:var(--muted); line-height:1.45; display:block;}
 
-  .story{ margin-top:6mm; display:flex; gap:7mm; }
+  .story{ margin-top:5mm; display:flex; gap:7mm; }
   .story .txt{ flex:1.5; }
   .story p{ font-size:9.3pt; line-height:1.6; }
   .story p+p{ margin-top:2.2mm; }
@@ -60,8 +60,8 @@
   .stat span{ font-size:7.4pt; color:var(--muted); line-height:1.3; display:block; margin-top:.6mm;}
 
   .cta{
-    margin-top:5mm; background:var(--dark); color:#EDEAE2; border-radius:4mm;
-    padding:5mm 6.5mm; display:flex; align-items:center; gap:7mm;
+    margin-top:2.5mm; background:var(--dark); color:#EDEAE2; border-radius:4mm;
+    padding:3.2mm 6.5mm; display:flex; align-items:center; gap:7mm;
   }
   .cta .qr{ background:#fff; border-radius:2.5mm; padding:2.2mm; width:26mm; height:26mm; flex-shrink:0;}
   .cta .qr img{ width:100%; height:100%; display:block;}
@@ -69,7 +69,7 @@
   .cta p{ font-size:8.8pt; line-height:1.55; color:#C9C3B6;}
   .cta p b{ color:#F5F2EA; }
   .cta .o{ color:var(--accent-soft); font-weight:600;}
-  .fine{ margin-top:3mm; font-size:7pt; color:var(--muted); line-height:1.42; text-align:center;}
+  .fine{ margin-top:1.5mm; font-size:6.8pt; color:var(--muted); line-height:1.42; text-align:center;}
 </style>
 </head>
 <body>
@@ -90,13 +90,13 @@
   <div class="sub">Every Claude plan has a 5-hour session window and a 7-day weekly window. CCooldown puts both on your Android home screen — for your <b style="color:#F5F2EA;">Personal and Work accounts at once</b> — forecasts when you'll hit the wall at your current pace, and pings you before it happens <i>and</i> the moment you're back.</div>
 
   <div class="shots">
-    <figure><img src="shots/work-tab-final.png" width="172"><figcaption>The app — both windows, the<br>pacing bar and exact reset times</figcaption></figure>
+    <figure><img src="shots/v11-chart-credits.png" width="172"><figcaption>The app — the pace chart<br>and your usage credits</figcaption></figure>
     <figure><img src="shots/widget-large-dark.png" width="172"><figcaption>The widgets — live on your home<br>screen, in your accent color</figcaption></figure>
     <figure><img src="shots/quick-settings-tiles.png" width="172"><figcaption>The tiles — Personal &amp; Work usage in the<br>shade, visible from inside any app</figcaption></figure>
   </div>
 
   <div class="chips">
-    <span class="chip">LIVE WIDGETS</span><span class="chip">BURN-RATE FORECAST</span><span class="chip">SMART ALERTS</span><span class="chip">PERSONAL + WORK</span><span class="chip">QUICK-SETTINGS TILES</span><span class="chip">NO SERVERS</span>
+    <span class="chip">LIVE WIDGETS</span><span class="chip">PACE CHART</span><span class="chip">USAGE CREDITS</span><span class="chip">SMART ALERTS</span><span class="chip">PERSONAL + WORK</span><span class="chip">NO SERVERS</span>
   </div>
 
   <div class="claudeband">
@@ -109,28 +109,28 @@
 <div class="page p2">
   <h2>What it <span>does</span></h2>
   <div class="grid">
-    <div class="feat"><span class="ic">📊</span><b>Both limit windows, live</b><span>5-hour session bar + 7-day bars (all models <i>and</i> per-model caps like Fable), with exact reset day &amp; time for each.</span></div>
     <div class="feat"><span class="ic">📅</span><b>Usage history</b><span>A scrollable bar for every 5-hour session, week by week — see how many you ran and which ones hit 100%.</span></div>
-    <div class="feat"><span class="ic">📌</span><b>Pinned notification</b><span>An optional always-on, silent notification with a status-bar gauge that fills as you use your 5-hour window.</span></div>
-    <div class="feat"><span class="ic">📈</span><b>Burn-rate forecast</b><span>A sparkline of your usage curve and a plain-words projection: "At this pace: 100% at Thu 2:40 PM — 1h 20m before the reset."</span></div>
+    <div class="feat"><span class="ic">📌</span><b>Pinned notification</b><span>Always-on and silent, with a status-bar gauge that fills — in four styles, including one with the percentage as big as it goes.</span></div>
+    <div class="feat"><span class="ic">📈</span><b>The pace chart</b><span>Every reading plotted, with a forecast tail: "At this pace: 100% at Thu 2:40 PM — 1h 20m before the reset."</span></div>
     <div class="feat"><span class="ic">🔔</span><b>Granular alerts</b><span>Per-window threshold chips, reset pings set off / if-busy / always, and a per-profile mute — quiet when you want, loud when it counts.</span></div>
-    <div class="feat"><span class="ic">⏱️</span><b>The pacing bar</b><span>"Days elapsed" sits under your weekly bars — usage behind it means headroom, ahead of it means slow down.</span></div>
+    <div class="feat"><span class="ic">⏱️</span><b>The even-pace line</b><span>One diagonal across each chart. Below it you'll finish inside your limit; cross it and the overshoot shades amber.</span></div>
     <div class="feat"><span class="ic">👥</span><b>Two accounts, editable</b><span>Personal (Pro/Max) and Work (Team) as fully independent profiles — separate tabs, widgets, tiles and alerts; rename them freely.</span></div>
     <div class="feat"><span class="ic">🔐</span><b>Sign in on the phone</b><span>The same secure OAuth flow Claude Code uses, right from the phone — no computer, no copied tokens, self-renews monthly.</span></div>
+    <div class="feat"><span class="ic">💳</span><b>Usage credits</b><span>Pay-as-you-go credits get their own card — spent, total and what's left. Plans without them never see it.</span></div>
     <div class="feat"><span class="ic">💾</span><b>Private &amp; backed up</b><span>No servers or telemetry; the token is Keystore-encrypted. History &amp; settings now survive a reinstall (token excluded).</span></div>
   </div>
 
   <div class="story">
     <div class="txt">
       <h2 style="margin-bottom:2.5mm;">How it was <span>made</span></h2>
-      <p>CCooldown exists because of one recurring pain: deep in a Claude chat or a Cowork run, the dreaded <i>"approaching your limit"</i> — with no idea how close, or when the window resets. (Claude Code can tell you; the chat and Cowork apps can't.) The fix: put the answer where your eyes already are — the home screen.</p>
-      <p><b>Claude Fable 5 built it — in a weekend.</b> After a week of ideas and throwaway prototypes, one weekend turned it real: pushed to git, signed, running on an actual phone. Fable wrote virtually everything — the app, the Glance widgets, the alert logic, even the reverse-engineering of the undocumented usage API.</p>
-      <p>Then it hit the one wall Fable wouldn't cross: the OAuth <b>sign-in handshake</b>, which Fable declined on cybersecurity grounds. <b>Claude Opus 4.8</b> stepped in — built the native sign-in the app now uses, and wrote the docs Fable left undone. If you pay for Claude, you already have the engineer… or two.</p>
+      <p>CCooldown exists because of one recurring pain: deep in a Claude chat or a Cowork run, the dreaded <i>"approaching your limit"</i> — with no idea how close, or when the window resets. Claude Code can tell you; the chat and Cowork apps can't. The fix: put the answer where your eyes already are.</p>
+      <p><b>Claude Fable 5 built it — in a weekend.</b> After a week of throwaway prototypes, one weekend turned it real: pushed to git, signed, running on a phone. Fable wrote virtually everything — the app, the Glance widgets, the alert logic, even the reverse-engineering of the undocumented usage API.</p>
+      <p>Then it hit the one wall Fable wouldn't cross: the OAuth <b>sign-in handshake</b>, which Fable declined on cybersecurity grounds. <b>Claude Opus 4.8</b> stepped in — built the native sign-in the app now uses, and wrote the docs Fable left undone. <b>Claude Opus 5</b> shipped v1.1 — the pace chart, usage credits, and a forecast fix. If you pay for Claude, you already have the engineer… or three.</p>
     </div>
     <div class="stats">
-      <div class="stat"><b>v1.0</b><span>first official release<br>(v0.1–v0.14 in beta)</span></div>
+      <div class="stat"><b>v1.1</b><span>credits, pace chart,<br>notification styles</span></div>
       <div class="stat"><b>1</b><span>weekend to a working<br>build on a real phone</span></div>
-      <div class="stat"><b>100%</b><span>written by Claude<br>Fable 5 + Opus 4.8</span></div>
+      <div class="stat"><b>100%</b><span>written by Claude<br>Fable 5 · 4.8 · Opus 5</span></div>
       <div class="stat"><b>0</b><span>servers, trackers<br>or analytics</span></div>
     </div>
   </div>
@@ -144,7 +144,7 @@
     </div>
   </div>
 
-  <div class="fine">Android 12+ · sideloaded APK, not on any store · Claude Pro / Max / Team · token encrypted on-device, only ever talks to Anthropic · unofficial — uses the Claude Code CLI's sign-in against an undocumented usage endpoint · by Robin Richard Rajan, not affiliated with or endorsed by Anthropic · v1.0, July 2026</div>
+  <div class="fine">Android 12+ · sideloaded APK, not on any store · Claude Pro / Max / Team · token encrypted on-device · <b>unofficial</b> — uses the Claude Code CLI's sign-in against an undocumented usage endpoint · by Robin Richard Rajan, <b>not affiliated with or endorsed by Anthropic</b> · v1.1, July 2026</div>
 </div>
 
 </body>

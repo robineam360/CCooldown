@@ -12,7 +12,7 @@ to see how close you are.
 
 **📱 Android only (for now)** — an iOS version is on the roadmap. iPhone folks, watch this space.
 
-📄 **Docs:** [User Guide (PDF)](Release/docs/CCooldown-User-Guide-v1.0.pdf) — the full
+📄 **Docs:** [User Guide (PDF)](Release/docs/CCooldown-User-Guide-v1.1.pdf) — the full
 install → sign-in → widgets walkthrough · [Brochure (PDF)](Release/docs/CCooldown-Brochure.pdf) —
 a 2-page overview.
 
@@ -48,11 +48,14 @@ a 2-page overview.
 - **Granular alerts** 🆕 — pick exactly which thresholds warn you per window (5-hour, 7-day,
   per-model), turn reset pings off / smart / always, and mute a whole profile — no more
   all-or-nothing
-- **Burn-rate projection** — a sparkline of each window's usage curve and a plain-words
-  forecast ("At this pace: 100% at 2:40 PM — 1h 20m before the reset"), built from a local
-  history of your own polls
-- **A "days elapsed" pacing bar** — see whether your weekly usage is running ahead of or
-  behind the week itself
+- **Pace chart + burn-rate projection** — every reading plotted with threshold guides and a
+  forecast tail, plus a plain-words verdict ("At this pace: 100% at 2:40 PM — 1h 20m before
+  the reset"), built from a local history of your own polls
+- **Pay-as-you-go usage credits** — spent, total and what's left, on the main screen and as
+  a widget; hidden for plans without a credit budget
+- **An "even pace" line on every chart** — the diagonal from 0% at the window's start to
+  100% at its reset. Stay below it and you'll finish inside your limit; cross it and the
+  overshoot shades amber
 - **13 theme colors** including Material You dynamic color, full light/dark support; usage
   bars shade amber then a clear warning-red as you approach 100%
 
@@ -237,7 +240,7 @@ About section (it emails <robin@eam360.com>).
 ## Version history
 
 A quick, plain-English tour of what each update added (newest first). The full technical
-changelog lives in the [User Guide](Release/docs/CCooldown-User-Guide-v1.0.pdf).
+changelog lives in the [User Guide](Release/docs/CCooldown-User-Guide-v1.1.pdf).
 
 - **1.0** — First official release — everything below, polished into one build and shared with the team.
 - **0.14** — Feedback now opens an email (was WhatsApp); added a **Check for updates** button; the app downloads from GitHub Releases.

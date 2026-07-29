@@ -3,7 +3,7 @@
 **A personal home-screen widget for your Claude plan limits — for two accounts.**
 Shows the 5-hour and 7-day rolling windows for your **Personal** and **Work** profiles (including per-model caps like Fable), when each resets, how far into the week you are, forecasts *when* you'll hit a limit at your current pace, and warns you *before* you hit it — and *when* a window resets.
 
-> Version **1.0** · released 22 Jul 2026 · sideloaded personal app, not on any store
+> Version **1.1** · released 29 Jul 2026 · sideloaded personal app, not on any store
 > Download the APK from the [latest GitHub release](https://github.com/robineam360/CCooldown/releases/latest)
 
 ---
@@ -36,7 +36,7 @@ Shows the 5-hour and 7-day rolling windows for your **Personal** and **Work** pr
 |:---:|:---:|:---:|
 | ![Widget setup screen](screenshots/widget-setup.png) | ![Threshold and reset notifications](screenshots/notifications.png) | ![Personal and Work tiles](screenshots/quick-settings-tiles.png) |
 
-| Settings — accounts | Settings — About (v1.0) | Themeable (13 colors) |
+| Settings — accounts | Settings — About | Themeable (13 colors) |
 |:---:|:---:|:---:|
 | ![Accounts and profile names](screenshots/settings-top-dark.png) | ![About, version 1.0](screenshots/settings-bottom-dark.png) | ![Blue-theme widgets](screenshots/widget-theme-blue.png) |
 
@@ -172,8 +172,7 @@ The main screen has **two tabs — Personal | Work** — swipe horizontally (or 
 - **7-day window card** — three bars sharing one reset footer (they all reset together):
   - **All models** — your total weekly usage
   - **Fable** (and any other per-model cap the API reports)
-  - **Days elapsed** — how far through the 7-day window you are (time, not usage)
-- **Pacing trick:** compare *Days elapsed* against the usage bars. Usage **behind** Days elapsed → you have headroom. Usage **ahead** of it → you may run out before the weekly reset.
+- **The even-pace line** *(v1.1)*: each chart carries a diagonal from 0% at the window's start to 100% at its reset. **Below it** → you'll finish inside your limit. **Above it** → you're on course to run out early, and the overshoot shades amber. The readout says it in words too: *"33 points below even pace"*.
 - **Burn-rate forecast:** once a window has ~20 minutes of history, each card grows a **sparkline** of that window's usage curve (solid = what actually happened, dashed = where it's heading) and a plain-words projection: *"At this pace: 100% at Thu 2:40 PM — 1h 20m before the reset"* in red when you're on course to hit the wall, or *"At this pace: ~62% when the window resets"* in grey when you're safe. The history is collected from the app's own polls and stays on the phone.
 
 **Bar colors:** your chosen theme color normally → **yellow** above 80% → **orange** above 90% → a clear **warning-red** at 100%. The warning hues are deliberately vivid so they never blend into the muted Claude Orange theme. Only the bars shift color; text stays neutral.
@@ -193,8 +192,8 @@ Optionally keep an **always-on, silent notification** in your shade with a **sta
 
 **Two widget types** (the moment you drop either one, a **Widget setup** screen appears asking which **profile** it should show):
 
-- **Full widget (4×3 default)** — everything: 5-hour, 7-day bars, days elapsed, reset times
-- **Single-bar widget (2×1)** — one bar of your choice: 5-hour, 7-day all models, per-model (Fable), or Days elapsed. Place as many as you like, mixing profiles freely.
+- **Full widget (4×3 default)** — everything: 5-hour, the 7-day bars, per-model caps, reset times (and usage credits if you opt in)
+- **Single-bar widget (2×1)** — one bar of your choice: 5-hour, 7-day all models, per-model (Fable), or **usage credits**. Place as many as you like, mixing profiles freely.
 
 **Widget specifics:**
 
@@ -292,6 +291,7 @@ Below the Refresh button the app shows **Last success** and **Last attempt** as 
 
 ## 9 · Version history
 
+- **1.1** — **Credits, a readable chart, and a notification you can read at a glance.** Pay-as-you-go **usage credits** on the main screen and as a single-bar widget (per-profile switches, plus an opt-in for the tall widget); **four notification styles** — Gauge, Number tile, Progress bar and Huge number — so the pinned percentage is finally legible, with the collapsed row now showing the 5-hour window only; tapping the notification can open the **Claude app**; the **Quick Settings tile** shows the 5-hour reset as a countdown or a clock time and its icon fills as the window burns; a rebuilt **pace chart** — twice as tall, a dot per reading, threshold guides at 80/90/100% and an **even-pace line** with the overshoot shaded amber. **Fixed:** the chart and forecast almost never appeared (readings were matched to a window by an exact reset timestamp the server nudges forward on nearly every check — 561 distinct values across 672 readings, one matching); usage history was wiped on sign-out; the forecast fitted only the first and last reading. **Retired** the Days-elapsed bar. Built with **Claude Opus 5**.
 - **1.0** — **First official release.** The v0.1–v0.14 beta, now official and shared with the team — everything below in one polished build: live 5-hour & 7-day windows for Personal + Work, usage history, pinned notification, granular alerts, burn-rate forecast, home-screen widgets & Quick Settings tiles, on-phone sign-in — private, no servers, backed up. Prototyped and built over a weekend by **Claude Fable 5**; the native sign-in Fable declined (on cybersecurity grounds) and all the docs finished by **Claude Opus 4.8**.
 - **0.14** — **Feedback, updates & distribution.** Share feedback now opens an email to robin@eam360.com (was WhatsApp); new **Check for updates** in About queries the public GitHub Releases API and links to the latest release; the APK is no longer committed to the repo — it ships only as a GitHub Release asset.
 - **0.13** — **History, pinned notification & finer alerts.** New **Usage history** screen: scrollable bars, one per 5-hour session (day + start time, red when it hit 100%) with a week pager, plus a per-week view — backed by a new on-device session log kept for a year. New optional **pinned notification**: an always-on, silent status readout with a status-bar gauge icon that fills with your 5-hour usage (Ring/Pie/Battery/Number styles), expanding to the 7-day and per-model bars with a Refresh action. **Alerts are now granular** — per-window threshold chips, reset pings set to Off/If-busy/Always, and a per-profile mute — instead of three blunt toggles. **Profile names are editable.** The 100% bar colour is now a true warning-red (previously an orange that clashed with the Claude Orange theme). And **Android Auto Backup** now preserves history + settings across reinstall/new-device (the encrypted token is excluded). Releases are now signed with a permanent key, so from here on updates install in place and keep your data — the one-time cost was this upgrade needing a reinstall.
