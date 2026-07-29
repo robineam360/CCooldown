@@ -41,11 +41,42 @@ root). `app/build.gradle.kts` reads them automatically.
 - On a fresh clone without the two files, `assembleRelease` still builds but produces an
   **unsigned** APK — restore the keystore files before a real release.
 
-## 3. Update the docs if needed
+## 3. Update the docs
 
-- `Release/USER-GUIDE.md` — if screens or setup steps changed
-- `Release/screenshots/` — if the UI changed visibly
-- `README.md` — if features changed
+The PDFs are generated — never edit them. The sources are `Release/docs/src/guide.html`
+and `brochure.html`; edit those, then rebuild with one command:
+
+```bash
+./Release/docs/build.sh
+```
+
+It reads `versionName` from `app/build.gradle.kts` and writes three files into
+`Release/docs/`:
+
+| Output | What it's for |
+|---|---|
+| `CCooldown-User-Guide-v<ver>.pdf` | the 13-page guide the README and release notes link to |
+| `CCooldown-Brochure.pdf` | the 2-page pitch |
+| `CCooldown-whats-new-v<ver>.png` | **guide page 3 as a single image** — paste under a Slack post |
+
+The one-pager is *sliced out of* `guide.html` at build time, not authored separately, so
+it can't drift. That's deliberate: don't add a fourth "what's new" document — the guide
+page already is one.
+
+**⚠️ Read every page you changed in the built PDF.** Each `.page` is a fixed A4 box with
+`overflow:hidden`, so content that doesn't fit is **silently clipped, not reflowed**. In
+v1.1 four pages overflowed and one lost an entire callout before anyone noticed. Adding a
+row to a table, or a card to a grid, is enough to do it.
+
+Also update by hand when the UI or features change:
+
+- `Release/USER-GUIDE.md` — the markdown guide (its own version header + changelog)
+- `README.md` — feature bullets, and **both PDF links** if the version in the guide's
+  filename changed
+- `Release/docs/src/shots/` — screenshots. Retire any that show a removed feature; a
+  figure that contradicts the text is worse than no figure. v1.1's blue-accent
+  "themeable" figure is currently absent for this reason — reshoot it with a blue theme
+  if you want it back.
 
 ## 4. Commit and push
 

@@ -11,7 +11,22 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
 
 ## Open
 
-_Nothing open._
+### CCBG-3 · Credits card ignores extra-usage being switched off
+- **Status:** Open
+- **Severity:** Low (misleading display, no data loss) — and possibly unreachable
+- **Symptom:** Suspected, not observed. The credits card renders whenever
+  `limit > 0`, so an account that has *switched extra usage off* while keeping a
+  non-zero monthly limit would still be shown a credits bar as though it were live.
+- **Detail:** the payload carries `spend.enabled` and `extra_usage.is_enabled`, and
+  `UsageParser` reads neither — see `creditsFrom()` in
+  [Models.kt](app/src/main/java/com/robin/claudeusage/data/Models.kt). The render gate is
+  the `limitMinor > 0` check in `MainActivity`, `UsageWidget` and `BarWidget`.
+- **Why it's still open rather than fixed:** both flags read `true` on every account we
+  can see, so the disabled-with-a-limit state has never been observed. Gating on a flag
+  whose behaviour we can't verify risks hiding the card from people who should see it —
+  the worse failure. Fix it when someone can actually produce the state.
+- **Fix when confirmed:** treat `enabled == false` as "no credits" in `SpendCredits`, and
+  add a `UsageParserTest` case with the real payload for that state.
 
 ---
 
@@ -51,10 +66,10 @@ _Nothing open._
   `historyStore.clear(profile)` from `clearCredentials()`. Both stores are now
   untouched by the credential lifecycle, so `HistoryStore` and `SessionLog` stay
   consistent, and stale points age out via the existing 8-day prune.
-- **Follow-up:** nothing clears history any more. `HistoryStore.clear()` and
-  `SessionLog.clear()` are now callerless. If a genuine account switch should
-  start clean, that needs its own explicit affordance (or the account-comparison
-  variant below) — worth a roadmap item rather than re-coupling it to sign-out.
+- **Follow-up:** nothing clears history any more — `HistoryStore.clear()` and
+  `SessionLog.clear()` are both callerless. A genuine account switch needs its own
+  explicit affordance rather than re-coupling it to sign-out; filed as
+  [CCRM-14](ROADMAP.md).
 - **Severity:** High (silent data loss)
 - **Symptom:** After clearing credentials and signing back in, the accumulated usage
   history/trend for that profile is gone.

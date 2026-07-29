@@ -54,9 +54,8 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
   something else, and this content was chosen explicitly.
 - **Not done:** the pinned notification still shows windows only — it's already tight
   on space (see CCRM-3).
-- **Open question:** `spend.enabled` / `extra_usage.is_enabled` are parsed past, not
-  acted on. If someone turns extra usage off while keeping a non-zero limit, we still
-  draw the bar. Revisit if that state turns out to be reachable.
+- **Known gap:** `spend.enabled` / `extra_usage.is_enabled` are parsed past, not acted
+  on — filed as [CCBG-3](BUGS.md).
 
 ### CCRM-2 · Configurable persistent-notification tap action
 - **Status:** Done (2026-07-27)
@@ -167,6 +166,31 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
   windowLengthMs)`, generalised off 7 days so the 5-hour chart gets the same readout.
   Widgets already placed as `"days"` fall through to the 7-day bar, which is what the
   figure was derived from.
+
+### CCRM-14 · A way to clear usage history
+- **Status:** Planned
+- **Why:** CCBG-1 decoupled history from the credential lifecycle, which was right — but
+  it left *nothing* able to clear it. `HistoryStore.clear()` and `SessionLog.clear()` are
+  both callerless. Someone genuinely switching the account behind a profile slot has no
+  way to start clean, and their new account inherits the old one's trend line.
+- **Approach:** an explicit, confirmed action rather than a side effect of anything else —
+  "Clear usage history" under the account card or Settings → Usage history, with a
+  confirmation naming what goes (the 8-day sample history *and* the year-long session log,
+  which must be cleared together or the bars and the sparkline disagree).
+- **Deliberately not:** wiring it back into "Clear credentials". That's what CCBG-1 was.
+
+### CCRM-15 · Verify the above-pace chart state on a device
+- **Status:** Planned · small
+- **Why:** The pace chart's warning half — the amber overshoot fill, the wash over the
+  above-pace region, and the bold warning-coloured readout — has **never rendered on real
+  hardware**. Every window on every account we have sits below pace, so it has only ever
+  been seen in a wireframe. It shipped in v1.1 unobserved.
+- **Approach:** either wait for a window to genuinely cross (Work's 5-hour window has been
+  climbing at ~18%/h, so this may happen on its own), or add a debug-only override that
+  forces the chart to plot a synthetic above-pace series so the state can be inspected and
+  screenshotted on demand. The latter is worth having regardless — it's the only way to
+  screenshot the state for the docs.
+- **Then:** capture it for the guide, which currently illustrates only the below-pace case.
 
 ### CCRM-13 · Standalone chart widget
 - **Status:** Planned · gated on the in-app chart proving itself
