@@ -89,17 +89,26 @@ object PinnedNotification {
         val smallIcon = drawStatusIcon(context, pct, cache.pinnedIconStyle())
         val pctText = if (pct == null) "—" else "${pct.toInt()}%"
 
-        // The percentage lives in the gauge/tile, so it stays out of the title —
-        // except in "progress", where the bar carries no number of its own.
-        val title = if (style == "progress") "$pctText · $label · 5-hour"
-        else "$label · 5-hour window"
-        // One compact line so it doesn't wrap next to the gauge on narrow screens.
-        // The absolute reset time still shows on the 7-day bar in the expanded panel.
-        val collapsedText = buildString {
-            if (session?.resetsAt != null) append("Resets ${Fmt.relIn(session.resetsAt)}")
-            else append("Not started yet")
-            data?.weekly?.percent?.let { append(" · 7-day ${it.toInt()}%") }
-        }
+        val resetShort =
+            if (session?.resetsAt != null) "resets ${Fmt.relIn(session.resetsAt)}"
+            else "not started yet"
+        // Collapsed is the 5-hour window and nothing else: percentage, bar, and when
+        // it resets. The 7-day window and the model caps live in the expanded panel,
+        // so repeating any of it here would just be duplicate info.
+        val resetLong =
+            if (session?.resetsAt != null) "Resets ${Fmt.relIn(session.resetsAt)} · " +
+                Fmt.timeOnly(session.resetsAt, use24h)
+            else "Not started yet"
+
+        // "progress" is the odd one out: with setProgress() occupying a row, the
+        // shade drops the content-text line when collapsed, which is where the reset
+        // was. So for that style the title carries the percentage *and* the reset —
+        // the title is the only slot guaranteed to survive — and the text line takes
+        // the profile identity instead. Every other style keeps the percentage in
+        // its own graphic, so the title names the window and the text line resets.
+        val progress = style == "progress"
+        val title = if (progress) "$pctText · $resetShort" else "$label · 5-hour window"
+        val collapsedText = if (progress) "$label · 5-hour window" else resetLong
 
         val openApp = tapIntent(context, cache, profile)
         val refresh = PendingIntent.getBroadcast(
@@ -117,6 +126,9 @@ object PinnedNotification {
             .setOnlyAlertOnce(true)
             .setShowWhen(false)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
+            // Drives the accent the shade uses for the app name and, crucially, the
+            // tint of setProgress()'s bar — the only way to colour that bar.
+            .setColor(fill.toArgb())
             .addAction(0, "Refresh", refresh)
 
         val panel = data?.let { drawPanel(context, label, it, theme, dark, use24h) }
@@ -181,10 +193,16 @@ object PinnedNotification {
         )
     }
 
+    /**
+     * Note there's no `bigLargeIcon(null)` here. Hiding it made the 5-hour
+     * percentage — the whole point of the gauge and number-tile styles — vanish
+     * the moment you expanded the notification. Leaving it unset keeps the large
+     * icon in the expanded header, so the percentage stays put and the panel below
+     * only has to carry the 7-day window.
+     */
     private fun bigPicture(panel: Bitmap, summary: String) =
         NotificationCompat.BigPictureStyle()
             .bigPicture(panel)
-            .bigLargeIcon(null as Bitmap?)
             .setSummaryText(summary)
 
     /**
@@ -246,26 +264,33 @@ object PinnedNotification {
         c.drawRoundRect(RectF(0f, 0f, size.toFloat(), size.toFloat()), size * 0.22f, size * 0.22f, plate)
 
         val label = if (pct == null) "—" else pct.toInt().toString()
-        val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val digits = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = AndroidColor.WHITE
-            textAlign = Paint.Align.CENTER
+            textAlign = Paint.Align.LEFT
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             // Three digits (100) need to step down or they'd run past the tile.
-            textSize = size * if (label.length >= 3) 0.44f else 0.58f
+            textSize = size * if (label.length >= 3) 0.46f else 0.60f
         }
-        // Nudged up a touch to leave room for the percent sign beneath the digits.
-        val baseline = size * 0.5f - (text.descent() + text.ascent()) / 2f - size * 0.06f
-        c.drawText(label, size / 2f, baseline, text)
+        // The percent sign rides as a superscript to the right of the digits rather
+        // than sitting under them, which is how a percentage normally reads.
+        val sign = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = AndroidColor.WHITE
+            textAlign = Paint.Align.LEFT
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textSize = digits.textSize * 0.42f
+            alpha = 215
+        }
 
+        val digitsW = digits.measureText(label)
+        val signW = if (pct == null) 0f else sign.measureText("%")
+        val gap = if (pct == null) 0f else size * 0.015f
+        // Centre the digits + sign as one group.
+        val startX = (size - (digitsW + gap + signW)) / 2f
+        val baseline = size * 0.5f - (digits.descent() + digits.ascent()) / 2f
+
+        c.drawText(label, startX, baseline, digits)
         if (pct != null) {
-            val sign = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = AndroidColor.WHITE
-                textAlign = Paint.Align.CENTER
-                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-                textSize = size * 0.2f
-                alpha = 210
-            }
-            c.drawText("%", size / 2f, size * 0.9f, sign)
+            c.drawText("%", startX + digitsW + gap, baseline - digits.textSize * 0.36f, sign)
         }
         return bmp
     }
@@ -315,15 +340,15 @@ object PinnedNotification {
             c.drawArc(rect, -90f, (360f * fraction).coerceAtLeast(4f), false, arc)
         }
 
-        // Solid center disc — guarantees contrast for the white number.
-        val disc = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = fillArgb }
-        c.drawCircle(cx, cx, size * 0.31f, disc)
-
+        // No centre disc: it was the same colour as the arc, so the ring read as a
+        // solid blob. The number is drawn in the usage colour on the bare shade
+        // instead, which keeps the ring legible as a ring.
         val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = AndroidColor.WHITE
+            color = fillArgb
             textAlign = Paint.Align.CENTER
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            textSize = size * (if (pct != null && pct >= 100.0) 0.22f else 0.26f)
+            // Slightly larger now that it isn't boxed into the disc.
+            textSize = size * (if (pct != null && pct >= 100.0) 0.26f else 0.30f)
         }
         val label = if (pct == null) "—" else "${pct.toInt()}%"
         val baseline = cx - (text.descent() + text.ascent()) / 2f
@@ -335,68 +360,93 @@ object PinnedNotification {
     private fun drawStatusIcon(context: Context, pct: Double?, iconStyle: String): IconCompat =
         IconCompat.createWithBitmap(UsageIcon.draw(context, pct, iconStyle))
 
-    /** The expanded panel: labeled, color-coded bars for 5-hour, 7-day, and model caps. */
+    /**
+     * The expanded panel: the 7-day window and any per-model caps, each drawn the
+     * same way the collapsed row draws the 5-hour window — name on the left, bold
+     * percentage on the right, full-width bar underneath, reset time below it.
+     *
+     * The 5-hour window is deliberately absent: it's the large icon plus the title
+     * in the header above, and repeating it here would be duplicate info. There's
+     * no profile header either, for the same reason — the title already names it.
+     */
     private fun drawPanel(
         context: Context,
-        profileLabel: String,
+        @Suppress("UNUSED_PARAMETER") profileLabel: String,
         data: UsageData,
         theme: Color,
         dark: Boolean,
         use24h: Boolean,
     ): Bitmap? {
-        // 5-hour is already the gauge + title in the header, so the panel covers
-        // the rest: the 7-day window and any per-model caps.
-        data class Bar(val label: String, val window: UsageWindow?, val trailing: String)
+        data class Bar(val label: String, val window: UsageWindow?, val sub: String)
         val bars = buildList {
-            add(Bar("7-day", data.weekly, data.weekly?.resetsAt?.let { Fmt.dayTime(it, use24h) } ?: ""))
+            add(
+                Bar(
+                    "7-day", data.weekly,
+                    data.weekly?.resetsAt?.let { "Resets ${Fmt.dayTime(it, use24h)}" } ?: "",
+                )
+            )
             for (cap in data.modelCaps) add(Bar(cap.modelName, cap.window, ""))
         }.take(4)
+        if (bars.isEmpty()) return null
 
         val width = dp(context, 340f).toInt()
-        val rowH = dp(context, 34f)
-        val headerH = dp(context, 30f)
-        val height = (headerH + rowH * bars.size + dp(context, 8f)).toInt()
-        val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val left = dp(context, 2f)
+        val right = width - dp(context, 2f)
+        val barThick = dp(context, 10f)
+        val labelH = dp(context, 19f)
+        val subH = dp(context, 15f)
+        val rowGap = dp(context, 14f)
+
+        var height = 0f
+        for (b in bars) {
+            height += labelH + dp(context, 7f) + barThick
+            if (b.sub.isNotEmpty()) height += subH
+            height += rowGap
+        }
+
+        val bmp = Bitmap.createBitmap(width, height.toInt().coerceAtLeast(1), Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
 
         val onSurface = if (dark) AndroidColor.parseColor("#ECECEC") else AndroidColor.parseColor("#1F1F1F")
         val muted = if (dark) AndroidColor.parseColor("#9E9E9E") else AndroidColor.parseColor("#6B6B6B")
-        val labelW = dp(context, 84f)
-        val valueW = dp(context, 96f)
-        val barLeft = labelW
-        val barRight = width - valueW
-        val barThick = dp(context, 7f)
 
-        val header = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = onSurface; textSize = dp(context, 14f)
+        val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = onSurface; textSize = dp(context, 13.5f)
+        }
+        // Bold and larger, mirroring the collapsed row's headline percentage.
+        val valuePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = onSurface; textSize = dp(context, 16f); textAlign = Paint.Align.RIGHT
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         }
-        c.drawText("$profileLabel usage", dp(context, 2f), dp(context, 20f), header)
-
-        val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = onSurface; textSize = dp(context, 13f) }
-        val valuePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = muted; textSize = dp(context, 12f); textAlign = Paint.Align.RIGHT
+        val subPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = muted; textSize = dp(context, 12f)
         }
 
-        bars.forEachIndexed { i, bar ->
-            val cy = headerH + rowH * i + rowH / 2f
-            c.drawText(bar.label, dp(context, 2f), cy + dp(context, 4.5f), labelPaint)
+        var y = 0f
+        for (bar in bars) {
+            val baseline = y + labelH - dp(context, 4f)
+            c.drawText(bar.label, left, baseline, labelPaint)
+            c.drawText(bar.window?.percent?.let { "${it.toInt()}%" } ?: "—", right, baseline, valuePaint)
+            y += labelH + dp(context, 7f)
 
             val fill = Palette.barColor(bar.window?.percent, theme, dark)
-            val track = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = fill.copy(alpha = 0.22f).toArgb() }
             val radius = barThick / 2f
-            c.drawRoundRect(RectF(barLeft, cy - barThick / 2, barRight, cy + barThick / 2), radius, radius, track)
+            val track = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = fill.copy(alpha = 0.25f).toArgb() }
+            c.drawRoundRect(RectF(left, y, right, y + barThick), radius, radius, track)
 
             val fraction = ((bar.window?.percent ?: 0.0) / 100.0).coerceIn(0.0, 1.0).toFloat()
             if (fraction > 0f) {
                 val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = fill.toArgb() }
-                val end = barLeft + (barRight - barLeft) * fraction
-                c.drawRoundRect(RectF(barLeft, cy - barThick / 2, end.coerceAtLeast(barLeft + barThick), cy + barThick / 2), radius, radius, paint)
+                val end = (left + (right - left) * fraction).coerceAtLeast(left + barThick)
+                c.drawRoundRect(RectF(left, y, end, y + barThick), radius, radius, paint)
             }
+            y += barThick
 
-            val value = (bar.window?.percent?.let { "${it.toInt()}%" } ?: "—") +
-                if (bar.trailing.isNotEmpty()) " · ${bar.trailing}" else ""
-            c.drawText(value, width - dp(context, 2f), cy + dp(context, 4.5f), valuePaint)
+            if (bar.sub.isNotEmpty()) {
+                c.drawText(bar.sub, left, y + subH - dp(context, 3f), subPaint)
+                y += subH
+            }
+            y += rowGap
         }
         return bmp
     }

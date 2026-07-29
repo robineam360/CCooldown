@@ -2,7 +2,13 @@
 <!--
     Expanded view for the "big number" style: the same headline row, then the
     usual bar panel underneath as a bitmap. Height is generous here, so the
-    number goes up to 44sp.
+    number goes up to 44sp. Number trails, matching the collapsed row and the
+    other styles.
+
+    Text colours come from the platform's own notification appearances, never from
+    ?android:attr/textColorPrimary: that resolves against Theme.ClaudeUsage (light
+    in values/, dark in values-night/), not against the shade, which produced dark
+    text on a dark shade.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -17,30 +23,20 @@
         android:orientation="horizontal"
         android:gravity="center_vertical">
 
-        <TextView
-            android:id="@+id/pct"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textSize="44sp"
-            android:textStyle="bold"
-            android:includeFontPadding="false"
-            android:maxLines="1" />
-
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:layout_marginStart="14dp"
             android:orientation="vertical">
 
             <TextView
                 android:id="@+id/title"
+                style="@android:style/TextAppearance.Material.Notification.Title"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:textSize="14sp"
                 android:maxLines="1"
-                android:ellipsize="end"
-                android:textColor="?android:attr/textColorPrimary" />
+                android:ellipsize="end" />
 
             <ImageView
                 android:id="@+id/bar"
@@ -52,14 +48,25 @@
 
             <TextView
                 android:id="@+id/sub"
+                style="@android:style/TextAppearance.Material.Notification.Info"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
                 android:textSize="12sp"
                 android:maxLines="1"
-                android:ellipsize="end"
-                android:textColor="?android:attr/textColorSecondary" />
+                android:ellipsize="end" />
         </LinearLayout>
+
+        <TextView
+            android:id="@+id/pct"
+            style="@android:style/TextAppearance.Material.Notification.Title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="14dp"
+            android:textSize="44sp"
+            android:textStyle="bold"
+            android:includeFontPadding="false"
+            android:maxLines="1" />
     </LinearLayout>
 
     <ImageView
