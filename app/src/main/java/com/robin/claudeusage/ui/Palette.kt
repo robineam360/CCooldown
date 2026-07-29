@@ -74,6 +74,15 @@ object Fmt {
         return DateTimeFormatter.ofPattern(pattern).withZone(ZoneId.systemDefault()).format(instant)
     }
 
+    /**
+     * "23 Jul" — for chart axes spanning days, where a weekday name alone is
+     * ambiguous (a 7-day window starts and ends on the same weekday).
+     */
+    fun dayMonth(instant: Instant?): String {
+        instant ?: return ""
+        return DateTimeFormatter.ofPattern("d MMM").withZone(ZoneId.systemDefault()).format(instant)
+    }
+
     /** "in 4h 47m" */
     fun relIn(instant: Instant?): String {
         instant ?: return "unknown"

@@ -118,6 +118,32 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
 
 ## Later — larger, still on the path
 
+### CCRM-12 · Readable trend chart
+- **Status:** Done (2026-07-29)
+- **Why:** The sparkline was 44dp of bare line — no scale, no plot points, no marker
+  for the present. You couldn't read a value off it or tell where "now" was.
+- **Shipped** (`ui/Sparkline.kt`, 96dp canvas):
+  - a dot on every real fetch, so polling gaps show instead of being smoothed away;
+  - a hairline and larger marker on the newest sample, directly labelled;
+  - an **even-pace diagonal** from (start, 0%) to (reset, 100%) — above it means
+    usage is outrunning the window;
+  - dashed guides at 80/90/100% in the alert colours from `Palette.barColor`, so the
+    chart and the notification thresholds agree, labelled in a right-hand gutter;
+  - a 14% area fill under the observed curve;
+  - the projection as a dashed tail to a hollow, labelled endpoint;
+  - an x axis with window start, `now`, and reset — clock time for an hours-long
+    window, **dates** for a days-long one (a 7-day window starts and ends on the same
+    weekday, so `Fmt.dayTime` printed the same label twice; `Fmt.dayMonth` added);
+  - burn rate appended to the caption (`· 0.4%/h`).
+- **No more silent absence:** when a gate fails the block says which — "Not enough
+  history in this window yet to chart a pace" or "Usage hasn't moved enough yet to
+  project a pace". Silence was indistinguishable from a bug, which is exactly how
+  CCBG-2 stayed hidden.
+- **Open question:** the even-pace diagonal makes the **Days elapsed** bar largely
+  redundant — same comparison, done visually. Worth removing that bar.
+- **Judgement call to revisit:** a window at 0% with no movement still draws a mostly
+  empty chart. It does show where `now` sits in the window, but it may be noise.
+
 ### CCRM-11 · Quick Settings tile shows the 5-hour reset
 - **Status:** Done (2026-07-27)
 - **Why:** The tile spent its one subtitle line on the 7-day percentage. The 5-hour

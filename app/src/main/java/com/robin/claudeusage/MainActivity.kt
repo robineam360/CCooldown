@@ -80,6 +80,7 @@ import com.robin.claudeusage.widget.BarWidget
 import com.robin.claudeusage.widget.UsageWidget
 import com.robin.claudeusage.work.Polling
 import java.time.Duration
+import java.util.Locale
 import java.time.Instant
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -93,6 +94,10 @@ class MainActivity : ComponentActivity() {
 }
 
 private enum class Screen { MAIN, SETTINGS, GUIDE, HISTORY }
+
+/** Window lengths, used both to scale the chart's x axis and to bind history to it. */
+private val SESSION_MS: Long = Duration.ofHours(5).toMillis()
+private val WEEKLY_MS: Long = Duration.ofDays(7).toMillis()
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -384,9 +389,9 @@ private fun ProfileScreen(repo: UsageRepository, profile: Profile, use24h: Boole
                     TrendBlock(
                         window = w,
                         samples = w.resetsAt?.let {
-                            Projection.sessionSamples(history, it.toEpochMilli())
+                            Projection.sessionSamples(history, it.toEpochMilli(), SESSION_MS)
                         } ?: emptyList(),
-                        windowLengthMs = Duration.ofHours(5).toMillis(),
+                        windowLengthMs = SESSION_MS,
                         use24h = use24h,
                     )
                 }
@@ -411,9 +416,9 @@ private fun ProfileScreen(repo: UsageRepository, profile: Profile, use24h: Boole
                     TrendBlock(
                         window = w,
                         samples = w.resetsAt?.let {
-                            Projection.weeklySamples(history, it.toEpochMilli())
+                            Projection.weeklySamples(history, it.toEpochMilli(), WEEKLY_MS)
                         } ?: emptyList(),
-                        windowLengthMs = Duration.ofDays(7).toMillis(),
+                        windowLengthMs = WEEKLY_MS,
                         use24h = use24h,
                     )
                 }
@@ -522,7 +527,10 @@ private fun ProfileScreen(repo: UsageRepository, profile: Profile, use24h: Boole
 /**
  * The burn-rate view for one window: a sparkline of this window instance's
  * fetches (dashed tail = extrapolation) and a plain-words projection line.
- * Renders nothing until the window has enough history to be honest.
+ *
+ * When there isn't enough signal to project honestly, it says so rather than
+ * rendering nothing — a silently missing chart is indistinguishable from a broken
+ * one, which is exactly how it read before.
  */
 @Composable
 private fun TrendBlock(
@@ -532,7 +540,15 @@ private fun TrendBlock(
     use24h: Boolean,
 ) {
     val resetMs = window.resetsAt?.toEpochMilli() ?: return
-    if (samples.size < 2) return
+    if (samples.size < 2) {
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Not enough history in this window yet to chart a pace",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        return
+    }
     val est = Projection.estimate(samples, resetMs)
     val atLimit = (window.percent ?: 0.0) >= 100.0
 
@@ -545,17 +561,27 @@ private fun TrendBlock(
             if (e.hitsLimitAtMs != null) e.hitsLimitAtMs to 100.0 else resetMs to e.pctAtReset
         },
         color = barFill(window.percent),
-        modifier = Modifier.fillMaxWidth().height(44.dp),
+        use24h = use24h,
+        modifier = Modifier.fillMaxWidth().height(96.dp),
     )
+    if (est == null && !atLimit) {
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Usage hasn't moved enough yet to project a pace",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
     if (est != null && !atLimit) {
         Spacer(Modifier.height(4.dp))
         val hits = est.hitsLimitAtMs
+        val rate = " · ${String.format(Locale.US, "%.1f", est.ratePctPerHour)}%/h"
         Text(
-            if (hits != null)
+            (if (hits != null)
                 "At this pace: 100% at ${Fmt.dayTime(Instant.ofEpochMilli(hits), use24h)} — " +
                     "${Fmt.span(resetMs - hits)} before the reset"
             else
-                "At this pace: ~${est.pctAtReset.toInt()}% when the window resets",
+                "At this pace: ~${est.pctAtReset.toInt()}% when the window resets") + rate,
             style = MaterialTheme.typography.bodySmall,
             color = if (hits != null) MaterialTheme.colorScheme.error
             else MaterialTheme.colorScheme.onSurfaceVariant,

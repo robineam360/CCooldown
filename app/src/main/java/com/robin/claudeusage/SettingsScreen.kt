@@ -75,6 +75,7 @@ import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import com.robin.claudeusage.data.AuthState
 import com.robin.claudeusage.data.Profile
+import com.robin.claudeusage.data.Projection
 import com.robin.claudeusage.data.UpdateCheck
 import com.robin.claudeusage.data.UpdateInfo
 import com.robin.claudeusage.data.UsageCache
@@ -480,6 +481,8 @@ fun SettingsScreen(
     if (debugUnlocked) {
         Spacer(Modifier.height(24.dp))
         SectionLabel("Debug")
+        TrendDiagnostics(repo, use24h)
+        Spacer(Modifier.height(10.dp))
         DebugSection(repo)
     }
     Spacer(Modifier.height(8.dp))
@@ -1233,6 +1236,72 @@ private sealed interface UpdateUi {
     data class Ok(val info: UpdateInfo) : UpdateUi
     /** A plain message (error, or fallback when no email app is present). */
     data class Message(val text: String) : UpdateUi
+}
+
+/**
+ * Why the trend chart is or isn't showing. `Projection` binds history points to a
+ * window by exact `resets_at` equality, so if the server's `resets_at` drifts
+ * mid-window every earlier point orphans and the chart goes quiet. The distinct
+ * counts below are the test for that: more than one value for a live window means
+ * drift, not missing data.
+ */
+@Composable
+private fun TrendDiagnostics(repo: UsageRepository, use24h: Boolean) {
+    SectionCard {
+        Text("Trend samples", style = MaterialTheme.typography.bodyLarge)
+        for (profile in Profile.entries) {
+            val points = remember(profile) { repo.history().points(profile) }
+            val data = repo.snapshot(profile).data
+            Spacer(Modifier.height(8.dp))
+            Text(
+                repo.cacheSettings().profileLabel(profile),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            if (points.isEmpty()) {
+                Text(
+                    "no history points recorded",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                continue
+            }
+            val lines = buildList {
+                add("history points: ${points.size} · oldest ${Fmt.ago(points.first().at)}")
+                val session = data?.session?.resetsAt?.toEpochMilli()
+                val weekly = data?.weekly?.resetsAt?.toEpochMilli()
+                if (session != null) {
+                    val bound = Projection.sessionSamples(points, session, 5 * 60 * 60_000L).size
+                    val distinct = points.map { it.sessionResetAt }.filter { it > 0 }.distinct().size
+                    add("5-hour resets_at ${Fmt.dayTime(java.time.Instant.ofEpochMilli(session), use24h)}")
+                    add("  bound to it: $bound · distinct in history: $distinct")
+                } else add("5-hour: no resets_at in the payload")
+                if (weekly != null) {
+                    val bound = Projection.weeklySamples(points, weekly, 7 * 24 * 60 * 60_000L).size
+                    val distinct = points.map { it.weeklyResetAt }.filter { it > 0 }.distinct().size
+                    add("7-day resets_at ${Fmt.dayTime(java.time.Instant.ofEpochMilli(weekly), use24h)}")
+                    add("  bound to it: $bound · distinct in history: $distinct")
+                } else add("7-day: no resets_at in the payload")
+            }
+            for (line in lines) {
+                Text(
+                    line,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "A chart needs 2+ bound samples, 20 min of span, and 1% of movement. " +
+                "\"distinct in history\" above 1 for a live window means resets_at moved " +
+                "and older points no longer match.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 }
 
 @Composable
