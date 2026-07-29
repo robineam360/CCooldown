@@ -53,7 +53,6 @@ import com.robin.claudeusage.data.UsageWindow
 import com.robin.claudeusage.data.WidgetPrefs
 import com.robin.claudeusage.ui.Fmt
 import com.robin.claudeusage.ui.Palette
-import com.robin.claudeusage.ui.daysElapsedWindow
 import com.robin.claudeusage.work.Polling
 
 class UsageWidgetReceiver : GlanceAppWidgetReceiver() {
@@ -183,9 +182,6 @@ private fun WidgetContent(
                     LabeledBar("All models", data.weekly?.percent, "%", theme, dark)
                     for (cap in data.modelCaps) {
                         LabeledBar(cap.modelName, cap.window.percent, "%", theme, dark)
-                    }
-                    daysElapsedWindow(data.weekly)?.let {
-                        LabeledBar("Days elapsed", it.percent, "%", theme, dark)
                     }
                     credits?.let {
                         LabeledBar(

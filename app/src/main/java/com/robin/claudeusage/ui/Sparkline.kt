@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
@@ -59,6 +60,13 @@ fun UsageSparkline(
     val warn90 = Palette.barColor(95.0, color, dark)
     val warn100 = Palette.barColor(100.0, color, dark)
 
+    // Is the newest reading at or past the pace line? Drives the wash below.
+    val lastSample = samples.last()
+    val paceAtNow =
+        ((lastSample.first - windowStartMs).toDouble() / (windowEndMs - windowStartMs) * 100.0)
+            .coerceIn(0.0, 100.0)
+    val atOrAbovePace = lastSample.second - paceAtNow > -PACE_DEAD_ZONE
+
     // Clock time for a window measured in hours; a date for one measured in days,
     // where the weekday repeats at both ends and reads as a duplicate label.
     val spanMs = windowEndMs - windowStartMs
@@ -85,6 +93,30 @@ fun UsageSparkline(
 
         val tiny = TextStyle(fontSize = 9.5.sp, color = muted)
 
+        // A value label normally sits above its marker, but near the top of the plot
+        // that crowds the 80/90/100% guides and their gutter labels — so up there it
+        // flips underneath instead.
+        val topThird = plotTop + (plotBottom - plotTop) / 3f
+        fun labelY(markerY: Float, labelH: Int): Float =
+            if (markerY < topThird) markerY + 5.dp.toPx()
+            else (markerY - labelH - 5.dp.toPx()).coerceAtLeast(0f)
+
+        // --- the pace region ---
+        val abovePace = Path().apply {
+            moveTo(0f, y(0.0)); lineTo(plotRight, y(100.0)); lineTo(0f, y(100.0)); close()
+        }
+        val belowPace = Path().apply {
+            moveTo(0f, y(0.0)); lineTo(plotRight, y(100.0)); lineTo(plotRight, y(0.0)); close()
+        }
+        // The wash only appears once usage has actually reached the line, so its
+        // arrival is the signal. Drawn permanently it did the opposite: a window at
+        // 0% — the safest state there is — came up two-thirds shaded red, and a
+        // region that's always there can't warn about anything. It also goes first,
+        // under the guides, so it can't dim them.
+        if (atOrAbovePace) {
+            drawPath(abovePace, warn100.copy(alpha = if (dark) 0.10f else 0.07f))
+        }
+
         // --- threshold guides ---
         for ((pct, c) in listOf(100.0 to warn100, 90.0 to warn90, 80.0 to warn80)) {
             drawLine(
@@ -98,31 +130,28 @@ fun UsageSparkline(
             drawText(l, topLeft = Offset(plotRight + 3.dp.toPx(), y(pct) - l.size.height / 2f))
         }
 
-        // --- even-pace diagonal ---
+        // --- the pace diagonal ---
         drawLine(
-            color = muted.copy(alpha = 0.35f),
+            color = warn80.copy(alpha = 0.9f),
             start = Offset(0f, y(0.0)),
             end = Offset(plotRight, y(100.0)),
-            strokeWidth = 1.5.dp.toPx(),
-            pathEffect = PathEffect.dashPathEffect(floatArrayOf(2f, 6f)),
-        )
-        val paceLabel = measurer.measure("even pace", tiny)
-        drawText(
-            paceLabel,
-            topLeft = Offset(
-                (plotRight * 0.52f).coerceAtMost(plotRight - paceLabel.size.width),
-                y(52.0) - paceLabel.size.height - 2.dp.toPx(),
-            ),
+            strokeWidth = 2.5.dp.toPx(),
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 6f)),
         )
 
-        // --- observed: area, line, points ---
+        // --- observed: area (split at the diagonal), line, points ---
         val area = Path().apply {
             moveTo(x(samples.first().first), y(0.0))
             for ((t, pct) in samples) lineTo(x(t), y(pct))
             lineTo(x(samples.last().first), y(0.0))
             close()
         }
-        drawPath(area, color.copy(alpha = 0.14f))
+        // The overshoot is shaded in the warning colour so you can see exactly when
+        // the curve crossed and by how much — a single colour for the whole curve
+        // would flatten that into one verdict, and would also disagree with the
+        // usage bar above the chart, which is coloured by absolute percentage.
+        clipPath(belowPace) { drawPath(area, color.copy(alpha = if (dark) 0.20f else 0.18f)) }
+        clipPath(abovePace) { drawPath(area, warn90.copy(alpha = if (dark) 0.34f else 0.30f)) }
 
         val line = Path()
         samples.forEachIndexed { i, (t, pct) ->
@@ -149,13 +178,11 @@ fun UsageSparkline(
             "${nowPct.toInt()}%",
             TextStyle(fontSize = 11.sp, color = onSurface, fontWeight = FontWeight.Bold),
         )
-        drawText(
-            nowLabel,
-            topLeft = Offset(
-                (nowX - nowLabel.size.width - 4.dp.toPx()).coerceAtLeast(0f),
-                (y(nowPct) - nowLabel.size.height - 5.dp.toPx()).coerceAtLeast(0f),
-            ),
+        val nowLabelPos = Offset(
+            (nowX - nowLabel.size.width - 4.dp.toPx()).coerceAtLeast(0f),
+            labelY(y(nowPct), nowLabel.size.height),
         )
+        drawText(nowLabel, topLeft = nowLabelPos)
 
         // --- projection tail ---
         projectedEnd?.let { (t, pct) ->
@@ -180,14 +207,42 @@ fun UsageSparkline(
                 "~${pct.toInt()}%",
                 TextStyle(fontSize = 11.sp, color = muted, fontWeight = FontWeight.Bold),
             )
-            drawText(
-                l,
-                topLeft = Offset(
-                    (endX - l.size.width).coerceIn(0f, plotRight - l.size.width),
-                    (endY - l.size.height - 5.dp.toPx()).coerceAtLeast(0f),
-                ),
+            // Late in a window the projection endpoint sits close to the now marker
+            // and the two value labels collide. The caption below spells this number
+            // out ("At this pace: ~75% when the window resets"), so the marker keeps
+            // its label and this one yields.
+            val pos = Offset(
+                (endX - l.size.width).coerceIn(0f, plotRight - l.size.width),
+                labelY(endY, l.size.height),
             )
+            val clearOfNowLabel =
+                pos.x > nowLabelPos.x + nowLabel.size.width + 2.dp.toPx() ||
+                    pos.y > nowLabelPos.y + nowLabel.size.height ||
+                    pos.y + l.size.height < nowLabelPos.y
+            if (clearOfNowLabel) drawText(l, topLeft = pos)
         }
+
+        // --- pace legend ---
+        // Top-left is the one corner neither the curve nor the diagonal occupies,
+        // since both start bottom-left. The exception is very heavy usage very
+        // early, which is the only way the curve reaches up there — then it goes
+        // bottom-right, which that same scenario leaves empty.
+        val earlyAndHigh = samples.any { (t, pct) ->
+            x(t) < plotRight * 0.45f && pct > 70.0
+        }
+        val swatchW = 14.dp.toPx()
+        val legend = measurer.measure("even pace", tiny.copy(color = warn80.copy(alpha = 0.95f)))
+        val legendW = swatchW + 4.dp.toPx() + legend.size.width
+        val legendX = if (earlyAndHigh) plotRight - legendW else 0f
+        val legendY = if (earlyAndHigh) plotBottom - legend.size.height - 2.dp.toPx() else plotTop
+        drawLine(
+            color = warn80.copy(alpha = 0.9f),
+            start = Offset(legendX, legendY + legend.size.height / 2f),
+            end = Offset(legendX + swatchW, legendY + legend.size.height / 2f),
+            strokeWidth = 2.5.dp.toPx(),
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 6f)),
+        )
+        drawText(legend, topLeft = Offset(legendX + swatchW + 4.dp.toPx(), legendY))
 
         // --- x axis ---
         drawLine(

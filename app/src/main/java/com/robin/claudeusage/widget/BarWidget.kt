@@ -29,7 +29,6 @@ import com.robin.claudeusage.data.UsageCache
 import com.robin.claudeusage.data.UsageWindow
 import com.robin.claudeusage.data.WidgetPrefs
 import com.robin.claudeusage.ui.Fmt
-import com.robin.claudeusage.ui.daysElapsedWindow
 
 class BarWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = BarWidget()
@@ -45,7 +44,6 @@ class BarWidget : GlanceAppWidget() {
             "session" to "5-hour",
             "weekly" to "7-day all models",
             "model" to "7-day per-model (e.g. Fable)",
-            "days" to "Days elapsed",
             "credits" to "Usage credits (pay-as-you-go)",
         )
     }
@@ -89,12 +87,14 @@ private fun BarContent(
     val data = snapshot.data
 
     val (window: UsageWindow?, label: String, suffix: String) = when (bar) {
-        "weekly" -> Triple(data?.weekly, "7-day", "% used")
+        // "days" was the Days elapsed option, retired once the chart's even-pace
+        // diagonal made it redundant. Widgets already placed with it land on the
+        // 7-day window, which is what the figure was derived from.
+        "weekly", "days" -> Triple(data?.weekly, "7-day", "% used")
         "model" -> {
             val cap = data?.modelCaps?.firstOrNull()
             Triple(cap?.window, "${cap?.modelName ?: "Model"} · 7d", "% used")
         }
-        "days" -> Triple(daysElapsedWindow(data?.weekly), "Days elapsed", "%")
         else -> Triple(data?.session, "5-hour", "% used")
     }
 

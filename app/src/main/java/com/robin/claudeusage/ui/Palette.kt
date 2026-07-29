@@ -9,6 +9,14 @@ import java.time.format.DateTimeFormatter
 import java.util.Currency
 import java.util.Locale
 
+/**
+ * How far usage may sit from the even-pace line before it counts as above or below.
+ * Shared by the chart's wash and the pace readout so the two can never disagree —
+ * without it, the verdict and its colour flip on every poll while usage hovers on
+ * the line.
+ */
+const val PACE_DEAD_ZONE = 3.0
+
 data class ThemeOption(val name: String, val light: Color, val dark: Color)
 
 /** Theme colors + the bar status shift, shared by the app UI and the widget. */
@@ -173,14 +181,18 @@ object Fmt {
 }
 
 /**
- * Synthetic "time elapsed" bar for the 7-day window: 0% right after a reset,
- * 100% when the next reset arrives. Comparing it against the usage bars shows
- * whether usage is running ahead of or behind the week.
+ * How far through a window we are, 0-100 — the "even pace" reference the trend
+ * chart draws as a diagonal. Usage above this is outrunning the clock and will
+ * hit the limit before the reset if it keeps up.
+ *
+ * This used to surface as a "Days elapsed" bar next to the usage bars. The chart's
+ * diagonal says the same thing without spending a row on it, so the number now
+ * only feeds the pace readout.
  */
-fun daysElapsedWindow(weekly: UsageWindow?): UsageWindow? {
-    val resets = weekly?.resetsAt ?: return null
-    val totalMs = Duration.ofDays(7).toMillis().toDouble()
-    val elapsedMs = totalMs - Duration.between(Instant.now(), resets).toMillis().toDouble()
-    val pct = (elapsedMs / totalMs * 100.0).coerceIn(0.0, 100.0)
-    return UsageWindow(pct, resets, null)
+fun elapsedPercent(window: UsageWindow?, windowLengthMs: Long): Double? {
+    val resets = window?.resetsAt ?: return null
+    val total = windowLengthMs.toDouble()
+    if (total <= 0.0) return null
+    val remaining = Duration.between(Instant.now(), resets).toMillis().toDouble()
+    return ((total - remaining) / total * 100.0).coerceIn(0.0, 100.0)
 }

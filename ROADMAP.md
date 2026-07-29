@@ -139,10 +139,46 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
   history in this window yet to chart a pace" or "Usage hasn't moved enough yet to
   project a pace". Silence was indistinguishable from a bug, which is exactly how
   CCBG-2 stayed hidden.
-- **Open question:** the even-pace diagonal makes the **Days elapsed** bar largely
-  redundant — same comparison, done visually. Worth removing that bar.
-- **Judgement call to revisit:** a window at 0% with no movement still draws a mostly
-  empty chart. It does show where `now` sits in the window, but it may be noise.
+- **Follow-up shipped the same day — pace made the point of the chart:**
+  - Both charts **192dp**, and the 5-hour one always draws, even flat. A chart that
+    appears and disappears moves everything below it; a stable position is worth more
+    than avoiding an empty state.
+  - The even-pace diagonal is now the **limit line**, not decoration: 2.5dp at 0.85
+    alpha with long dashes, in the 80% warning yellow so it reads as the same class of
+    object as the threshold guides. Legend moved to the top-left — the one corner
+    neither the curve nor the diagonal occupies, since both start bottom-left — with a
+    bottom-right fallback for the rare heavy-usage-very-early case.
+  - **The area fill splits at the diagonal:** usage colour below, warning colour above.
+    The overshoot wedge shows *when* the crossing happened and by how much, which
+    recolouring the whole curve would flatten into a single verdict — and which would
+    also contradict the usage bar right above the chart, coloured by absolute percent.
+  - Above the diagonal carries a faint wash. **Dark mode gets its own opacities**
+    (wash .07→.10, overshoot .30→.34, below-fill .18→.20): 7% red over near-black is
+    invisible. Nothing here is an automatic light-mode flip.
+  - Curve colour still means **absolute usage**, from the same `barFill` as the bar
+    above it. The chart carries two different risk signals — how close to the wall
+    (guides) and whether you'll reach it (diagonal) — and they don't share a channel.
+  - Pace readout replaces the retired **Days elapsed** bar: `N points below even
+    pace` / `On even pace` / `N points above even pace`, the last in the warning
+    colour and bold. A **±3 point dead zone** (`PACE_DEAD_ZONE`) stops the verdict and
+    its colour flipping every poll while usage sits on the line.
+- **Days elapsed retired** from the app card, the large `UsageWidget`, and
+  `BarWidget`'s options. `daysElapsedWindow` became `Palette.elapsedPercent(window,
+  windowLengthMs)`, generalised off 7 days so the 5-hour chart gets the same readout.
+  Widgets already placed as `"days"` fall through to the 7-day bar, which is what the
+  figure was derived from.
+
+### CCRM-13 · Standalone chart widget
+- **Status:** Planned · gated on the in-app chart proving itself
+- **Why:** The trend chart answers "will I run out before the reset" better than any
+  bar, and that's worth having on the home screen without opening the app.
+- **Approach:** A new widget rendering `UsageSparkline`'s content, with the window
+  (5-hour ↔ 7-day) and profile chosen at placement, like `BarWidget`. Glance has no
+  Canvas, so the chart has to be drawn to a bitmap and shown via `Image` — the same
+  approach `PinnedNotification` already uses for its panel, so the drawing code wants
+  extracting from the Compose Canvas into something both can call.
+- **Depends on:** CCRM-4 would let a placed instance be reconfigured without
+  re-adding it.
 
 ### CCRM-11 · Quick Settings tile shows the 5-hour reset
 - **Status:** Done (2026-07-27)

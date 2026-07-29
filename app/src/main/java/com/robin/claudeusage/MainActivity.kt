@@ -75,12 +75,14 @@ import com.robin.claudeusage.data.UsageWindow
 import com.robin.claudeusage.ui.Fmt
 import com.robin.claudeusage.ui.Palette
 import com.robin.claudeusage.ui.UsageSparkline
-import com.robin.claudeusage.ui.daysElapsedWindow
+import com.robin.claudeusage.ui.PACE_DEAD_ZONE
+import com.robin.claudeusage.ui.elapsedPercent
 import com.robin.claudeusage.widget.BarWidget
 import com.robin.claudeusage.widget.UsageWidget
 import com.robin.claudeusage.work.Polling
 import java.time.Duration
 import java.util.Locale
+import kotlin.math.roundToInt
 import java.time.Instant
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -409,9 +411,6 @@ private fun ProfileScreen(repo: UsageRepository, profile: Profile, use24h: Boole
                 for (cap in data.modelCaps) {
                     SubBar(cap.modelName, cap.window.percent, "% used")
                 }
-                daysElapsedWindow(data.weekly)?.let {
-                    SubBar("Days elapsed", it.percent, "%")
-                }
                 data.weekly?.let { w ->
                     TrendBlock(
                         window = w,
@@ -562,10 +561,28 @@ private fun TrendBlock(
         },
         color = barFill(window.percent),
         use24h = use24h,
-        modifier = Modifier.fillMaxWidth().height(96.dp),
+        modifier = Modifier.fillMaxWidth().height(192.dp),
     )
+    // The pace readout: what the retired "Days elapsed" bar used to say, as a
+    // number rather than a row. A ±3 point dead zone around the line stops it
+    // flapping between above and below — with its colour — on every poll.
+    elapsedPercent(window, windowLengthMs)?.let { elapsed ->
+        val delta = (window.percent ?: 0.0) - elapsed
+        val above = delta > PACE_DEAD_ZONE
+        Spacer(Modifier.height(6.dp))
+        Text(
+            when {
+                delta > PACE_DEAD_ZONE -> "${delta.roundToInt()} points above even pace"
+                delta < -PACE_DEAD_ZONE -> "${(-delta).roundToInt()} points below even pace"
+                else -> "On even pace"
+            },
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = if (above) FontWeight.Bold else FontWeight.Normal,
+            color = if (above) barFill(95.0) else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
     if (est == null && !atLimit) {
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(2.dp))
         Text(
             "Usage hasn't moved enough yet to project a pace",
             style = MaterialTheme.typography.bodySmall,
@@ -573,7 +590,7 @@ private fun TrendBlock(
         )
     }
     if (est != null && !atLimit) {
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(2.dp))
         val hits = est.hitsLimitAtMs
         val rate = " · ${String.format(Locale.US, "%.1f", est.ratePctPerHour)}%/h"
         Text(
