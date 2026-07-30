@@ -12,7 +12,7 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
 
 ## Next — small, high value, ready to build
 
-### CCRM-1 · Show usage credits used / total available
+### CCRM-1 · Credits Display — show usage credits used / total available
 - **Status:** Done (2026-07-27)
 - **Why:** Percentages answer "how close am I to the limit"; credits answer "how much
   have I actually spent". They're **currency, not a token count** — Claude Code renders
@@ -57,7 +57,7 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
 - **Known gap:** `spend.enabled` / `extra_usage.is_enabled` are parsed past, not acted
   on — filed as [CCBG-3](BUGS.md).
 
-### CCRM-2 · Configurable persistent-notification tap action
+### CCRM-2 · Notification Tap Target — configurable persistent-notification tap action
 - **Status:** Done (2026-07-27)
 - **Why:** One tap should go where the user wants — straight into Claude, or into this
   app for the full breakdown.
@@ -70,7 +70,7 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
 - **Package id:** `com.anthropic.claude`, confirmed against the Play Store listing
   (`play.google.com/store/apps/details?id=com.anthropic.claude`).
 
-### CCRM-16 · Correct the token-family expiry when renewal dies early
+### CCRM-16 · Sign-in Expiry Accuracy — correct the token-family expiry when renewal dies early
 - **Status:** Planned · small
 - **Why:** For a native sign-in we don't know when the refresh-token family actually
   expires — the token response omits it, so we display sign-in time + a flat 30-day
@@ -102,7 +102,7 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
   requiring a factor a Custom Tab can't satisfy; then the fallback is the existing
   copy-the-desktop-sign-in path (README §"If the phone can't complete the sign-in").
 
-### CCRM-4 · Widget long-press quick-edit
+### CCRM-4 · Widget Quick-Edit — reconfigure a placed widget by long-press
 - **Status:** Planned · small · **prerequisite for CCRM-3 phase 2**
 - **Moved up from *Later* on 2026-07-30.** CCRM-3 phase 2 gives each widget a layout, a
   background and an accent. A cosmetic setting you can only change by deleting the widget
@@ -128,7 +128,7 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
 
 ## Needs design — decide the shape before building
 
-### CCRM-17 · "Ping" — start a 5-hour window on a schedule
+### CCRM-17 · Window Pings — start a 5-hour window on a schedule
 - **Status:** Needs design · **spike DONE, feature is viable** — mechanism proven end
   to end 2026-07-30; what remains is a product call on posture and defaults, not a
   technical unknown
@@ -229,7 +229,7 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
 - **Naming:** "Ping" reads like a connectivity check. Prefer **Start window** or
   **Reserve window**.
 
-### CCRM-3 · Unified theming system for widgets & notifications
+### CCRM-3 · Unified Theming — one theming system for widgets & notifications
 - **Status:** Phase 1 done (2026-07-27) · phase 2 designed (2026-07-30) · phase 3 needs design
 - **Phase 1 shipped — notification styles.** `pinnedStyle` pref, chip selector under
   **Settings → Pinned notification**, four options, default unchanged (`gauge`) so
@@ -331,7 +331,7 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
 
 ## Later — larger, still on the path
 
-### CCRM-12 · Readable trend chart
+### CCRM-12 · Trend Chart — make the trend chart readable
 - **Status:** Done (2026-07-29)
 - **Why:** The sparkline was 44dp of bare line — no scale, no plot points, no marker
   for the present. You couldn't read a value off it or tell where "now" was.
@@ -381,7 +381,7 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
   Widgets already placed as `"days"` fall through to the 7-day bar, which is what the
   figure was derived from.
 
-### CCRM-14 · A way to clear usage history
+### CCRM-14 · Clear History — let the user clear usage history
 - **Status:** Planned
 - **Why:** CCBG-1 decoupled history from the credential lifecycle, which was right — but
   it left *nothing* able to clear it. `HistoryStore.clear()` and `SessionLog.clear()` are
@@ -393,7 +393,7 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
   which must be cleared together or the bars and the sparkline disagree).
 - **Deliberately not:** wiring it back into "Clear credentials". That's what CCBG-1 was.
 
-### CCRM-15 · Verify the above-pace chart state on a device
+### CCRM-15 · Above-Pace Verification — verify the above-pace chart state on a device
 - **Status:** Planned · small
 - **Why:** The pace chart's warning half — the amber overshoot fill, the wash over the
   above-pace region, and the bold warning-coloured readout — has **never rendered on real
@@ -406,7 +406,7 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
   screenshot the state for the docs.
 - **Then:** capture it for the guide, which currently illustrates only the below-pace case.
 
-### CCRM-13 · Standalone chart widget
+### CCRM-13 · Chart Widget — standalone chart widget
 - **Status:** Planned · gated on the in-app chart proving itself
 - **Why:** The trend chart answers "will I run out before the reset" better than any
   bar, and that's worth having on the home screen without opening the app.
@@ -421,7 +421,7 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
   Canvas-to-bitmap escape hatch for the same reason. Whichever ships first should do the
   extraction properly — one drawing surface both can call — rather than solving it twice.
 
-### CCRM-11 · Quick Settings tile shows the 5-hour reset
+### CCRM-11 · Tile Reset Time — Quick Settings tile shows the 5-hour reset
 - **Status:** Done (2026-07-27)
 - **Why:** The tile spent its one subtitle line on the 7-day percentage. The 5-hour
   reset is the number that changes what you do next.
@@ -440,7 +440,7 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
   overload is still the only option below API 34 and minSdk is 31, so it's suppressed
   with a note rather than removed.
 
-### CCRM-5 · Work section as its own pinned notification
+### CCRM-5 · Per-Profile Notification — Work section as its own pinned notification
 - **Status:** Planned
 - **Why:** Today only Personal can be pinned. Heavy Work users want both windows live
   at a glance.
@@ -449,7 +449,7 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
   profile, each with its own channel/icon/style so they're distinguishable in the
   status bar. Add per-profile "pin this" toggles in settings.
 
-### CCRM-6 · More than two accounts
+### CCRM-6 · Multi-Account — more than two accounts
 - **Status:** Needs design
 - **Why:** `Profile` is a hard-coded `PERSONAL`/`WORK` enum ([Profile.kt](app/src/main/java/com/robin/claudeusage/data/Profile.kt)),
   wired through credentials, cache keys, notification IDs, widgets and alerts. Users
@@ -464,7 +464,7 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
 
 ## Bookends — major efforts, gated on the above
 
-### CCRM-7 · iOS version
+### CCRM-7 · iOS — an iOS version of the app
 - **Status:** Planned · gated → v2.0
 - **Why / when:** Build only after most of the above has settled, so we port a stable
   design rather than a moving one. Targeted for v2.0.
@@ -473,7 +473,7 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
   the closest analog to the Android pinned notification (there's no true always-on
   persistent notification, so expect a design adaptation here).
 
-### CCRM-8 · Desktop Mac menu-bar app
+### CCRM-8 · Mac Menu-Bar — desktop Mac menu-bar app
 - **Status:** Planned · gated (last) · **new repo**
 - **Why / when:** After everything above. A native Mac menu-bar app showing usage
   progress. New app/repo — carries over learnings from this project, not built here.
@@ -484,7 +484,7 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
 
 ## Someday / Maybe
 
-### CCRM-9 · Claude news in the unused space (free sources only)
+### CCRM-9 · News Feed — Claude news in the unused space (free sources only)
 - **Status:** Idea — needs a free, stable source
 - **Context:** Personal and Work each have ~half a page free below the refresh button.
   The old plan was a Twitter/X feed (see CCRM-10) — dropped as paid/fragile. The
@@ -499,7 +499,7 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
 
 ## Dropped
 
-### CCRM-10 · Twitter/X feed in unused space
+### CCRM-10 · X Feed — Twitter/X feed in unused space
 - **Status:** Dropped
 - **Why:** Reading a public X timeline reliably now needs a paid API tier, and
   scrape-based approaches break constantly. Not worth coupling the app's stability to

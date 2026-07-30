@@ -11,7 +11,7 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
 
 ## Open
 
-### CCBG-3 · Credits card ignores extra-usage being switched off
+### CCBG-3 · Credits Visibility — credits card ignores extra-usage being switched off
 - **Status:** Open
 - **Severity:** Low (misleading display, no data loss) — and possibly unreachable
 - **Symptom:** Suspected, not observed. The credits card renders whenever
@@ -32,14 +32,14 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
 
 ## Fixed
 
-### CCBG-4 · Threshold alerts re-fired every poll — `resets_at` is not stable
+### CCBG-4 · Alert Dedup — threshold alerts re-fired every poll because `resets_at` isn't stable
 - **Status:** Fixed (2026-07-30)
 - **Severity:** High (repeat notifications; the dedup that existed didn't work)
 - **Symptom:** once a window was past its lowest threshold (80% session, 90% weekly),
   the usage alert re-fired on **every poll** — every 15 min on the default interval —
   instead of once per window. `notify()` sets no `setOnlyAlertOnce`, so each repeat
   re-alerted with sound rather than quietly updating in place.
-- **Root cause:** the same server-side `resets_at` drift as [CCBG-2](#ccbg-2--trend-chart-and-projection-almost-never-appeared),
+- **Root cause:** the same server-side `resets_at` drift as [CCBG-2](#ccbg-2--trend-chart-binding--trend-chart-and-projection-almost-never-appeared),
   in a consumer that fix didn't touch. `checkThresholds` used `resetsAt.toEpochMilli()`
   as window identity and compared it **exactly**:
 
@@ -92,7 +92,7 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
 - **Rule going forward:** never compare `resets_at` with `==`, and never normalise it by
   truncation. Go through `Projection.sameWindow`.
 
-### CCBG-2 · Trend chart and projection almost never appeared
+### CCBG-2 · Trend Chart Binding — trend chart and projection almost never appeared
 - **Status:** Fixed (2026-07-29)
 - **Severity:** High (a whole feature silently dead, and it looked like flakiness)
 - **Symptom:** The burn-rate sparkline and the "At this pace…" line showed up
@@ -121,7 +121,7 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
 - **Diagnostic kept:** Settings → Debug → **Trend samples** reports bound vs distinct
   counts per window. `distinct` above 1 for a live window is the signature of drift.
 
-### CCBG-1 · Usage history is wiped on sign-out / re-auth
+### CCBG-1 · History Retention — usage history is wiped on sign-out / re-auth
 - **Status:** Fixed (2026-07-27) — took the preferred option below: dropped
   `historyStore.clear(profile)` from `clearCredentials()`. Both stores are now
   untouched by the credential lifecycle, so `HistoryStore` and `SessionLog` stay
