@@ -29,6 +29,25 @@ object Projection {
      */
     fun tolerance(windowLengthMs: Long): Long = windowLengthMs / 4
 
+    /** The two plan window lengths. Single source of truth — [tolerance] derives from them. */
+    const val SESSION_MS: Long = 5 * 60 * 60_000L
+    const val WEEKLY_MS: Long = 7 * 24 * 60 * 60_000L
+
+    /**
+     * Whether two `resets_at` readings (epoch millis) name the same window instance.
+     *
+     * **Never compare `resets_at` with `==`.** For the reason see this object's doc:
+     * the server recomputes the timestamp per request, so one live window yields
+     * hundreds of distinct values. Truncating to a unit is not a substitute either —
+     * the drift straddles unit boundaries (measured 2026-07-30: five polls inside one
+     * unchanged window spanned `09:19:59.625`–`09:20:00.950`, so minute-truncation
+     * still flips between `09:19` and `09:20`).
+     *
+     * `0` means "nothing recorded yet" and matches no window.
+     */
+    fun sameWindow(a: Long, b: Long, windowLengthMs: Long): Boolean =
+        a != 0L && b != 0L && abs(a - b) <= tolerance(windowLengthMs)
+
     data class Estimate(
         val ratePctPerHour: Double,
         /** When usage reaches 100% at the current pace; null = not before the reset. */

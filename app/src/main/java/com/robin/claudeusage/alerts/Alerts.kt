@@ -11,6 +11,7 @@ import com.robin.claudeusage.MainActivity
 import com.robin.claudeusage.R
 import com.robin.claudeusage.data.AuthState
 import com.robin.claudeusage.data.Profile
+import com.robin.claudeusage.data.Projection
 import com.robin.claudeusage.data.SessionLog
 import com.robin.claudeusage.data.UsageCache
 import com.robin.claudeusage.data.UsageWindow
@@ -101,8 +102,8 @@ object Alerts {
 
         // Reset detection always runs (it also tracks window identity and peak);
         // the per-window ping mode and profile scope decide whether it notifies.
-        checkReset(context, cache, profile, "Session", "5-hour", data.session)
-        checkReset(context, cache, profile, "Weekly", "7-day", data.weekly)
+        checkReset(context, cache, profile, "Session", "5-hour", data.session, Projection.SESSION_MS)
+        checkReset(context, cache, profile, "Weekly", "7-day", data.weekly, Projection.WEEKLY_MS)
 
         if (!cache.profileAlertsEnabled(profile)) return
 
@@ -114,6 +115,7 @@ object Alerts {
                 notificationId = notifId(profile, 1),
                 title = { pct -> "$label: 5-hour window at $pct%" },
                 use24h = use24h,
+                windowLengthMs = Projection.SESSION_MS,
             )
         }
         data.weekly?.let { w ->
@@ -124,6 +126,7 @@ object Alerts {
                 notificationId = notifId(profile, 2),
                 title = { pct -> "$label: 7-day window at $pct%" },
                 use24h = use24h,
+                windowLengthMs = Projection.WEEKLY_MS,
             )
         }
         // Per-model 7-day caps (e.g. an Opus limit) — same machinery, keyed
@@ -136,6 +139,8 @@ object Alerts {
                 notificationId = notifId(profile, MODEL_CAP_KIND_BASE + index),
                 title = { pct -> "$label: ${cap.modelName} 7-day cap at $pct%" },
                 use24h = use24h,
+                // Per-model caps are weekly_scoped, so they drift on the 7-day clock.
+                windowLengthMs = Projection.WEEKLY_MS,
             )
         }
     }
@@ -205,11 +210,17 @@ object Alerts {
         windowName: String,
         windowLabel: String,
         window: UsageWindow?,
+        windowLengthMs: Long,
     ) {
         val key = window?.resetsAt?.toEpochMilli() ?: return
         val pct = window.percent ?: 0.0
         val lastSeen = cache.lastSeenWindowKey(profile, windowName)
-        if (lastSeen != 0L && lastSeen != key && Instant.ofEpochMilli(lastSeen).isBefore(Instant.now())) {
+        // Proximity, not equality (CCBG-4). Exact comparison also made this fire
+        // spuriously when a poll landed within ~1s of the boundary and drift pushed
+        // lastSeen just into the past.
+        if (lastSeen != 0L && !Projection.sameWindow(lastSeen, key, windowLengthMs) &&
+            Instant.ofEpochMilli(lastSeen).isBefore(Instant.now())
+        ) {
             // The window rolled over. Log the window that just closed to the
             // long-term session log (its identity is lastSeen, its peak is what
             // we accumulated while it was open) for the history bars.
@@ -248,12 +259,22 @@ object Alerts {
         notificationId: Int,
         title: (Int) -> String,
         use24h: Boolean,
+        windowLengthMs: Long,
     ) {
         val pct = window.percent?.toInt() ?: return
         val windowKey = window.resetsAt?.toEpochMilli() ?: return
 
-        if (cache.alertKey(profile, keyName) != windowKey) {
+        val storedKey = cache.alertKey(profile, keyName)
+        if (!Projection.sameWindow(storedKey, windowKey, windowLengthMs)) {
+            // A genuinely new window — start its dedup state fresh.
             cache.setAlertState(profile, keyName, windowKey, 0)
+        } else if (storedKey != windowKey) {
+            // Same window, drifted timestamp (CCBG-4): re-anchor to the newest
+            // reading, keeping the threshold already notified. Comparing against the
+            // latest value rather than the first-seen one keeps each comparison over
+            // a single poll interval, so the slide can never accumulate past
+            // tolerance over a long window.
+            cache.setAlertState(profile, keyName, windowKey, cache.alertThreshold(profile, keyName))
         }
         val alreadyNotified = cache.alertThreshold(profile, keyName)
         val crossed = thresholds.firstOrNull { pct >= it && alreadyNotified < it } ?: return

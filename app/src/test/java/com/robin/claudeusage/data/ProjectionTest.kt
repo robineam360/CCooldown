@@ -1,6 +1,7 @@
 package com.robin.claudeusage.data
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -157,5 +158,64 @@ class ProjectionTest {
     fun `tolerance is a quarter of the window`() {
         assertEquals(sessionLen / 4, Projection.tolerance(sessionLen))
         assertEquals(weeklyLen / 4, Projection.tolerance(weeklyLen))
+    }
+
+    // --- sameWindow: window identity under server-side resets_at drift (CCBG-4) ---
+
+    /**
+     * The five values the usage endpoint actually returned for ONE unchanged window,
+     * polled 60s apart on 2026-07-30 (09:19:59.625 – 09:20:00.950 UTC). Every pair
+     * must read as the same window; before the fix, `==` made each poll look like a
+     * new one and re-fired the threshold alert.
+     */
+    private val observedDrift = listOf(
+        1785403199913L, 1785403199625L, 1785403200333L, 1785403200950L, 1785403200698L,
+    )
+
+    @Test
+    fun `real observed drift within one window reads as the same window`() {
+        for (a in observedDrift) {
+            for (b in observedDrift) {
+                assertTrue(
+                    "$a vs $b should be one window",
+                    Projection.sameWindow(a, b, Projection.SESSION_MS),
+                )
+            }
+        }
+        // All five are distinct, so exact comparison really would have broken.
+        assertEquals(5, observedDrift.distinct().size)
+    }
+
+    @Test
+    fun `truncating to the minute would not have fixed it`() {
+        // The drift straddles the 09:20:00 boundary: the pair below truncate to
+        // different minutes, which is why the fix is tolerance and not truncation.
+        val below = 1785403199913L // 09:19:59.913
+        val above = 1785403200333L // 09:20:00.333
+        assertEquals(29756719L, below / 60_000L)
+        assertEquals(29756720L, above / 60_000L)
+        assertTrue(Projection.sameWindow(below, above, Projection.SESSION_MS))
+    }
+
+    @Test
+    fun `a genuine reset is a different window`() {
+        val reset = 1785403200333L
+        assertFalse(Projection.sameWindow(reset, reset + Projection.SESSION_MS, Projection.SESSION_MS))
+        assertFalse(Projection.sameWindow(reset, reset + Projection.WEEKLY_MS, Projection.WEEKLY_MS))
+        // A genuine move is four times the tolerance, so there is no ambiguous band.
+        assertFalse(Projection.sameWindow(reset, reset + Projection.SESSION_MS / 2, Projection.SESSION_MS))
+    }
+
+    @Test
+    fun `zero means nothing recorded yet and matches no window`() {
+        assertFalse(Projection.sameWindow(0L, 1785403200333L, Projection.SESSION_MS))
+        assertFalse(Projection.sameWindow(1785403200333L, 0L, Projection.SESSION_MS))
+        assertFalse(Projection.sameWindow(0L, 0L, Projection.SESSION_MS))
+    }
+
+    @Test
+    fun `window length constants match the plan windows`() {
+        assertEquals(5 * 60 * 60_000L, Projection.SESSION_MS)
+        assertEquals(7 * 24 * 60 * 60_000L, Projection.WEEKLY_MS)
     }
 }

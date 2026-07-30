@@ -1302,13 +1302,13 @@ private fun TrendDiagnostics(repo: UsageRepository, use24h: Boolean) {
                 val session = data?.session?.resetsAt?.toEpochMilli()
                 val weekly = data?.weekly?.resetsAt?.toEpochMilli()
                 if (session != null) {
-                    val bound = Projection.sessionSamples(points, session, 5 * 60 * 60_000L).size
+                    val bound = Projection.sessionSamples(points, session, Projection.SESSION_MS).size
                     val distinct = points.map { it.sessionResetAt }.filter { it > 0 }.distinct().size
                     add("5-hour resets_at ${Fmt.dayTime(java.time.Instant.ofEpochMilli(session), use24h)}")
                     add("  bound to it: $bound · distinct in history: $distinct")
                 } else add("5-hour: no resets_at in the payload")
                 if (weekly != null) {
-                    val bound = Projection.weeklySamples(points, weekly, 7 * 24 * 60 * 60_000L).size
+                    val bound = Projection.weeklySamples(points, weekly, Projection.WEEKLY_MS).size
                     val distinct = points.map { it.weeklyResetAt }.filter { it > 0 }.distinct().size
                     add("7-day resets_at ${Fmt.dayTime(java.time.Instant.ofEpochMilli(weekly), use24h)}")
                     add("  bound to it: $bound · distinct in history: $distinct")

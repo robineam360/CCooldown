@@ -89,7 +89,6 @@ import com.robin.claudeusage.ui.twoPane
 import com.robin.claudeusage.widget.BarWidget
 import com.robin.claudeusage.widget.UsageWidget
 import com.robin.claudeusage.work.Polling
-import java.time.Duration
 import java.util.Locale
 import kotlin.math.roundToInt
 import java.time.Instant
@@ -108,9 +107,13 @@ class MainActivity : ComponentActivity() {
 
 private enum class Screen { MAIN, SETTINGS, GUIDE, HISTORY }
 
-/** Window lengths, used both to scale the chart's x axis and to bind history to it. */
-private val SESSION_MS: Long = Duration.ofHours(5).toMillis()
-private val WEEKLY_MS: Long = Duration.ofDays(7).toMillis()
+/**
+ * Window lengths, used both to scale the chart's x axis and to bind history to it.
+ * Aliased from [Projection] so the lengths the drift tolerance derives from (CCBG-4)
+ * have a single definition.
+ */
+private const val SESSION_MS: Long = Projection.SESSION_MS
+private const val WEEKLY_MS: Long = Projection.WEEKLY_MS
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
