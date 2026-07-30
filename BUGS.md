@@ -11,6 +11,40 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
 
 ## Open
 
+### CCBG-5 · Ping Verification — a working ping is reported as a failure
+- **Status:** Open
+- **Severity:** High (reports the opposite of what happened, and the scheduled path
+  would notify on it)
+- **Symptom:** observed on the Fold 7, 2026-07-30. **Test ping now** on Personal, from a
+  genuinely cold state, reported `Ping sent but no window opened — nothing scheduled`.
+  The ping had in fact worked — 33 minutes later the 5-hour card showed a live window.
+- **Root cause: the usage endpoint lags the inference.** `sendWindowPing` sends the
+  ping, immediately re-reads usage, and treats "no window in the response" as failure.
+  But the window is not visible that soon.
+  - **It is not rate limiting.** That was my first guess and the evidence refutes it:
+    the main screen read `Last success: Thu 8:08 pm`, so the post-ping fetch *succeeded*
+    — it just still showed no window. (A 429 did appear at 8:09, but that was a later,
+    separate refresh triggered by returning to the main screen.)
+  - Timeline: 8:06 pm no window · 8:08 pm ping `200`, successful usage read still shows
+    no window · 8:41 pm window present, `[7:59 pm → 12:59 am]`.
+  - **Lag is bounded only as: longer than a few seconds, no more than 33 minutes.**
+    It needs measuring; the 15s settle in the spike script is not known to be enough.
+- **Consequence: synchronous verification cannot work.** Any read taken straight after a
+  ping may legitimately show nothing, so "no window yet" carries no information about
+  whether the ping succeeded.
+- **Fix:**
+  1. **Defer the check.** Ping, then verify on a separate alarm a minute or two later,
+     with one or two re-checks — not inline.
+  2. **Add an `Unverified` outcome** distinct from `Started` and from failure. It must
+     never fire `notifyPingFailed`; "we can't see it yet" is not "it didn't happen".
+     The current code would wake the user at 4am to report a success as a failure.
+  3. **Stop the extra inline fetch** burning the ~180s usage floor — it is what caused
+     the follow-on 429.
+- **Also worth fixing while here:** `sendWindowPing` ignores the `FetchResult` from its
+  own `doFetch`. Even once the check is deferred, a refresh that fails should read as
+  unverified rather than as evidence of anything.
+- **Found via:** the first on-device run of CCRM-17 (Window Pings).
+
 ### CCBG-3 · Credits Visibility — credits card ignores extra-usage being switched off
 - **Status:** Open
 - **Severity:** Low (misleading display, no data loss) — and possibly unreachable
