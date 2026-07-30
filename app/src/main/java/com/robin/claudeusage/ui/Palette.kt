@@ -1,6 +1,8 @@
 package com.robin.claudeusage.ui
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.robin.claudeusage.data.UsageWindow
 import java.time.Duration
 import java.time.Instant
@@ -61,6 +63,113 @@ object Palette {
             else -> theme
         }
     }
+}
+
+// --- CCRM-3 step 1: surface tokens ---
+//
+// One set of tokens every surface reads, so widgets, the notification and the app
+// screen can't drift apart. This is the *token* axis only — what things look like.
+// What each surface *draws* (bars vs ring vs huge number) is the layout axis, and it
+// lives with the surface, because its scope differs: global for the notification,
+// per instance for widgets, fixed in-app.
+//
+// Deliberately additive. Every resolver below returns today's value when handed the
+// defaults, so this file can land with nothing wired up and nothing moving. See
+// `SurfaceTokensTest`, which pins exactly that.
+
+/** How a usage bar's ends are drawn. */
+enum class BarShape { ROUNDED, SQUARE }
+
+/** What sits behind a widget's content. */
+enum class BackgroundMode {
+    /** The widget background colour — today's look, always legible. */
+    SOLID,
+
+    /** A scrim: the wallpaper shows through, but text keeps its contrast. */
+    TRANSLUCENT,
+
+    /** Nothing. Contrast becomes the wallpaper's problem — pair with [TextContrast]. */
+    NONE,
+}
+
+/**
+ * Which way content colour is forced. Only meaningful once the background stops being
+ * ours: `GlanceTheme.colors.onSurface` follows the *system* dark-mode flag, not the
+ * wallpaper behind one particular widget, so on [BackgroundMode.NONE] "auto" can put
+ * light text on a light wallpaper and read as a bug rather than a choice.
+ */
+enum class TextContrast { AUTO, LIGHT, DARK }
+
+data class SurfaceTokens(
+    val accentName: String = Palette.DEFAULT,
+    val barShape: BarShape = BarShape.ROUNDED,
+    val background: BackgroundMode = BackgroundMode.SOLID,
+    val textContrast: TextContrast = TextContrast.AUTO,
+    val textScale: Float = 1f,
+)
+
+/**
+ * Resolves [SurfaceTokens] to the concrete values a renderer needs.
+ *
+ * The accent is the exception: a "Material You" accent can only be read from a live
+ * composition (`GlanceTheme.colors.primary` / `MaterialTheme.colorScheme.primary`), so
+ * it stays resolved at the call site the way `widgetThemeColor()` already does it.
+ * [isDynamicAccent] is the whole of this object's involvement — pretending otherwise
+ * would mean threading a Context through a pure model to gain nothing.
+ */
+object Tokens {
+
+    /** Scrim strength for [BackgroundMode.TRANSLUCENT] — wallpaper visible, text safe. */
+    const val TRANSLUCENT_ALPHA = 0.55f
+
+    /** Squared bars keep a hairline radius; a true 0 reads as a rendering fault. */
+    val SQUARE_BAR_RADIUS: Dp = 2.dp
+
+    // Forced content colours. The dark one matches the `onPrimary` already used for
+    // dark schemes in WidgetConfigActivity, so a forced choice and an automatic one
+    // can't land on two different near-blacks.
+    val FORCED_LIGHT = Color(0xFFF5F5F5)
+    val FORCED_DARK = Color(0xFF1F1F1F)
+
+    fun isDynamicAccent(accentName: String): Boolean = accentName == Palette.DYNAMIC
+
+    /**
+     * Bar corner radius. [BarShape.ROUNDED] is `height / 2` — a full pill, which is
+     * what every bar draws today (`RoundedCornerShape(height / 2)` in the app,
+     * `cornerRadius(height / 2)` in Glance), so the default is a no-op.
+     */
+    fun barCornerRadius(shape: BarShape, height: Dp): Dp = when (shape) {
+        BarShape.ROUNDED -> height / 2
+        BarShape.SQUARE -> SQUARE_BAR_RADIUS
+    }
+
+    /**
+     * The colour to paint behind widget content, given the surface colour the platform
+     * would otherwise use. [BackgroundMode.SOLID] returns [base] unchanged.
+     */
+    fun background(mode: BackgroundMode, base: Color): Color = when (mode) {
+        BackgroundMode.SOLID -> base
+        BackgroundMode.TRANSLUCENT -> base.copy(alpha = TRANSLUCENT_ALPHA)
+        BackgroundMode.NONE -> Color.Transparent
+    }
+
+    /**
+     * Content colour. [TextContrast.AUTO] returns [auto] — whatever the theme already
+     * chose — so the default changes nothing; the forced modes exist for the case where
+     * the background is no longer ours to reason about.
+     */
+    fun contentColor(contrast: TextContrast, auto: Color): Color = when (contrast) {
+        TextContrast.AUTO -> auto
+        TextContrast.LIGHT -> FORCED_LIGHT
+        TextContrast.DARK -> FORCED_DARK
+    }
+
+    /**
+     * Scales a text size, in sp. Takes and returns a bare Float rather than a
+     * `TextUnit`: the app uses Compose's `.sp` and the widgets use Glance's, and this
+     * has to serve both without picking one.
+     */
+    fun scaledSp(baseSp: Float, scale: Float): Float = baseSp * scale
 }
 
 object Fmt {
