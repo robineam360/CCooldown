@@ -70,6 +70,38 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
 - **Package id:** `com.anthropic.claude`, confirmed against the Play Store listing
   (`play.google.com/store/apps/details?id=com.anthropic.claude`).
 
+### CCRM-16 · Correct the token-family expiry when renewal dies early
+- **Status:** Planned · small
+- **Why:** For a native sign-in we don't know when the refresh-token family actually
+  expires — the token response omits it, so we display sign-in time + a flat 30-day
+  guess (`OAuthSignIn.ESTIMATED_FAMILY_MS`,
+  [OAuthSignIn.kt:39](app/src/main/java/com/robin/claudeusage/data/OAuthSignIn.kt#L39)).
+  If Anthropic shortens family lifetime, the account card keeps showing a confident
+  "expires around <date>" weeks after renewal has already started failing. The estimate
+  is only ever revised downward on a *pasted* token; a native slot deliberately keeps
+  its clock through rotation ([UsageRepository.kt:300](app/src/main/java/com/robin/claudeusage/data/UsageRepository.kt#L300)),
+  so nothing corrects it.
+- **Trigger for filing:** Claude Code desktop now periodically re-verifies identity for
+  resumable sessions (passkey prompt, seen 2026-07-30). That's session-level and does
+  **not** touch our phone-minted family — the widget was unaffected — but it signals
+  session lifetimes tightening for the same `client_id`, so the 30-day guess is worth
+  making self-correcting before it silently goes wrong.
+- **Approach:** treat a `REAUTH_NEEDED` (or a `firstRefreshFailAt` streak crossing
+  `STUCK_REFRESH_MS`) that lands materially before the estimate as evidence the estimate
+  is wrong: stop rendering "expires around" as a date and say renewal has stopped
+  working, with the observed sign-in→death interval. Persisting that interval as the new
+  estimate for subsequent sign-ins would make the app learn the real cap — worth doing
+  only if we see it happen more than once, since one revocation isn't a lifetime.
+- **Also:** the ~30-day figure has never been verified against an actual expiry. A
+  debug line showing the age of the current family (sign-in → now) would tell us the
+  real number the first time a family dies of old age rather than revocation.
+- **Not in scope:** anything about passkeys at authorize time. Sign-in runs in a Custom
+  Tab, so a WebAuthn challenge on `claude.com/cai/oauth/authorize` is handled by the
+  browser and its credential provider, not by us — no app change needed, as long as the
+  user's passkey is reachable from the phone. Only revisit if the authorize page starts
+  requiring a factor a Custom Tab can't satisfy; then the fallback is the existing
+  copy-the-desktop-sign-in path (README §"If the phone can't complete the sign-in").
+
 ---
 
 ## Needs design — decide the shape before building
