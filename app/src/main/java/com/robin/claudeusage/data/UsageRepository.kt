@@ -3,6 +3,7 @@ package com.robin.claudeusage.data
 import android.content.Context
 import androidx.glance.appwidget.updateAll
 import com.robin.claudeusage.alerts.Alerts
+import com.robin.claudeusage.ui.Fmt
 import com.robin.claudeusage.widget.BarWidget
 import com.robin.claudeusage.widget.UsageWidget
 import kotlinx.coroutines.Dispatchers
@@ -20,6 +21,22 @@ sealed class FetchResult(val message: String) {
     class AuthNeeded : FetchResult("Re-auth needed — paste a fresh token")
     class NoCredentials : FetchResult("No token set — open settings")
     class Error(detail: String) : FetchResult("Error: $detail")
+}
+
+/**
+ * Result of a window ping (CCRM-17). [startedWindow] is the only thing that matters
+ * operationally — a 200 that didn't move `resets_at` is a failure, not a success.
+ */
+sealed class PingResult(val message: String, val startedWindow: Boolean, val failed: Boolean) {
+    class Started(boundary: String) : PingResult("Window opened, runs to $boundary", true, false)
+    class AlreadyOpen(boundary: String) :
+        PingResult("Skipped — a window was already open to $boundary", false, false)
+
+    /** The request succeeded but no window appeared. Reported as a failure on purpose. */
+    class NoWindow : PingResult("Ping sent but no window opened — nothing scheduled", false, true)
+    class AuthNeeded : PingResult("Ping failed — sign-in needs renewing", false, true)
+    class NoCredentials : PingResult("Ping failed — not signed in", false, true)
+    class Error(detail: String) : PingResult("Ping failed — $detail", false, true)
 }
 
 class UsageRepository(private val context: Context) {
@@ -209,6 +226,71 @@ class UsageRepository(private val context: Context) {
             Alerts.evaluate(context, cache)
             result
         }
+
+    /**
+     * Sends a window ping and **verifies it landed** (CCRM-17).
+     *
+     * The verification is the point: a 200 from `/v1/messages` only says the request
+     * was accepted. Whether a 5-hour window actually opened is a separate fact, read
+     * back from the usage endpoint. A silent failure here is the worst outcome the
+     * feature has — the user wakes up believing they have a fresh window and doesn't —
+     * so anything short of an observed window counts as a failure.
+     *
+     * The "did it move" test goes through [PingSchedule.windowMoved], never an exact
+     * comparison: `resets_at` is recomputed per request and drifts about a second
+     * (CCBG-4), so `before != after` would report success for drift alone.
+     */
+    suspend fun sendWindowPing(profile: Profile): PingResult = withContext(Dispatchers.IO) {
+        val result = mutex.withLock {
+            val before = cache.snapshot(profile).data?.session?.resetsAt?.toEpochMilli()
+            val now = System.currentTimeMillis()
+            val creds = credStore.load(profile) ?: return@withLock PingResult.NoCredentials()
+
+            var token = creds.accessToken
+            if (creds.expiresAt in 1 until now + EXPIRY_MARGIN_MS) {
+                token = refreshAccessToken(profile, creds) ?: return@withLock PingResult.AuthNeeded()
+            }
+
+            try {
+                var resp = ApiClient.sendPing(token)
+                if (resp.code == 401) {
+                    token = refreshAccessToken(profile, credStore.load(profile) ?: creds)
+                        ?: return@withLock PingResult.AuthNeeded()
+                    resp = ApiClient.sendPing(token)
+                }
+                if (resp.code != 200) {
+                    return@withLock PingResult.Error(pingErrorDetail(resp))
+                }
+                // Re-read usage to find out what actually happened. ignoreGates so the
+                // 180s manual floor can't make us skip the very check we need.
+                doFetch(profile, manual = false, ignoreGates = true)
+                val after = cache.snapshot(profile).data?.session?.resetsAt
+                val afterMs = after?.toEpochMilli()
+                val boundary = after?.let { Fmt.dayTime(it, cache.use24hTime()) }
+                when {
+                    boundary == null -> PingResult.NoWindow()
+                    PingSchedule.windowMoved(before, afterMs) -> PingResult.Started(boundary)
+                    else -> PingResult.AlreadyOpen(boundary)
+                }
+            } catch (e: IOException) {
+                PingResult.Error(e.message ?: "no network")
+            } catch (e: Exception) {
+                PingResult.Error(e.message ?: "unexpected error")
+            }
+        }
+        updateWidgets()
+        result
+    }
+
+    /** Pulls the server's own error text out of a non-200 ping response when present. */
+    private fun pingErrorDetail(resp: HttpResult): String {
+        val fromBody = try {
+            JSONObject(resp.body).optJSONObject("error")?.optString("message")?.ifEmpty { null }
+        } catch (_: Exception) {
+            null
+        }
+        return fromBody ?: "HTTP ${resp.code}"
+    }
 
     private fun doFetch(profile: Profile, manual: Boolean, ignoreGates: Boolean = false): FetchResult {
         val now = System.currentTimeMillis()

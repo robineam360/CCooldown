@@ -35,6 +35,11 @@ class UsagePollWorker(context: Context, params: WorkerParameters) :
         val cache = UsageCache(applicationContext)
         Polling.scheduleResetChecks(applicationContext, cache)
 
+        // Window pings chain off the observed resets_at, which only changes when we
+        // poll — so the alarm has to follow the fresh value rather than the one it was
+        // armed against (CCRM-17).
+        com.robin.claudeusage.ping.PingScheduler.rescheduleAll(applicationContext)
+
         // WorkManager periodic work can't run more often than every 15 min; for
         // shorter user-chosen intervals we self-chain one-shots (periodic stays
         // as a backstop if the chain ever breaks).

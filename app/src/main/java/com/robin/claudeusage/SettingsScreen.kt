@@ -81,6 +81,7 @@ import com.robin.claudeusage.data.UpdateCheck
 import com.robin.claudeusage.data.UpdateInfo
 import com.robin.claudeusage.data.UsageCache
 import com.robin.claudeusage.data.UsageRepository
+import com.robin.claudeusage.ping.PingScheduler
 import com.robin.claudeusage.ui.Fmt
 import com.robin.claudeusage.ui.Palette
 import com.robin.claudeusage.ui.hasTwoColumns
@@ -359,6 +360,12 @@ fun SettingsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        }
+        Spacer(Modifier.height(24.dp))
+
+        SectionLabel("Window pings")
+        SectionCard {
+            WindowPingsSection(repo = repo, labels = labels, use24h = use24h)
         }
         Spacer(Modifier.height(24.dp))
 
@@ -1605,6 +1612,272 @@ private fun ResetModeRow(label: String, window: String, cache: UsageCache) {
                     shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
                 ) { Text(text) }
             }
+        }
+    }
+}
+
+/**
+ * Window pings (CCRM-17) — schedule the start of your own 5-hour windows.
+ *
+ * Off by default, per profile. A ping spends the user's subscription quota on an
+ * automated request, so the copy says exactly what it sends and on whose account
+ * rather than burying it.
+ */
+@Composable
+private fun WindowPingsSection(
+    repo: UsageRepository,
+    labels: Map<Profile, String>,
+    use24h: Boolean,
+) {
+    val context = LocalContext.current
+    val cacheSettings = repo.cacheSettings()
+    val scope = rememberCoroutineScope()
+    var profile by remember { mutableStateOf(Profile.PERSONAL) }
+    var tick by remember { mutableIntStateOf(0) }
+
+    var enabled by remember(profile, tick) { mutableStateOf(cacheSettings.pingEnabled(profile)) }
+    var firstMinute by remember(profile, tick) {
+        mutableIntStateOf(cacheSettings.pingFirstMinuteOfDay(profile))
+    }
+    var renewals by remember(profile, tick) { mutableIntStateOf(cacheSettings.pingRenewals(profile)) }
+    var cutoff by remember(profile, tick) {
+        mutableIntStateOf(cacheSettings.pingCutoffMinuteOfDay(profile))
+    }
+    var testing by remember { mutableStateOf(false) }
+    var exactOk by remember(tick) { mutableStateOf(PingScheduler.canScheduleExact(context)) }
+
+    fun rearm() = PingScheduler.reschedule(context, profile)
+
+    Text(
+        "Starts a 5-hour window when you choose, instead of whenever you happen to send " +
+            "your first message. Sends a one-word message to Claude on the selected " +
+            "account — it spends a token or two of that account's own quota.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Spacer(Modifier.height(12.dp))
+
+    Text("Account", style = MaterialTheme.typography.bodyLarge)
+    Spacer(Modifier.height(8.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        for (p in Profile.entries) {
+            FilterChip(
+                selected = profile == p,
+                onClick = { profile = p },
+                label = {
+                    Text(
+                        if (cacheSettings.pingEnabled(p)) "${labels.getValue(p)} · on"
+                        else labels.getValue(p)
+                    )
+                },
+            )
+        }
+    }
+    RowDivider()
+
+    ToggleRow(
+        title = "Schedule window pings",
+        subtitle = "Off unless you turn it on, separately for each account",
+        checked = enabled,
+    ) {
+        enabled = it
+        cacheSettings.setPingEnabled(profile, it)
+        rearm()
+    }
+
+    if (!repo.hasCredentials(profile)) {
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "${labels.getValue(profile)} isn't signed in yet, so pings can't run for it.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+        )
+    }
+
+    if (enabled) {
+        RowDivider()
+        MinuteOfDayRow("First ping", firstMinute, use24h) {
+            firstMinute = it
+            cacheSettings.setPingFirstMinuteOfDay(profile, it)
+            rearm()
+        }
+
+        RowDivider()
+        Text("Renewals", style = MaterialTheme.typography.bodyLarge)
+        Text(
+            "How many more windows to open after the first, each starting when the last one ends",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            for ((value, text) in listOf(0 to "None", 1 to "1", 2 to "2", 3 to "3")) {
+                FilterChip(
+                    selected = renewals == value,
+                    onClick = {
+                        renewals = value
+                        cacheSettings.setPingRenewals(profile, value)
+                        rearm()
+                    },
+                    label = { Text(text) },
+                )
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            plannedWindows(firstMinute, renewals, cutoff, use24h),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        RowDivider()
+        MinuteOfDayRow("Never ping after", cutoff, use24h) {
+            cutoff = it
+            cacheSettings.setPingCutoffMinuteOfDay(profile, it)
+            rearm()
+        }
+        Text(
+            "A hard stop, so a chain that has slipped later in the day can't open a window overnight.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        // The times above are a target, not a promise: a window's boundaries follow the
+        // message that opens it, so the real ones come from the server.
+        val liveReset = repo.snapshot(profile).data?.session?.resetsAt
+        if (liveReset != null) {
+            RowDivider()
+            Text(
+                "Current window really ends ${Fmt.dayTime(liveReset, use24h)} — the app follows " +
+                    "this, not the times above.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        if (!exactOk) {
+            RowDivider()
+            Text(
+                "Exact alarms are off",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.error,
+            )
+            Text(
+                "Pings may fire minutes late. A window starts when the ping lands, so being " +
+                    "late shifts every window for the rest of the day.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(onClick = {
+                openExactAlarmSettings(context)
+                exactOk = PingScheduler.canScheduleExact(context)
+            }) { Text("Allow exact alarms") }
+        }
+
+        RowDivider()
+        val lastResult = cacheSettings.pingLastResult(profile)
+        val lastAt = cacheSettings.pingLastAttemptAt(profile)
+        if (lastResult != null && lastAt > 0) {
+            Text(
+                "${Fmt.dayTime(java.time.Instant.ofEpochMilli(lastAt), use24h)} — $lastResult",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (cacheSettings.pingLastFailed(profile)) MaterialTheme.colorScheme.error
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+        }
+        OutlinedButton(
+            enabled = !testing && repo.hasCredentials(profile),
+            onClick = {
+                testing = true
+                scope.launch {
+                    repo.sendWindowPing(profile)
+                    testing = false
+                    tick++
+                    rearm()
+                }
+            },
+        ) { Text(if (testing) "Pinging…" else "Test ping now") }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "Sends one straight away and reports what happened. If a window is already open " +
+                "it will say so rather than starting another.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** A time-of-day row that opens the platform picker; value is minutes past midnight. */
+@Composable
+private fun MinuteOfDayRow(title: String, minuteOfDay: Int, use24h: Boolean, onChange: (Int) -> Unit) {
+    val context = LocalContext.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .clickable {
+                android.app.TimePickerDialog(
+                    context,
+                    { _, hour, minute -> onChange(hour * 60 + minute) },
+                    minuteOfDay / 60,
+                    minuteOfDay % 60,
+                    use24h,
+                ).show()
+            }
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Text(formatMinuteOfDay(minuteOfDay, use24h), style = MaterialTheme.typography.bodyLarge)
+    }
+}
+
+private fun formatMinuteOfDay(minuteOfDay: Int, use24h: Boolean): String {
+    val h = (minuteOfDay / 60) % 24
+    val m = minuteOfDay % 60
+    if (use24h) return "%02d:%02d".format(h, m)
+    val suffix = if (h < 12) "AM" else "PM"
+    val h12 = when (h % 12) {
+        0 -> 12
+        else -> h % 12
+    }
+    return "%d:%02d %s".format(h12, m, suffix)
+}
+
+/**
+ * The slots the current settings would produce on a clean day. Explicitly a plan:
+ * real boundaries follow whenever each ping actually lands.
+ */
+private fun plannedWindows(firstMinute: Int, renewals: Int, cutoff: Int, use24h: Boolean): String {
+    val cutoffMinutes = if (cutoff <= 0) 1440 else cutoff
+    val slots = mutableListOf<String>()
+    var start = firstMinute
+    for (i in 0..renewals) {
+        val end = start + 300
+        if (start >= cutoffMinutes) break
+        slots += "${formatMinuteOfDay(start, use24h)}–${formatMinuteOfDay(end, use24h)}"
+        start = end
+    }
+    if (slots.isEmpty()) return "Nothing would run — the first ping is after the cutoff."
+    return "On a clean day: " + slots.joinToString(", ") + "."
+}
+
+/** Opens the per-app exact-alarm screen, falling back to app details on odd skins. */
+private fun openExactAlarmSettings(context: android.content.Context) {
+    val intents = listOf(
+        Intent("android.settings.REQUEST_SCHEDULE_EXACT_ALARM")
+            .setData(android.net.Uri.parse("package:${context.packageName}")),
+        Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+            .setData(android.net.Uri.parse("package:${context.packageName}")),
+    )
+    for (intent in intents) {
+        try {
+            context.startActivity(intent)
+            return
+        } catch (_: Exception) {
+            // Try the next one; some skins ship neither.
         }
     }
 }

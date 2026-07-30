@@ -4,6 +4,20 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!--
+      Window pings (CCRM-17) need to fire at an exact minute: a window's boundaries
+      follow the message that opens it, so an alarm 3 minutes late costs 3 minutes of
+      every window for the rest of the day. USE_EXACT_ALARM is Play-restricted, which
+      does not apply here — this app is sideload-only. SCHEDULE_EXACT_ALARM is the
+      user-revocable fallback for older releases.
+    -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission
+        android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        android:maxSdkVersion="32" />
+    <!-- Alarms are cleared on reboot, so they have to be re-armed. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Sideload-only app (never Play Store): allowed to enumerate installed
          browsers so the sign-in "open with" picker can list them reliably,
          including on OEM skins where a scoped <queries> under-reports.
@@ -93,6 +107,18 @@
         <receiver
             android:name=".notify.PinnedRefreshReceiver"
             android:exported="false" />
+
+        <receiver
+            android:name=".ping.PingAlarmReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".ping.PingBootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
 
     </application>
 </manifest>

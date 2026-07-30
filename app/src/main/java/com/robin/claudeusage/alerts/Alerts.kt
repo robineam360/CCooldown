@@ -29,6 +29,12 @@ object Alerts {
     private const val CHANNEL_AUTH = "auth_alerts"
     private const val CHANNEL_HEALTH = "health_alerts"
 
+    /**
+     * Its own channel so a user who wants window pings but not their noise can mute
+     * exactly this. Only ever used for failures — a ping that works says nothing.
+     */
+    private const val CHANNEL_PING = "ping_alerts"
+
     /** Notification-id kinds 1–7 are fixed; per-model caps use this base + index. */
     private const val MODEL_CAP_KIND_BASE = 10
 
@@ -57,6 +63,26 @@ object Alerts {
             NotificationChannel(
                 CHANNEL_HEALTH, "Data freshness", NotificationManager.IMPORTANCE_DEFAULT
             ).apply { description = "Usage data hasn't refreshed for hours" }
+        )
+        nm.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_PING, "Window pings", NotificationManager.IMPORTANCE_HIGH
+            ).apply { description = "A scheduled window ping failed to start a window" }
+        )
+    }
+
+    /**
+     * A scheduled ping failed after its retries. Deliberately IMPORTANCE_HIGH: the
+     * user is relying on a window existing that now doesn't, and finding out at 8am
+     * is the failure this feature exists to avoid.
+     */
+    fun notifyPingFailed(context: Context, profile: Profile, detail: String) {
+        ensureChannels(context)
+        val cache = UsageCache(context)
+        notify(
+            context, profile, notifId(profile, 8), CHANNEL_PING,
+            "${cache.profileLabel(profile)}: window not started",
+            detail,
         )
     }
 

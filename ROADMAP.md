@@ -129,9 +129,48 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
 ## Needs design — decide the shape before building
 
 ### CCRM-17 · Window Pings — start a 5-hour window on a schedule
-- **Status:** Needs design · **spike DONE, feature is viable** — mechanism proven end
-  to end 2026-07-30; what remains is a product call on posture and defaults, not a
-  technical unknown
+- **Status:** **Built 2026-07-30, opt-in and off by default** · not yet device-verified
+- **Shipped:**
+  - `ApiClient.sendPing()` — `POST /v1/messages`, Haiku, `max_tokens 1`, body `"hi"`.
+    No UA rule (the endpoint has no UA gate) and no Claude Code system preamble.
+  - `data/PingSchedule.kt` — all the scheduling rules as pure, framework-free logic so
+    they're testable: skip/ping/stop, the next alarm time, the cutoff, the renewal
+    bound, and `windowMoved()`. 16 tests in `PingScheduleTest`.
+  - `ping/PingScheduler.kt` — `AlarmManager.setExactAndAllowWhileIdle`, one alarm per
+    profile, degrading to inexact (and saying so in the UI) when the permission is
+    absent. `ping/PingAlarmReceiver.kt` re-decides at fire time, then re-arms;
+    `PingBootReceiver` re-arms after a reboot.
+  - `UsageRepository.sendWindowPing()` — sends, then **re-reads usage to verify a window
+    actually opened**. A 200 that didn't move `resets_at` is reported as a failure.
+  - `UsageCache` ping prefs, per profile, `pingEnabled` defaulting to **false**.
+  - `Alerts.notifyPingFailed` on its own `ping_alerts` channel, `IMPORTANCE_HIGH`.
+    Silent on success.
+  - Settings → **Window pings**: account chips, master switch, first-ping time,
+    renewals (None/1/2/3), never-ping-after, the planned slots, the live real boundary,
+    an exact-alarm warning with a grant button, the last outcome, and **Test ping now**.
+  - `UsagePollWorker` re-arms the chain after every poll, since `resets_at` only
+    changes when we poll.
+- **Design decisions worth keeping:**
+  - **Per profile, off by default on both.** A ping spends real quota on an automated
+    request, so enabling it on a Team account stays the user's explicit act.
+  - **The chain follows the observed `resets_at`, never anchor + 5h.** A session the
+    user starts at 03:00 owns 03:00–08:00; the 04:00 ping is skipped and the next is
+    armed for 08:00, not the configured 09:00. Fixed wall-clock alarms would stay an
+    hour out of phase all day.
+  - **Lateness is surfaced, not hidden** — "fired 6m late" — because the window really
+    did shift by that much.
+  - **A failed attempt does not consume a renewal**; it retries at 1/3/8 minutes and
+    then notifies.
+  - **`windowMoved` needs a minute of movement**, not inequality. `resets_at` drifts
+    ~1.3s with nothing happening (CCBG-4), so an exact test would call drift a success
+    and the feature's own safety check would be the thing lying.
+- **Still to verify on-device:** a ping opening a window **from cold** (every spike so
+  far ran with a window already open — `Test ping now` reports exactly this), whether
+  the boundary truncates to the minute or something coarser, and that a 4am alarm
+  really fires on time in Doze on the Fold 7.
+- **Not done:** no widget or tile surface for pings, and no battery-optimization
+  exemption prompt — `setExactAndAllowWhileIdle` should be enough, so that only gets
+  added if real drift shows up.
 - **Why:** The 5-hour window starts on your first message, so its boundaries are an
   accident of when you happened to start working. Pinging on a schedule makes them a
   choice: 4am–9am, 9am–2pm, 2pm–7pm, 7pm–midnight is four windows covering 20h, all

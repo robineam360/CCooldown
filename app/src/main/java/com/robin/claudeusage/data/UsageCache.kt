@@ -370,6 +370,96 @@ class UsageCache(context: Context) {
     fun setLastSeenWindowKey(profile: Profile, window: String, key: Long) {
         prefs.edit().putLong(k(profile, "seen${window}Key"), key).apply()
     }
+
+    // --- window pings (CCRM-17): per profile, OFF unless the user turns it on ---
+
+    /**
+     * Default **false**, deliberately. A ping spends the user's own subscription quota
+     * on an automated request, so it is never something the app starts doing on its own
+     * — and this being per-profile is what keeps a Team account out of it by default.
+     */
+    fun pingEnabled(profile: Profile): Boolean = prefs.getBoolean(k(profile, "pingEnabled"), false)
+
+    fun setPingEnabled(profile: Profile, enabled: Boolean) {
+        prefs.edit().putBoolean(k(profile, "pingEnabled"), enabled).apply()
+    }
+
+    /** Minutes past local midnight, default 04:00. */
+    fun pingFirstMinuteOfDay(profile: Profile): Int =
+        prefs.getInt(k(profile, "pingFirstMinute"), 4 * 60)
+
+    fun setPingFirstMinuteOfDay(profile: Profile, minuteOfDay: Int) {
+        prefs.edit().putInt(k(profile, "pingFirstMinute"), minuteOfDay).apply()
+    }
+
+    /** Extra windows after the first, default 3 — the user's 4am/9am/2pm/7pm example. */
+    fun pingRenewals(profile: Profile): Int = prefs.getInt(k(profile, "pingRenewals"), 3)
+
+    fun setPingRenewals(profile: Profile, renewals: Int) {
+        prefs.edit().putInt(k(profile, "pingRenewals"), renewals).apply()
+    }
+
+    /** Minutes past local midnight; 0 means end of day. Default 0 (don't run into tomorrow). */
+    fun pingCutoffMinuteOfDay(profile: Profile): Int = prefs.getInt(k(profile, "pingCutoffMinute"), 0)
+
+    fun setPingCutoffMinuteOfDay(profile: Profile, minuteOfDay: Int) {
+        prefs.edit().putInt(k(profile, "pingCutoffMinute"), minuteOfDay).apply()
+    }
+
+    fun pingConfig(profile: Profile): PingSchedule.Config = PingSchedule.Config(
+        enabled = pingEnabled(profile),
+        firstPingMinuteOfDay = pingFirstMinuteOfDay(profile),
+        renewals = pingRenewals(profile),
+        cutoffMinuteOfDay = pingCutoffMinuteOfDay(profile),
+    )
+
+    /**
+     * Windows opened today, so renewals are bounded. Stored as an ISO date string
+     * rather than millis so a day rollover is unambiguous across time zones.
+     */
+    fun pingDayState(profile: Profile): PingSchedule.DayState = PingSchedule.DayState(
+        day = prefs.getString(k(profile, "pingDay"), null)?.let {
+            try {
+                java.time.LocalDate.parse(it)
+            } catch (_: Exception) {
+                null
+            }
+        },
+        windowsStarted = prefs.getInt(k(profile, "pingWindowsStarted"), 0),
+    )
+
+    fun recordPingWindowStarted(profile: Profile, day: java.time.LocalDate) {
+        val current = pingDayState(profile)
+        val started = if (current.day == day) current.windowsStarted + 1 else 1
+        prefs.edit()
+            .putString(k(profile, "pingDay"), day.toString())
+            .putInt(k(profile, "pingWindowsStarted"), started)
+            .apply()
+    }
+
+    /** Human-readable outcome of the last ping, for the settings status row. */
+    fun pingLastResult(profile: Profile): String? = prefs.getString(k(profile, "pingLastResult"), null)
+
+    fun pingLastAttemptAt(profile: Profile): Long = prefs.getLong(k(profile, "pingLastAttemptAt"), 0L)
+
+    /** True when the last attempt failed, so the row can be styled as a problem. */
+    fun pingLastFailed(profile: Profile): Boolean =
+        prefs.getBoolean(k(profile, "pingLastFailed"), false)
+
+    fun setPingOutcome(profile: Profile, at: Long, result: String, failed: Boolean) {
+        prefs.edit()
+            .putLong(k(profile, "pingLastAttemptAt"), at)
+            .putString(k(profile, "pingLastResult"), result)
+            .putBoolean(k(profile, "pingLastFailed"), failed)
+            .apply()
+    }
+
+    /** Which retry step the current slot is on; reset once the slot resolves. */
+    fun pingRetryIndex(profile: Profile): Int = prefs.getInt(k(profile, "pingRetryIndex"), 0)
+
+    fun setPingRetryIndex(profile: Profile, index: Int) {
+        prefs.edit().putInt(k(profile, "pingRetryIndex"), index).apply()
+    }
 }
 
 /** Per-widget configuration chosen in the setup screen when a widget is placed. */

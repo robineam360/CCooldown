@@ -4,6 +4,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
@@ -24,6 +25,12 @@ object ApiClient {
     const val USER_AGENT = "claude-code/2.1.214"
 
     private const val USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
+
+    /** Inference endpoint, used only to open a window — see [sendPing]. */
+    private const val MESSAGES_URL = "https://api.anthropic.com/v1/messages"
+
+    /** Cheapest model available; a ping's content is irrelevant, only that it bills. */
+    private const val PING_MODEL = "claude-haiku-4-5-20251001"
     // 2026 migration: authorize + token endpoints moved to the claude.com /
     // platform.claude.com family (verified against Claude Code 2.1.214's binary).
     // Claude's own SDK posts JSON (application/json) to this endpoint.
@@ -46,6 +53,42 @@ object ApiClient {
             .header("Authorization", "Bearer $accessToken")
             .header("anthropic-beta", "oauth-2025-04-20")
             .header("User-Agent", USER_AGENT)
+            .header("Content-Type", "application/json")
+            .build()
+        client.newCall(request).execute().use { resp ->
+            return HttpResult(resp.code, resp.body?.string() ?: "")
+        }
+    }
+
+    /**
+     * Sends the smallest possible inference request, purely to make the server open
+     * a 5-hour window (CCRM-17). Reading usage never starts a window; only a billed
+     * message does.
+     *
+     * Verified 2026-07-30 against the Work account: 200 with `user:inference` (which
+     * [OAuthSignIn.SCOPE] already requests), and **no** `"You are Claude Code…"`
+     * system preamble required. Unlike the token endpoint this one has no
+     * User-Agent gate at all — probes with claude-code, okhttp, curl and empty UAs
+     * every one reached real auth validation — so we send OkHttp's default and add
+     * no UA rule here.
+     *
+     * Costs 8 input tokens and 1 output token; too small to move the usage percent.
+     */
+    fun sendPing(accessToken: String): HttpResult {
+        val payload = JSONObject()
+            .put("model", PING_MODEL)
+            .put("max_tokens", 1)
+            .put(
+                "messages",
+                JSONArray().put(JSONObject().put("role", "user").put("content", "hi")),
+            )
+            .toString()
+        val request = Request.Builder()
+            .url(MESSAGES_URL)
+            .post(payload.toRequestBody(jsonMedia))
+            .header("Authorization", "Bearer $accessToken")
+            .header("anthropic-beta", "oauth-2025-04-20")
+            .header("anthropic-version", "2023-06-01")
             .header("Content-Type", "application/json")
             .build()
         client.newCall(request).execute().use { resp ->
