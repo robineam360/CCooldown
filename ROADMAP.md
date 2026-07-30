@@ -102,6 +102,28 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
   requiring a factor a Custom Tab can't satisfy; then the fallback is the existing
   copy-the-desktop-sign-in path (README §"If the phone can't complete the sign-in").
 
+### CCRM-4 · Widget long-press quick-edit
+- **Status:** Planned · small · **prerequisite for CCRM-3 phase 2**
+- **Moved up from *Later* on 2026-07-30.** CCRM-3 phase 2 gives each widget a layout, a
+  background and an accent. A cosmetic setting you can only change by deleting the widget
+  and adding it again is worse than not shipping it, so this now leads that work rather
+  than trailing it.
+- **Why:** Reconfiguring a placed widget shouldn't mean removing and re-adding it.
+- **Approach:** Wire the widget's long-press/reconfigure entry point to relaunch
+  `widget/WidgetConfigActivity.kt` pre-filled with that instance's current settings
+  (Personal ↔ Work, the bar kind, and the CCRM-3 layout/background/accent). Half the work
+  is already done and unused: `WidgetPrefs` is keyed by `appWidgetId`, but `ConfigScreen`
+  ignores it and hardcodes its initial state
+  ([WidgetConfigActivity.kt:102](app/src/main/java/com/robin/claudeusage/widget/WidgetConfigActivity.kt#L102)),
+  so the screen needs to read back rather than gain storage. Uses the standard
+  `APPWIDGET_CONFIGURE` "reconfigure existing widget" flow, which also needs
+  `android:widgetFeatures="reconfigurable"` in both `usage_widget_info.xml` and
+  `bar_widget_info.xml`.
+- **Also:** the confirm button reads "Add widget" unconditionally — it needs to say
+  "Save changes" when reconfiguring, and the screen wants a "use my defaults" escape back
+  to the CCRM-3 defaults.
+- **Was:** "Depends on CCRM-3 for the theme control." Inverted — CCRM-3 depends on this.
+
 ---
 
 ## Needs design — decide the shape before building
@@ -208,7 +230,7 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
   **Reserve window**.
 
 ### CCRM-3 · Unified theming system for widgets & notifications
-- **Status:** Phase 1 done (2026-07-27) · phases 2-3 still need design
+- **Status:** Phase 1 done (2026-07-27) · phase 2 designed (2026-07-30) · phase 3 needs design
 - **Phase 1 shipped — notification styles.** `pinnedStyle` pref, chip selector under
   **Settings → Pinned notification**, four options, default unchanged (`gauge`) so
   nobody's notification moves under them:
@@ -226,25 +248,84 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
     7-day window, which matters less than the 5-hour one.
 - **Combines the old "widget themes", "5h widget", and "bigger notification" items.**
   They were three overlapping asks; building theming three separate times is how we'd
-  end up with three inconsistent looks. Define **one** set of theme tokens (palette +
-  layout + size), then have every surface draw from it.
-- **Why now:** The pinned-notification percentage is genuinely too small today — that's
-  the most-felt problem in this cluster.
-- **Approach — design first, then phase the build:**
-  1. **Tokens.** Extend `ui/Palette.kt` into a small theme model (named themes →
-     colors, corner/opacity, text scale). One source of truth for widgets + notifications.
-  2. **Phase 1 — big-number notification theme** *(ship first; solves the real pain).*
-     A settings option exposing notification themes, including one that renders the
-     percentage as large as possible, plus a couple of visually distinct variants.
-     Lives in `notify/PinnedNotification.kt`.
-  3. **Phase 2 — widget themes.** Multiple visual themes for `widget/UsageWidget.kt`
-     and `widget/BarWidget.kt`, **including a transparent theme**. Selected in
-     `widget/WidgetConfigActivity.kt`.
-  4. **Phase 3 — dedicated 5-hour widget.** A widget built around the 5-hour window:
-     large centre percentage with a circular fill ring, offered as a few variants
-     (one with Claude's mascot inside the ring, plus other themed options).
-- **Open questions:** how many themes is enough (avoid a settings zoo); does the mascot
-  asset need licensing sign-off before it ships in a widget.
+  end up with three inconsistent looks. Define **one** set of tokens, then have every
+  surface draw from it.
+- **Two axes, deliberately separate — the design decision of 2026-07-30.** The four
+  phase-1 options are not themes, they are **layouts**: `gauge`/`number`/`progress`/`big`
+  change what is drawn, not what colour it is. "Transparent" is the opposite — a **token**
+  with no layout consequence. Keeping them in one undifferentiated list is exactly how we
+  arrive at the settings zoo this item used to worry about. So:
+  - **Tokens** — accent, bar shape, background mode, text contrast, text scale. One set,
+    app-wide, in `ui/Palette.kt`. Every surface reads them; none defines its own.
+  - **Layouts** — what a surface draws. Scope differs per surface: **global** for the
+    notification (there is only one), **per widget instance** for widgets (two widgets may
+    legitimately differ — a transparent number on one page, solid bars on another),
+    **fixed** for the in-app screen.
+- **The in-app screen gets tokens only — no per-card configuration.** Decided 2026-07-30.
+  It is the one surface with the room and the full context, so it should be the *reference*
+  rendering of the token set rather than another thing to style. Its real complaint is
+  length, not looks — two 192dp charts stand between the 5-hour bar and the credits card —
+  and that is density, not theming. Not filed: if the scroll ever becomes the top
+  complaint, one "trend charts: always / when they project / off" chip is the whole fix.
+- **Settings scope, capped up front:** widgets get **four** controls — layout, background,
+  accent, and which elements show (profile name / refresh icon / "updated 4m ago" footer).
+  Nothing else. Settings holds the **defaults** a newly placed widget inherits; `WidgetPrefs`
+  holds per-instance overrides; one **"apply to all N widgets"** action exists because
+  changing the accent must not mean long-pressing every widget in turn.
+- **Previews are schematic on purpose.** A Glance composable cannot be rendered inside the
+  config activity, so any preview is a second renderer that will drift from the first.
+  Better an obvious diagram than a subtly wrong mockup.
+- **Approach — build order:**
+  1. **Tokens.** Extend `ui/Palette.kt` into a theme model (accent, bar shape, background
+     mode, text contrast, text scale). Model only — no UI, no behaviour change. Mirror the
+     token names into [BEHAVIOR-SPEC.md](contract/BEHAVIOR-SPEC.md) so a second client
+     (CCRM-8) inherits the same vocabulary instead of inventing one.
+  2. **Prerequisite: CCRM-4**, before any cosmetic option exists. Shipping a look you can
+     only change by deleting and re-adding the widget is the worst possible discoverability
+     for a cosmetic feature. **This inverts the old dependency** — CCRM-4 gates phase 2,
+     not the reverse.
+  3. **Phase 2a — "huge number" widget layout** *(ship first: cheapest, and it proves the
+     split).* A port of `notif_big_number.xml` to `widget/BarWidget.kt` — weighted left
+     column (label / bar / reset) with the percentage trailing, bold and large. `BarWidget`
+     is already this content; the percentage just moves out of `HeaderRow`. Needs **no
+     bitmap**: Glance's `LinearProgressIndicator` takes a `ColorProvider`, which is the very
+     thing whose RemoteViews inconsistency forced the notification to draw its bar by hand.
+     No new provider, no new drawing code.
+     - **`BarWidget` must leave `SizeMode.Single`.** Today a 4×1 and a 2×1 render
+       identically; a big number has to know its width. Move to `SizeMode.Responsive` with
+       width buckets (~30sp narrow / 38sp medium / 46sp wide).
+     - **No spans in a Glance `Text`,** so `drawNumberTile()`'s superscript `%` at 0.42× is
+       unavailable. Use a bottom-aligned `Row` of two `Text`s instead.
+     - **Three digits step down 0.77×** — the same ratio `drawNumberTile()` already uses
+       (0.60 → 0.46), for the same reason.
+     - **The number takes the warning colour** along with the bar. Unlike the chart, which
+       deliberately splits two different risk signals across two channels (CCRM-12), this is
+       one signal with no channel to conflict with — and a 7dp bar is a weak place to say
+       "97%".
+     - **The percentage still truncates**, per
+       [BEHAVIOR-SPEC §2](contract/BEHAVIOR-SPEC.md). Considered unifying it with the
+       credits card's rounding and **rejected 2026-07-30**: truncation never overstates, so
+       a window at 99.7% must read 99 rather than claim a limit the user has not reached —
+       and at 46sp that matters more, not less. The visible consequence is that windows and
+       credits can differ by a point on the same screen; that is the intended trade.
+     - Narrow buckets drop the trailing clock time first, keeping the countdown.
+  4. **Phase 2b — background token.** Solid / translucent / none, across both widget
+     providers. **The translucent middle option is the one most people actually want:**
+     `Color.Transparent` is one line, but `GlanceTheme.colors.onSurface` is chosen by system
+     dark mode, not by the wallpaper behind that particular widget, so light text on a light
+     wallpaper reads as a bug. Hence the paired text-contrast control (auto / light / dark).
+  5. **Phase 2c — Settings → Widgets.** The defaults block plus "apply to all N".
+  6. **Phase 3 — ring layout.** Large centre percentage in a circular fill ring, as a
+     **layout option on the existing providers, not a third provider** — another entry in
+     the launcher's widget picker is a real cost, and only earns it if the ring needs its own
+     square default size. Glance has no Canvas, so this one *does* need a bitmap: extract the
+     drawing so CCRM-13 shares that extraction rather than repeating it. Cap dimensions and
+     cache per size bucket — a RemoteViews transaction has a size limit.
+- **Verification:** every layout wants looking at on real hardware before it is called done
+  (CCRM-15 exists because a state shipped unobserved), then a figure in `Release/docs`.
+- **Open questions:** does the mascot asset need licensing sign-off before it ships inside a
+  widget ring — phase 3 only, nothing earlier needs it. *(Resolved: "how many themes is
+  enough" — the four-control cap above.)*
 
 ---
 
@@ -336,6 +417,9 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
   extracting from the Compose Canvas into something both can call.
 - **Depends on:** CCRM-4 would let a placed instance be reconfigured without
   re-adding it.
+- **Shares its extraction with CCRM-3 phase 3.** The ring layout needs the same
+  Canvas-to-bitmap escape hatch for the same reason. Whichever ships first should do the
+  extraction properly — one drawing surface both can call — rather than solving it twice.
 
 ### CCRM-11 · Quick Settings tile shows the 5-hour reset
 - **Status:** Done (2026-07-27)
@@ -355,15 +439,6 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
 - **Also fixed:** the `startActivityAndCollapse(Intent)` lint error — the deprecated
   overload is still the only option below API 34 and minSdk is 31, so it's suppressed
   with a note rather than removed.
-
-### CCRM-4 · Widget long-press quick-edit
-- **Status:** Planned
-- **Why:** Reconfiguring a placed widget shouldn't mean removing and re-adding it.
-- **Approach:** Wire the widget's long-press/reconfigure entry point to relaunch
-  `widget/WidgetConfigActivity.kt` pre-filled with that instance's current settings
-  (Personal ↔ Work, 5-hour ↔ 7-day, theme from CCRM-3). Uses the standard
-  `APPWIDGET_CONFIGURE` "reconfigure existing widget" flow. Depends on CCRM-3 for the
-  theme control.
 
 ### CCRM-5 · Work section as its own pinned notification
 - **Status:** Planned
