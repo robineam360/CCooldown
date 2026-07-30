@@ -11,6 +11,60 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
 
 ## Open
 
+### CCBG-4 · Threshold alerts re-fire every poll — `resets_at` is not stable
+- **Status:** Open
+- **Severity:** High (repeat notifications; the dedup that exists doesn't work)
+- **Symptom:** once a window is past its lowest threshold (80% for the session, 90%
+  weekly), the usage alert re-fires on **every poll** — every 15 min on the default
+  interval — instead of once per window. `notify()` sets no `setOnlyAlertOnce`, so each
+  repeat re-alerts with sound/vibration rather than quietly updating in place.
+- **Root cause:** the server **recomputes `resets_at` per request**; it is not a stored
+  constant. Measured on the Work account 2026-07-30, five polls 60s apart inside one
+  window:
+
+  ```
+  2026-07-30T09:19:59.913124+00:00  -> 1785403199913
+  2026-07-30T09:19:59.625243+00:00  -> 1785403199625
+  2026-07-30T09:20:00.333280+00:00  -> 1785403200333
+  2026-07-30T09:20:00.950515+00:00  -> 1785403200950
+  2026-07-30T09:20:00.698040+00:00  -> 1785403200698
+  ```
+
+  ~1.3s of spread, all five distinct. `checkThresholds`
+  ([Alerts.kt:253](app/src/main/java/com/robin/claudeusage/alerts/Alerts.kt#L253)) uses
+  `resetsAt.toEpochMilli()` as the window identity and compares it exactly:
+
+  ```kotlin
+  if (cache.alertKey(profile, keyName) != windowKey) {
+      cache.setAlertState(profile, keyName, windowKey, 0)   // wipes "already notified"
+  }
+  val alreadyNotified = cache.alertThreshold(profile, keyName)   // reads back 0
+  ```
+
+  The key differs on every poll, so the state is wiped every poll, `alreadyNotified`
+  is always 0, and `crossed` re-selects the lowest threshold the percentage has passed.
+- **Fix — tolerance, NOT truncation.** Truncating to the minute is the obvious move and
+  is *wrong*: the observed jitter straddles the `09:20:00` boundary, so polls 1–2 would
+  truncate to `09:19` and 3–5 to `09:20` — still unstable, just less often, which is a
+  worse bug because it looks fixed. Compare with a tolerance instead, the way
+  [Projection.kt:30](app/src/main/java/com/robin/claudeusage/data/Projection.kt#L30)
+  already does (`tolerance = windowLengthMs / 4`). Consecutive windows are a full window
+  apart, so anything from a minute upward separates them cleanly while absorbing ~1.3s
+  of noise. Consider `setOnlyAlertOnce` as belt-and-braces.
+- **Not affected:**
+  - `Projection` / `HistoryStore` — already tolerance-bound (`abs(r - resetAtMs) <= tol`),
+    which is why CCBG-2's fix didn't surface this.
+  - `checkReset` ([Alerts.kt:212](app/src/main/java/com/robin/claudeusage/alerts/Alerts.kt#L212))
+    — `lastSeen != key` is now true every poll, but the third condition
+    `Instant.ofEpochMilli(lastSeen).isBefore(Instant.now())` still guards it: while a
+    window is open its reset time is in the future, so the rollover branch can't fire.
+    **Narrow residual risk:** a poll landing within ~1s of the true boundary could see
+    jitter push `lastSeen` into the past and spuriously log a closed window + reset
+    notification. Low probability at 15-min polling, and the tolerance fix removes it
+    too — worth fixing in the same pass.
+- **Found via:** the CCRM-17 ping spike, which snapshotted usage either side of an
+  inference call and showed `resets_at` moving when nothing had changed.
+
 ### CCBG-3 · Credits card ignores extra-usage being switched off
 - **Status:** Open
 - **Severity:** Low (misleading display, no data loss) — and possibly unreachable
