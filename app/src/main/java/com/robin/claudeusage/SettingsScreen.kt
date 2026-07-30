@@ -11,6 +11,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -1138,7 +1139,14 @@ private fun AboutCard(debugUnlocked: Boolean, onDebugUnlock: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Flows rather than a Row: the two labels together need ~325dp, which
+            // a settings column on a foldable doesn't have. Given a Row the second
+            // button wraps its own label to two lines; here it drops to its own
+            // line instead, and on a phone the pair still sits side by side.
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 OutlinedButton(onClick = {
                     val email = Intent(Intent.ACTION_SENDTO).apply {
                         data = Uri.parse("mailto:$FEEDBACK_EMAIL")
