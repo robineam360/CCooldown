@@ -465,7 +465,15 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
 ## Bookends — major efforts, gated on the above
 
 ### CCRM-7 · iOS — an iOS version of the app
-- **Status:** Planned · gated → v2.0
+- **Status:** Planned · **behind CCRM-8 (Mac), reordered 2026-07-30** · gated → v2.0
+- **No longer the next platform.** Mac goes first. iOS is held up by **distribution, not
+  readiness** — the full argument lives in CCRM-8 and isn't repeated here, but the short
+  version is that sideloading is a first-class path on Android and a dead end on Apple's
+  phone, so the same app reaches far fewer people for far more work. Nothing about the
+  design below is in doubt; only its position in the queue changed.
+- **What would move it back up:** a distribution route that doesn't depend on App Store
+  review — most plausibly the EU's alternative-distribution regime, or Anthropic
+  sanctioning third-party clients so review stops being a coin toss.
 - **Why / when:** Build only after most of the above has settled, so we port a stable
   design rather than a moving one. Targeted for v2.0.
 - **Approach:** New iOS app. Port the model/repository layer conceptually; reuse the
