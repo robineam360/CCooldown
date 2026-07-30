@@ -2,6 +2,7 @@ package com.robin.claudeusage
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -40,7 +41,9 @@ import com.robin.claudeusage.data.Profile
 import com.robin.claudeusage.data.SessionLog
 import com.robin.claudeusage.data.UsageRepository
 import com.robin.claudeusage.ui.Fmt
+import com.robin.claudeusage.ui.LocalWidthClass
 import com.robin.claudeusage.ui.Palette
+import com.robin.claudeusage.ui.twoPane
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -81,6 +84,10 @@ fun HistoryScreen(repo: UsageRepository, tick: Int) {
         )
     }
 
+    // Wide enough and both window kinds fit at once, so the toggle between them
+    // stops being a choice you have to make — the comparison is the useful part.
+    val sideBySide = LocalWidthClass.current.twoPane
+
     TabRow(selectedTabIndex = tab) {
         profiles.forEachIndexed { index, p ->
             Tab(
@@ -92,18 +99,39 @@ fun HistoryScreen(repo: UsageRepository, tick: Int) {
     }
     Spacer(Modifier.height(16.dp))
 
-    Row {
-        FilterChip(selected = !weekly, onClick = { weekly = false }, label = { Text("5-hour") })
-        Spacer(Modifier.width(8.dp))
-        FilterChip(selected = weekly, onClick = { weekly = true }, label = { Text("7-day") })
+    if (!sideBySide) {
+        Row {
+            FilterChip(selected = !weekly, onClick = { weekly = false }, label = { Text("5-hour") })
+            Spacer(Modifier.width(8.dp))
+            FilterChip(selected = weekly, onClick = { weekly = true }, label = { Text("7-day") })
+        }
+        Spacer(Modifier.height(12.dp))
     }
-    Spacer(Modifier.height(12.dp))
 
-    if (weekly) {
-        WeeklyView(HistoryStats.bars(records, SessionLog.WEEKLY, openBar(SessionLog.WEEKLY)), zone, use24h)
-    } else {
+    val sessions: @Composable () -> Unit = {
         val bars = HistoryStats.bars(records, SessionLog.SESSION, openBar(SessionLog.SESSION))
         SessionWeekView(HistoryStats.weeks(bars, zone), weekIndex, zone, use24h) { weekIndex = it }
+    }
+    val weeks: @Composable () -> Unit = {
+        WeeklyView(HistoryStats.bars(records, SessionLog.WEEKLY, openBar(SessionLog.WEEKLY)), zone, use24h)
+    }
+
+    if (sideBySide) {
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            // With the chips gone, each pane has to say which window it's showing.
+            Column(Modifier.weight(1f)) {
+                PaneLabel("5-hour windows")
+                sessions()
+            }
+            Column(Modifier.weight(1f)) {
+                PaneLabel("7-day windows")
+                weeks()
+            }
+        }
+    } else if (weekly) {
+        weeks()
+    } else {
+        sessions()
     }
 
     Spacer(Modifier.height(12.dp))
@@ -225,6 +253,17 @@ private fun BarRow(label: String, bar: HistoryStats.Bar) {
             modifier = Modifier.width(40.dp),
         )
     }
+}
+
+/** Heading over one pane of the side-by-side layout. */
+@Composable
+private fun PaneLabel(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+    )
 }
 
 @Composable

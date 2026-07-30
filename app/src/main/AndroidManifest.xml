@@ -22,8 +22,15 @@
         android:allowBackup="true"
         android:dataExtractionRules="@xml/backup_rules">
 
+        <!-- Handle size changes ourselves instead of being recreated. Compose
+             relayouts on its own, and on a foldable the alternative is that every
+             fold or unfold tears the activity down mid-refresh: the spinner and
+             any error message live in remember{} state and would vanish with it.
+             uiMode is deliberately absent — a day/night switch should still
+             recreate, which is how the theme gets reapplied. -->
         <activity
             android:name=".MainActivity"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|keyboardHidden"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

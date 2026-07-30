@@ -82,6 +82,7 @@ import com.robin.claudeusage.data.UsageCache
 import com.robin.claudeusage.data.UsageRepository
 import com.robin.claudeusage.ui.Fmt
 import com.robin.claudeusage.ui.Palette
+import com.robin.claudeusage.ui.hasTwoColumns
 import com.robin.claudeusage.widget.BarWidgetReceiver
 import com.robin.claudeusage.widget.UsageWidgetReceiver
 import com.robin.claudeusage.work.Polling
@@ -110,234 +111,273 @@ fun SettingsScreen(
     var namesTick by remember { mutableIntStateOf(0) }
     val labels = remember(namesTick) { Profile.entries.associateWith { cacheSettings.profileLabel(it) } }
 
-    SectionLabel("Accounts")
-    for (profile in Profile.entries) {
-        TokenCard(repo, profile, use24h, onOpenGuide, label = labels.getValue(profile))
-        Spacer(Modifier.height(10.dp))
-    }
-    Spacer(Modifier.height(14.dp))
+    // The sections split into two independent groups so a wide window — the
+    // Fold's inner screen, a tablet, a freeform window — can run them as two
+    // columns instead of one very long scroll. The split is by subject rather
+    // than by length: what the accounts are on one side, how this device
+    // surfaces them on the other.
+    val accountSections: @Composable () -> Unit = {
+        SectionLabel("Accounts")
+        for (profile in Profile.entries) {
+            TokenCard(repo, profile, use24h, onOpenGuide, label = labels.getValue(profile))
+            Spacer(Modifier.height(10.dp))
+        }
+        Spacer(Modifier.height(14.dp))
 
-    SectionLabel("Profile names")
-    SectionCard {
-        for ((index, profile) in Profile.entries.withIndex()) {
-            if (index > 0) Spacer(Modifier.height(10.dp))
-            var name by remember { mutableStateOf(cacheSettings.profileLabel(profile)) }
-            OutlinedTextField(
-                value = name,
-                onValueChange = {
-                    name = it.take(16)
-                    cacheSettings.setProfileLabel(profile, name)
-                    namesTick++
-                    refreshWidgets()
-                },
-                label = { Text("${profile.label} profile") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-        Spacer(Modifier.height(6.dp))
-        Text(
-            "Used everywhere — tabs, widgets, and notifications. Clear a field to go back to the default.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-    Spacer(Modifier.height(24.dp))
-
-    SectionLabel("Polling")
-    PollingSection(repo)
-    Spacer(Modifier.height(24.dp))
-
-    SectionLabel("Notifications")
-    SectionCard {
-        Text("Usage warnings", style = MaterialTheme.typography.bodyLarge)
-        Text(
-            "Notify when a window crosses these levels. Nothing selected = silent.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(4.dp))
-        ThresholdChipsRow("5-hour window", listOf(80, 90, 95), cacheSettings.sessionAlertThresholds()) {
-            cacheSettings.setSessionAlertThresholds(it)
-        }
-        ThresholdChipsRow("7-day window", listOf(75, 90), cacheSettings.weeklyAlertThresholds()) {
-            cacheSettings.setWeeklyAlertThresholds(it)
-        }
-        ThresholdChipsRow("Per-model caps", listOf(75, 90), cacheSettings.modelCapAlertThresholds()) {
-            cacheSettings.setModelCapAlertThresholds(it)
-        }
-        RowDivider()
-        Text("Reset pings", style = MaterialTheme.typography.bodyLarge)
-        Text(
-            "\"If busy\" pings only when that window had reached 80% before it reset.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(6.dp))
-        ResetModeRow("5-hour reset", "Session", cacheSettings)
-        Spacer(Modifier.height(8.dp))
-        ResetModeRow("7-day reset", "Weekly", cacheSettings)
-        RowDivider()
-        for ((index, profile) in Profile.entries.withIndex()) {
-            if (index > 0) RowDivider()
-            var enabled by remember { mutableStateOf(cacheSettings.profileAlertsEnabled(profile)) }
-            ToggleRow(
-                title = "${labels.getValue(profile)} alerts",
-                subtitle = "Usage warnings and reset pings for this profile",
-                checked = enabled,
-            ) {
-                enabled = it
-                cacheSettings.setProfileAlertsEnabled(profile, it)
-            }
-        }
-        RowDivider()
-        var authAlerts by remember { mutableStateOf(cacheSettings.authAlertsEnabled()) }
-        ToggleRow(
-            title = "Sign-in alerts",
-            subtitle = "Token expiring soon or no longer working",
-            checked = authAlerts,
-        ) {
-            authAlerts = it
-            cacheSettings.setAuthAlertsEnabled(it)
-        }
-        RowDivider()
-        var healthAlerts by remember { mutableStateOf(cacheSettings.healthAlertsEnabled()) }
-        ToggleRow(
-            title = "Stale data alerts",
-            subtitle = "Usage data hasn't refreshed for hours",
-            checked = healthAlerts,
-        ) {
-            healthAlerts = it
-            cacheSettings.setHealthAlertsEnabled(it)
-        }
-        RowDivider()
-        LinkRow("System notification settings") {
-            context.startActivity(
-                Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                    .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
-            )
-        }
-    }
-    Spacer(Modifier.height(24.dp))
-
-    SectionLabel("Pinned notification")
-    SectionCard {
-        var pinned by remember { mutableStateOf(cacheSettings.pinnedEnabled()) }
-        var pinnedProfile by remember { mutableStateOf(cacheSettings.pinnedProfile()) }
-        var iconStyle by remember { mutableStateOf(cacheSettings.pinnedIconStyle()) }
-        var tapTarget by remember { mutableStateOf(cacheSettings.pinnedTapTarget()) }
-        var pinnedStyle by remember { mutableStateOf(cacheSettings.pinnedStyle()) }
-        fun refreshPinned() {
-            com.robin.claudeusage.notify.PinnedNotification.update(context, cacheSettings)
-        }
-        ToggleRow(
-            title = "Always-on usage notification",
-            subtitle = "A silent, ongoing notification with a status-bar icon that fills as you use your 5-hour window",
-            checked = pinned,
-        ) {
-            pinned = it
-            cacheSettings.setPinnedEnabled(it)
-            refreshPinned()
-        }
-        if (pinned) {
-            RowDivider()
-            Text("Show profile", style = MaterialTheme.typography.bodyLarge)
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for (p in Profile.entries) {
-                    FilterChip(
-                        selected = pinnedProfile == p,
-                        onClick = {
-                            pinnedProfile = p
-                            cacheSettings.setPinnedProfile(p)
-                            refreshPinned()
-                        },
-                        label = { Text(labels.getValue(p)) },
-                    )
-                }
-            }
-            RowDivider()
-            Text("Notification style", style = MaterialTheme.typography.bodyLarge)
-            Spacer(Modifier.height(8.dp))
-            val styles = listOf(
-                "gauge" to "Gauge",
-                "number" to "Number tile",
-                "progress" to "Progress bar",
-                "big" to "Huge number",
-            )
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                for (row in styles.chunked(2)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        for ((value, text) in row) {
-                            FilterChip(
-                                selected = pinnedStyle == value,
-                                onClick = {
-                                    pinnedStyle = value
-                                    cacheSettings.setPinnedStyle(value)
-                                    refreshPinned()
-                                },
-                                label = { Text(text) },
-                            )
-                        }
-                    }
-                }
+        SectionLabel("Profile names")
+        SectionCard {
+            for ((index, profile) in Profile.entries.withIndex()) {
+                if (index > 0) Spacer(Modifier.height(10.dp))
+                var name by remember { mutableStateOf(cacheSettings.profileLabel(profile)) }
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = {
+                        name = it.take(16)
+                        cacheSettings.setProfileLabel(profile, name)
+                        namesTick++
+                        refreshWidgets()
+                    },
+                    label = { Text("${profile.label} profile") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
             Spacer(Modifier.height(6.dp))
             Text(
-                when (pinnedStyle) {
-                    "number" -> "The percentage fills the icon slot — about twice the size of the gauge."
-                    "progress" -> "A plain system progress bar with the percentage in the title."
-                    "big" -> "The largest number a collapsed notification allows. Uses a custom " +
-                        "layout, so a few phone skins may style it differently."
-                    else -> "A ring around the percentage, the original look."
-                },
+                "Used everywhere — tabs, widgets, and notifications. Clear a field to go back to the default.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            RowDivider()
-            Text("Tapping the notification opens", style = MaterialTheme.typography.bodyLarge)
-            Spacer(Modifier.height(8.dp))
-            val claudeInstalled = remember {
-                com.robin.claudeusage.notify.PinnedNotification.claudeLaunchIntent(context) != null
+        }
+        Spacer(Modifier.height(24.dp))
+
+        SectionLabel("Polling")
+        PollingSection(repo)
+        Spacer(Modifier.height(24.dp))
+
+        SectionLabel("Notifications")
+        SectionCard {
+            Text("Usage warnings", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                "Notify when a window crosses these levels. Nothing selected = silent.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(4.dp))
+            ThresholdChipsRow("5-hour window", listOf(80, 90, 95), cacheSettings.sessionAlertThresholds()) {
+                cacheSettings.setSessionAlertThresholds(it)
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for ((value, text) in listOf("app" to "Claude Cooldown", "claude" to "Claude app")) {
-                    FilterChip(
-                        selected = tapTarget == value,
-                        onClick = {
-                            tapTarget = value
-                            cacheSettings.setPinnedTapTarget(value)
-                            refreshPinned()
-                        },
-                        label = { Text(text) },
-                    )
+            ThresholdChipsRow("7-day window", listOf(75, 90), cacheSettings.weeklyAlertThresholds()) {
+                cacheSettings.setWeeklyAlertThresholds(it)
+            }
+            ThresholdChipsRow("Per-model caps", listOf(75, 90), cacheSettings.modelCapAlertThresholds()) {
+                cacheSettings.setModelCapAlertThresholds(it)
+            }
+            RowDivider()
+            Text("Reset pings", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                "\"If busy\" pings only when that window had reached 80% before it reset.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(6.dp))
+            ResetModeRow("5-hour reset", "Session", cacheSettings)
+            Spacer(Modifier.height(8.dp))
+            ResetModeRow("7-day reset", "Weekly", cacheSettings)
+            RowDivider()
+            for ((index, profile) in Profile.entries.withIndex()) {
+                if (index > 0) RowDivider()
+                var enabled by remember { mutableStateOf(cacheSettings.profileAlertsEnabled(profile)) }
+                ToggleRow(
+                    title = "${labels.getValue(profile)} alerts",
+                    subtitle = "Usage warnings and reset pings for this profile",
+                    checked = enabled,
+                ) {
+                    enabled = it
+                    cacheSettings.setProfileAlertsEnabled(profile, it)
                 }
             }
-            if (tapTarget == "claude" && !claudeInstalled) {
+            RowDivider()
+            var authAlerts by remember { mutableStateOf(cacheSettings.authAlertsEnabled()) }
+            ToggleRow(
+                title = "Sign-in alerts",
+                subtitle = "Token expiring soon or no longer working",
+                checked = authAlerts,
+            ) {
+                authAlerts = it
+                cacheSettings.setAuthAlertsEnabled(it)
+            }
+            RowDivider()
+            var healthAlerts by remember { mutableStateOf(cacheSettings.healthAlertsEnabled()) }
+            ToggleRow(
+                title = "Stale data alerts",
+                subtitle = "Usage data hasn't refreshed for hours",
+                checked = healthAlerts,
+            ) {
+                healthAlerts = it
+                cacheSettings.setHealthAlertsEnabled(it)
+            }
+            RowDivider()
+            LinkRow("System notification settings") {
+                context.startActivity(
+                    Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
+                )
+            }
+        }
+    }
+
+    val deviceSections: @Composable () -> Unit = {
+        SectionLabel("Pinned notification")
+        SectionCard {
+            var pinned by remember { mutableStateOf(cacheSettings.pinnedEnabled()) }
+            var pinnedProfile by remember { mutableStateOf(cacheSettings.pinnedProfile()) }
+            var iconStyle by remember { mutableStateOf(cacheSettings.pinnedIconStyle()) }
+            var tapTarget by remember { mutableStateOf(cacheSettings.pinnedTapTarget()) }
+            var pinnedStyle by remember { mutableStateOf(cacheSettings.pinnedStyle()) }
+            fun refreshPinned() {
+                com.robin.claudeusage.notify.PinnedNotification.update(context, cacheSettings)
+            }
+            ToggleRow(
+                title = "Always-on usage notification",
+                subtitle = "A silent, ongoing notification with a status-bar icon that fills as you use your 5-hour window",
+                checked = pinned,
+            ) {
+                pinned = it
+                cacheSettings.setPinnedEnabled(it)
+                refreshPinned()
+            }
+            if (pinned) {
+                RowDivider()
+                Text("Show profile", style = MaterialTheme.typography.bodyLarge)
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for (p in Profile.entries) {
+                        FilterChip(
+                            selected = pinnedProfile == p,
+                            onClick = {
+                                pinnedProfile = p
+                                cacheSettings.setPinnedProfile(p)
+                                refreshPinned()
+                            },
+                            label = { Text(labels.getValue(p)) },
+                        )
+                    }
+                }
+                RowDivider()
+                Text("Notification style", style = MaterialTheme.typography.bodyLarge)
+                Spacer(Modifier.height(8.dp))
+                val styles = listOf(
+                    "gauge" to "Gauge",
+                    "number" to "Number tile",
+                    "progress" to "Progress bar",
+                    "big" to "Huge number",
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for (row in styles.chunked(2)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            for ((value, text) in row) {
+                                FilterChip(
+                                    selected = pinnedStyle == value,
+                                    onClick = {
+                                        pinnedStyle = value
+                                        cacheSettings.setPinnedStyle(value)
+                                        refreshPinned()
+                                    },
+                                    label = { Text(text) },
+                                )
+                            }
+                        }
+                    }
+                }
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    "The Claude app isn't installed — taps will open Claude Cooldown instead.",
+                    when (pinnedStyle) {
+                        "number" -> "The percentage fills the icon slot — about twice the size of the gauge."
+                        "progress" -> "A plain system progress bar with the percentage in the title."
+                        "big" -> "The largest number a collapsed notification allows. Uses a custom " +
+                            "layout, so a few phone skins may style it differently."
+                        else -> "A ring around the percentage, the original look."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                RowDivider()
+                Text("Tapping the notification opens", style = MaterialTheme.typography.bodyLarge)
+                Spacer(Modifier.height(8.dp))
+                val claudeInstalled = remember {
+                    com.robin.claudeusage.notify.PinnedNotification.claudeLaunchIntent(context) != null
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for ((value, text) in listOf("app" to "Claude Cooldown", "claude" to "Claude app")) {
+                        FilterChip(
+                            selected = tapTarget == value,
+                            onClick = {
+                                tapTarget = value
+                                cacheSettings.setPinnedTapTarget(value)
+                                refreshPinned()
+                            },
+                            label = { Text(text) },
+                        )
+                    }
+                }
+                if (tapTarget == "claude" && !claudeInstalled) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "The Claude app isn't installed — taps will open Claude Cooldown instead.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                RowDivider()
+                Text("Status-bar icon", style = MaterialTheme.typography.bodyLarge)
+                Spacer(Modifier.height(8.dp))
+                val iconStyles = listOf(
+                    "ring" to "Ring",
+                    "pie" to "Pie",
+                    "battery" to "Battery",
+                    "number" to "Number",
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for ((value, text) in iconStyles) {
+                        FilterChip(
+                            selected = iconStyle == value,
+                            onClick = {
+                                iconStyle = value
+                                cacheSettings.setPinnedIconStyle(value)
+                                refreshPinned()
+                            },
+                            label = { Text(text) },
+                        )
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "The colored gauge and bars follow your theme and turn orange, then red, near the limit. The tiny status-bar icon is monochrome — Android renders it that way for every app.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            RowDivider()
-            Text("Status-bar icon", style = MaterialTheme.typography.bodyLarge)
-            Spacer(Modifier.height(8.dp))
-            val iconStyles = listOf(
-                "ring" to "Ring",
-                "pie" to "Pie",
-                "battery" to "Battery",
-                "number" to "Number",
+        }
+        Spacer(Modifier.height(24.dp))
+
+        SectionLabel("Quick Settings tile")
+        SectionCard {
+            Text(
+                "The tile in the notification shade / Control Center. It shows the 5-hour " +
+                    "percentage; this picks what sits under it.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Spacer(Modifier.height(8.dp))
+            var tileSubtitle by remember { mutableStateOf(cacheSettings.tileSubtitle()) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for ((value, text) in iconStyles) {
+                for ((value, text) in listOf("countdown" to "Countdown", "clock" to "Clock time")) {
                     FilterChip(
-                        selected = iconStyle == value,
+                        selected = tileSubtitle == value,
                         onClick = {
-                            iconStyle = value
-                            cacheSettings.setPinnedIconStyle(value)
-                            refreshPinned()
+                            tileSubtitle = value
+                            cacheSettings.setTileSubtitle(value)
                         },
                         label = { Text(text) },
                     )
@@ -345,145 +385,128 @@ fun SettingsScreen(
             }
             Spacer(Modifier.height(6.dp))
             Text(
-                "The colored gauge and bars follow your theme and turn orange, then red, near the limit. The tiny status-bar icon is monochrome — Android renders it that way for every app.",
+                if (tileSubtitle == "clock")
+                    "Shows \"resets 4:12 PM\". The tile only updates when you open the shade, " +
+                        "so a clock time can't go stale while it sits open."
+                else
+                    "Shows \"resets in 2h 14m\". Reads more naturally, but drifts if the " +
+                        "shade stays open a while.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "The tile icon fills as the window burns, following the status-bar icon " +
+                    "style above. Android tints tile icons itself, so it can't carry the " +
+                    "theme or warning colors.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-    }
-    Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(24.dp))
 
-    SectionLabel("Quick Settings tile")
-    SectionCard {
-        Text(
-            "The tile in the notification shade / Control Center. It shows the 5-hour " +
-                "percentage; this picks what sits under it.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(8.dp))
-        var tileSubtitle by remember { mutableStateOf(cacheSettings.tileSubtitle()) }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            for ((value, text) in listOf("countdown" to "Countdown", "clock" to "Clock time")) {
-                FilterChip(
-                    selected = tileSubtitle == value,
-                    onClick = {
-                        tileSubtitle = value
-                        cacheSettings.setTileSubtitle(value)
-                    },
-                    label = { Text(text) },
-                )
+        SectionLabel("Usage credits")
+        SectionCard {
+            Text(
+                "Pay-as-you-go credits that cover you once a plan window runs out. The " +
+                    "section only appears for accounts that actually have a credit budget.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(4.dp))
+            for (profile in Profile.entries) {
+                RowDivider()
+                var visible by remember { mutableStateOf(cacheSettings.creditsVisible(profile)) }
+                ToggleRow(
+                    title = "Show for ${labels.getValue(profile)}",
+                    subtitle = "Credits card on this profile's screen",
+                    checked = visible,
+                ) {
+                    visible = it
+                    cacheSettings.setCreditsVisible(profile, it)
+                    refreshWidgets()
+                }
             }
-        }
-        Spacer(Modifier.height(6.dp))
-        Text(
-            if (tileSubtitle == "clock")
-                "Shows \"resets 4:12 PM\". The tile only updates when you open the shade, " +
-                    "so a clock time can't go stale while it sits open."
-            else
-                "Shows \"resets in 2h 14m\". Reads more naturally, but drifts if the " +
-                    "shade stays open a while.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(6.dp))
-        Text(
-            "The tile icon fills as the window burns, following the status-bar icon " +
-                "style above. Android tints tile icons itself, so it can't carry the " +
-                "theme or warning colors.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-    Spacer(Modifier.height(24.dp))
-
-    SectionLabel("Usage credits")
-    SectionCard {
-        Text(
-            "Pay-as-you-go credits that cover you once a plan window runs out. The " +
-                "section only appears for accounts that actually have a credit budget.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(4.dp))
-        for (profile in Profile.entries) {
             RowDivider()
-            var visible by remember { mutableStateOf(cacheSettings.creditsVisible(profile)) }
+            var creditsOnWidgets by remember { mutableStateOf(cacheSettings.creditsOnWidgets()) }
             ToggleRow(
-                title = "Show for ${labels.getValue(profile)}",
-                subtitle = "Credits card on this profile's screen",
-                checked = visible,
+                title = "Show on widgets",
+                subtitle = "Adds a credits bar to the tall usage widget. Needs the room, " +
+                    "so smaller widgets stay as they are.",
+                checked = creditsOnWidgets,
             ) {
-                visible = it
-                cacheSettings.setCreditsVisible(profile, it)
+                creditsOnWidgets = it
+                cacheSettings.setCreditsOnWidgets(it)
                 refreshWidgets()
             }
         }
-        RowDivider()
-        var creditsOnWidgets by remember { mutableStateOf(cacheSettings.creditsOnWidgets()) }
-        ToggleRow(
-            title = "Show on widgets",
-            subtitle = "Adds a credits bar to the tall usage widget. Needs the room, " +
-                "so smaller widgets stay as they are.",
-            checked = creditsOnWidgets,
-        ) {
-            creditsOnWidgets = it
-            cacheSettings.setCreditsOnWidgets(it)
-            refreshWidgets()
-        }
-    }
-    Spacer(Modifier.height(24.dp))
-
-    SectionLabel("Appearance")
-    SectionCard {
-        ToggleRow(
-            title = "24-hour time",
-            subtitle = if (use24h) "Times shown like Thu 23:45" else "Times shown like Thu 11:45 PM",
-            checked = use24h,
-        ) {
-            onUse24h(it)
-            repo.cacheSettings().setUse24hTime(it)
-            refreshWidgets()
-        }
-        RowDivider()
-        Text("Theme color", style = MaterialTheme.typography.bodyLarge)
-        Spacer(Modifier.height(4.dp))
-        ThemeColorPicker(themeName) {
-            onTheme(it)
-            repo.cacheSettings().setThemeColorName(it)
-            refreshWidgets()
-        }
-    }
-    Spacer(Modifier.height(24.dp))
-
-    SectionLabel("Widgets")
-    SectionCard {
-        var pinMessage by remember { mutableStateOf<String?>(null) }
-        fun pin(receiver: Class<*>) {
-            val awm = context.getSystemService(AppWidgetManager::class.java)
-            val ok = awm.isRequestPinAppWidgetSupported &&
-                awm.requestPinAppWidget(ComponentName(context, receiver), null, null)
-            if (!ok) pinMessage = "Your launcher doesn't support pinning — long-press the home screen and add it from the widget list."
-        }
-        LinkRow("Add usage widget to home screen") { pin(UsageWidgetReceiver::class.java) }
-        RowDivider()
-        LinkRow("Add single-bar widget to home screen") { pin(BarWidgetReceiver::class.java) }
-        pinMessage?.let {
-            Spacer(Modifier.height(6.dp))
-            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-    Spacer(Modifier.height(24.dp))
-
-    SectionLabel("About")
-    AboutCard(debugUnlocked, onDebugUnlock)
-
-    if (debugUnlocked) {
         Spacer(Modifier.height(24.dp))
-        SectionLabel("Debug")
-        TrendDiagnostics(repo, use24h)
-        Spacer(Modifier.height(10.dp))
-        DebugSection(repo)
+
+        SectionLabel("Appearance")
+        SectionCard {
+            ToggleRow(
+                title = "24-hour time",
+                subtitle = if (use24h) "Times shown like Thu 23:45" else "Times shown like Thu 11:45 PM",
+                checked = use24h,
+            ) {
+                onUse24h(it)
+                repo.cacheSettings().setUse24hTime(it)
+                refreshWidgets()
+            }
+            RowDivider()
+            Text("Theme color", style = MaterialTheme.typography.bodyLarge)
+            Spacer(Modifier.height(4.dp))
+            ThemeColorPicker(themeName) {
+                onTheme(it)
+                repo.cacheSettings().setThemeColorName(it)
+                refreshWidgets()
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+
+        SectionLabel("Widgets")
+        SectionCard {
+            var pinMessage by remember { mutableStateOf<String?>(null) }
+            fun pin(receiver: Class<*>) {
+                val awm = context.getSystemService(AppWidgetManager::class.java)
+                val ok = awm.isRequestPinAppWidgetSupported &&
+                    awm.requestPinAppWidget(ComponentName(context, receiver), null, null)
+                if (!ok) pinMessage = "Your launcher doesn't support pinning — long-press the home screen and add it from the widget list."
+            }
+            LinkRow("Add usage widget to home screen") { pin(UsageWidgetReceiver::class.java) }
+            RowDivider()
+            LinkRow("Add single-bar widget to home screen") { pin(BarWidgetReceiver::class.java) }
+            pinMessage?.let {
+                Spacer(Modifier.height(6.dp))
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+
+        SectionLabel("About")
+        AboutCard(debugUnlocked, onDebugUnlock)
+
+        if (debugUnlocked) {
+            Spacer(Modifier.height(24.dp))
+            SectionLabel("Debug")
+            TrendDiagnostics(repo, use24h)
+            Spacer(Modifier.height(10.dp))
+            DebugSection(repo)
+        }
+    }
+
+    if (hasTwoColumns()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            Column(Modifier.weight(1f)) { accountSections() }
+            Column(Modifier.weight(1f)) { deviceSections() }
+        }
+    } else {
+        accountSections()
+        Spacer(Modifier.height(24.dp))
+        deviceSections()
     }
     Spacer(Modifier.height(8.dp))
 }

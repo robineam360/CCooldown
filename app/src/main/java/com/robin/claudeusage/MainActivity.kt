@@ -46,6 +46,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -53,6 +54,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -72,11 +74,18 @@ import com.robin.claudeusage.data.Profile
 import com.robin.claudeusage.data.Projection
 import com.robin.claudeusage.data.UsageRepository
 import com.robin.claudeusage.data.UsageWindow
+import com.robin.claudeusage.ui.ContentColumn
+import com.robin.claudeusage.ui.ContentMaxWidth
 import com.robin.claudeusage.ui.Fmt
+import com.robin.claudeusage.ui.LocalWidthClass
 import com.robin.claudeusage.ui.Palette
+import com.robin.claudeusage.ui.ProvideWidthClass
 import com.robin.claudeusage.ui.UsageSparkline
+import com.robin.claudeusage.ui.WideMaxWidth
+import com.robin.claudeusage.ui.hasTwoColumns
 import com.robin.claudeusage.ui.PACE_DEAD_ZONE
 import com.robin.claudeusage.ui.elapsedPercent
+import com.robin.claudeusage.ui.twoPane
 import com.robin.claudeusage.widget.BarWidget
 import com.robin.claudeusage.widget.UsageWidget
 import com.robin.claudeusage.work.Polling
@@ -91,7 +100,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val startProfile = Profile.fromKey(intent?.getStringExtra("profile"))
-        setContent { App(startProfile) }
+        // Measured at the root so every screen sees the same window width, and so
+        // it re-measures on a fold/unfold without the activity being torn down.
+        setContent { ProvideWidthClass { App(startProfile) } }
     }
 }
 
@@ -202,15 +213,21 @@ private fun App(startProfile: Profile) {
                     )
                 },
             ) { innerPadding ->
+                // Settings and History lay their own content out in columns when
+                // there's room, so they get the wider cap — but only when they'll
+                // actually use it, or the cap would just stretch one column. The
+                // guide is prose and stays at one readable measure at any size.
+                val contentWidth = when (screen) {
+                    Screen.SETTINGS -> if (hasTwoColumns()) WideMaxWidth else ContentMaxWidth
+                    Screen.HISTORY -> if (LocalWidthClass.current.twoPane) WideMaxWidth else ContentMaxWidth
+                    else -> ContentMaxWidth
+                }
                 when (screen) {
                     Screen.MAIN ->
                         ProfileTabs(repo, use24h, tick, startProfile, Modifier.padding(innerPadding))
-                    else -> Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(innerPadding)
-                            .padding(horizontal = 20.dp)
-                            .verticalScroll(rememberScrollState()),
+                    else -> ContentColumn(
+                        modifier = Modifier.padding(innerPadding),
+                        maxWidth = contentWidth,
                     ) {
                         Spacer(Modifier.height(8.dp))
                         if (screen == Screen.HISTORY) {
@@ -255,6 +272,14 @@ private fun ProfileTabs(
     modifier: Modifier,
 ) {
     val profiles = Profile.entries
+    // Both accounts at once is the whole point of the app, and on a wide window
+    // there's finally room for it — so the tabs and the swipe go away rather than
+    // making you page between two things that now fit side by side.
+    if (LocalWidthClass.current.twoPane) {
+        ProfilePanes(repo, use24h, tick, modifier)
+        return
+    }
+
     val pagerState = rememberPagerState(
         initialPage = profiles.indexOf(startProfile).coerceAtLeast(0),
         pageCount = { profiles.size },
@@ -276,15 +301,50 @@ private fun ProfileTabs(
             modifier = Modifier.fillMaxSize(),
             verticalAlignment = Alignment.Top,
         ) { page ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 20.dp)
-                    .verticalScroll(rememberScrollState()),
-            ) {
+            ContentColumn {
                 Spacer(Modifier.height(16.dp))
                 ProfileScreen(repo, profiles[page], use24h, tick)
                 Spacer(Modifier.height(24.dp))
+            }
+        }
+    }
+}
+
+/**
+ * Every profile side by side, one scrolling pane each. Each pane carries its own
+ * heading, which is what the tab strip used to do — without it the two columns of
+ * near-identical cards are impossible to tell apart.
+ */
+@Composable
+private fun ProfilePanes(
+    repo: UsageRepository,
+    use24h: Boolean,
+    tick: Int,
+    modifier: Modifier,
+) {
+    Row(modifier = modifier.fillMaxSize()) {
+        for ((index, profile) in Profile.entries.withIndex()) {
+            if (index > 0) VerticalDivider()
+            // Keyed so each pane keeps its own scroll position rather than
+            // inheriting its neighbour's by loop position.
+            key(profile) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .padding(horizontal = 20.dp)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        repo.cacheSettings().profileLabel(profile),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    ProfileScreen(repo, profile, use24h, tick)
+                    Spacer(Modifier.height(24.dp))
+                }
             }
         }
     }
