@@ -59,7 +59,10 @@ class SurfaceTokensTest {
     @Test
     fun `translucent keeps the hue and only drops alpha`() {
         val scrim = Tokens.background(BackgroundMode.TRANSLUCENT, surface)
-        assertEquals(Tokens.TRANSLUCENT_ALPHA, scrim.alpha, 0.0001f)
+        // An sRGB Color packs alpha at 8-bit precision, so 0.55f comes back as
+        // 140/255 = 0.5490196 — never exactly the constant. One 8-bit step is 1/255,
+        // hence the delta; anything tighter fails on arithmetic rather than on meaning.
+        assertEquals(Tokens.TRANSLUCENT_ALPHA, scrim.alpha, 1f / 255f)
         assertEquals(surface.red, scrim.red, 0.0001f)
         assertEquals(surface.green, scrim.green, 0.0001f)
         assertEquals(surface.blue, scrim.blue, 0.0001f)
