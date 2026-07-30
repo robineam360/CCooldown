@@ -106,6 +106,107 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
 
 ## Needs design — decide the shape before building
 
+### CCRM-17 · "Ping" — start a 5-hour window on a schedule
+- **Status:** Needs design · **spike DONE, feature is viable** — mechanism proven end
+  to end 2026-07-30; what remains is a product call on posture and defaults, not a
+  technical unknown
+- **Why:** The 5-hour window starts on your first message, so its boundaries are an
+  accident of when you happened to start working. Pinging on a schedule makes them a
+  choice: 4am–9am, 9am–2pm, 2pm–7pm, 7pm–midnight is four windows covering 20h, all
+  aligned to the user's day instead of to whenever they first opened a terminal.
+  An unused window costs nothing against the 7-day budget, so an early ping is close
+  to free.
+- **Mechanism:** reading usage does not start a window — only a billed inference call
+  does. So a ping is `POST https://api.anthropic.com/v1/messages` with the same bearer
+  we already hold, `anthropic-beta: oauth-2025-04-20`, `anthropic-version: 2023-06-01`,
+  cheapest model, `max_tokens: 1`, body `"hi"`. `OAuthSignIn.SCOPE` already requests
+  `user:inference` ([OAuthSignIn.kt:35](app/src/main/java/com/robin/claudeusage/data/OAuthSignIn.kt#L35)),
+  so no re-sign-in is needed.
+
+- **Spike part 1 — the edge gate (DONE, 2026-07-30, tokenless):** `/v1/messages` has
+  **no User-Agent gate**, unlike the token endpoint. Fixed-bogus-bearer probes across
+  `claude-code/2.1.214`, `okhttp/5.4.0`, curl-default and empty UAs *all* returned an
+  identical clean `401 authentication_error` — `"OAuth access token is invalid."` —
+  i.e. every shape reached real auth validation rather than the opaque
+  `429 rate_limit_error` WAF block that cost us five rounds in v0.12. Presence or
+  absence of `anthropic-beta` made no difference, nor did adding the Claude Code
+  system preamble. An `x-api-key` control returned a *different* error
+  (`"invalid x-api-key"`), confirming the OAuth bearer path is distinct and live.
+  **Consequence:** `ApiClient` needs no third UA rule — a ping can go out on OkHttp's
+  default UA, and the two-opposite-UAs comment at the top of the file stays a
+  two-endpoint story.
+- **Spike part 2 — the token half (DONE, 2026-07-30, WORK/Team account):** a real ping
+  returned **HTTP 200**.
+  1. **`user:inference` IS honoured for a third-party caller.** No 403 — unlike the
+     `setup-token` route, which 403'd on `user:profile` (v0.11 notes). Response was a
+     normal `message` object, `stop_reason: max_tokens`.
+  2. **The Claude Code system preamble is NOT required.** The plain body succeeded on
+     the first attempt, so the `"You are Claude Code…"` system block never had to be
+     tried. Don't send it.
+  3. **Cost is invisible.** 8 input tokens, 1 output; `percent` read 55 both before and
+     after, i.e. below the reporting granularity. An early ping really is ~free.
+  4. **UA is irrelevant here** (see part 1) — the ping went out on curl's default UA,
+     standing in for the app's `okhttp/<ver>`.
+  - **Still unobserved:** a window was already open (55%, `resets_at` 09:20 UTC), so
+    "ping with nothing open actually starts one" wasn't directly demonstrated. Everything
+    else points to yes — it's the documented model and the app's own `"Starts when a
+    message is sent"` copy — but it's inference, not observation. Confirm on a cold
+    morning before shipping.
+- **Windows do NOT round to the hour** — `resets_at` came back `09:20:00`, so boundaries
+  follow the first message, not the clock. Good news for the 4/9/2/7 plan (a 04:00 ping
+  really can yield an 09:00 boundary) but it means **the slots are only as clean as the
+  alarm is punctual**: fire at 04:03 and you own 04:03–09:03 forever after. Two
+  consequences: exact alarms are mandatory (below), and the UI must display the *actual*
+  boundaries from `resets_at` rather than the idealised times the user configured —
+  otherwise the app lies to them by a few minutes, all day.
+  - Granularity is not fully pinned: `:20:00` is consistent with truncation to the
+    minute, or to 5/10/20 minutes. One sample can't separate those. Worth a second
+    reading whenever a window starts naturally.
+
+- **Schedule model — chain off `resets_at`, don't use fixed wall-clock alarms.**
+  Fixed 4/9/2/7 alarms desynchronise the first time the user works off-grid: a session
+  started at 3am owns 3–8am, the 4am ping lands *inside* it and does nothing, and every
+  later slot is an hour out of phase for the rest of the day. Instead:
+  - **Anchor** at a user-set first-ping time (4am).
+  - **Guard:** before pinging, check for an open window via `session.resetsAt`
+    ([Models.kt:9](app/src/main/java/com/robin/claudeusage/data/Models.kt#L9)). If one is
+    open, skip the ping and re-arm for its actual `resetsAt`.
+  - **Chain:** after each successful ping, re-arm at the *observed* `resetsAt`, never
+    at anchor + 5h.
+  - **Stop:** at a user-set renewal count (1–3, the user's "renew or not") or a
+    wall-clock cutoff (midnight). Both, probably — whichever comes first.
+  This yields exactly the 4/9/2/7 slots on a clean day and self-corrects on a messy one.
+- **Scheduling primitive:** `work/Polling.kt`'s WorkManager is inexact and drifts in
+  Doze — fine for refreshing a widget, wrong here, because a renewal that fires 20
+  minutes late leaves a 20-minute hole in the coverage the feature exists to provide.
+  Needs `AlarmManager.setExactAndAllowWhileIdle` + `SCHEDULE_EXACT_ALARM`/
+  `USE_EXACT_ALARM` (API 31+), plus a battery-optimization exemption prompt for
+  reliability. `USE_EXACT_ALARM`'s Play policy restrictions don't bite us — the app is
+  GitHub-sideload only.
+- **Verify, don't assume.** After each ping, refresh usage and confirm `resetsAt`
+  actually moved. A silent 4am failure is the worst outcome in the feature: the user
+  wakes at 8am *believing* they have a fresh window and doesn't. Notify on failure,
+  stay silent on success. Retry with short backoff if the device was offline.
+  - **The "moved" test must be tolerance-based** — an exact comparison would report
+    success even when the ping did nothing. `resets_at` is recomputed server-side and
+    drifts ~1.3s between polls with no change at all (see
+    [CCBG-4](BUGS.md)), so require a move on the order of minutes, not milliseconds.
+    A real new window jumps ~5h; anything under a minute is noise. Getting this
+    backwards would make the feature's own self-check the thing that lies.
+  - Same tolerance applies to the pre-ping "is a window already open?" guard.
+- **Make it legible:** record ping-started windows in `SessionLog` so history can
+  distinguish them from organic ones. Otherwise the history bars quietly fill with
+  0%-used windows and stop meaning anything.
+- **Posture:** this moves the app from *reading* telemetry to *consuming* subscription
+  inference from a third-party client — a step further than the Feb-2026 ToS
+  clarification the v0.7 legal check already put us on the wrong side of (which is why
+  we're sideload-only and never Play Store). Same account, same quota, same call the
+  user's own client makes; but it should ship **opt-in and off by default**, with the
+  toggle stating plainly what it sends and on whose quota. Not a silent background
+  behaviour.
+- **Naming:** "Ping" reads like a connectivity check. Prefer **Start window** or
+  **Reserve window**.
+
 ### CCRM-3 · Unified theming system for widgets & notifications
 - **Status:** Phase 1 done (2026-07-27) · phases 2-3 still need design
 - **Phase 1 shipped — notification styles.** `pinnedStyle` pref, chip selector under
