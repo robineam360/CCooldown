@@ -278,8 +278,8 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
 - **Approach — build order:**
   1. **Tokens.** Extend `ui/Palette.kt` into a theme model (accent, bar shape, background
      mode, text contrast, text scale). Model only — no UI, no behaviour change. Mirror the
-     token names into [BEHAVIOR-SPEC.md](contract/BEHAVIOR-SPEC.md) so a second client
-     (CCRM-8) inherits the same vocabulary instead of inventing one.
+     token names into `BEHAVIOR-SPEC.md` (the shared contract — see CCRM-8) so a second
+     client inherits the same vocabulary instead of inventing one.
   2. **Prerequisite: CCRM-4**, before any cosmetic option exists. Shipping a look you can
      only change by deleting and re-adding the widget is the worst possible discoverability
      for a cosmetic feature. **This inverts the old dependency** — CCRM-4 gates phase 2,
@@ -303,7 +303,7 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
        one signal with no channel to conflict with — and a 7dp bar is a weak place to say
        "97%".
      - **The percentage still truncates**, per
-       [BEHAVIOR-SPEC §2](contract/BEHAVIOR-SPEC.md). Considered unifying it with the
+       `BEHAVIOR-SPEC` §2 (see CCRM-8). Considered unifying it with the
        credits card's rounding and **rejected 2026-07-30**: truncation never overstates, so
        a window at 99.7% must read 99 rather than claim a limit the user has not reached —
        and at 46sp that matters more, not less. The visible consequence is that windows and
@@ -474,11 +474,69 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
   persistent notification, so expect a design adaptation here).
 
 ### CCRM-8 · Mac Menu-Bar — desktop Mac menu-bar app
-- **Status:** Planned · gated (last) · **new repo**
-- **Why / when:** After everything above. A native Mac menu-bar app showing usage
-  progress. New app/repo — carries over learnings from this project, not built here.
-- **Approach:** Separate repo. Menu-bar item with the usage ring; reuse the API/OAuth
-  approach proven here.
+- **Status:** Planned · **next platform** · **new repo** — decided 2026-07-30
+- **Reordered ahead of CCRM-7.** Mac now comes before iOS. iOS is parked on
+  distribution, not on readiness: sideloading is a first-class path on Android and a
+  dead end on Apple's phone (App Store review would read the Claude Code OAuth
+  impersonation as unauthorised use of a third-party service; TestFlight external
+  testing needs Beta App Review; ad-hoc caps at 100 devices/year with annually
+  expiring profiles; a free-account sideload re-signs every 7 days). The Mac has no
+  such gate — a notarised direct download works — and it has real background
+  execution, so threshold alerts and polling behave properly. Same audience, a
+  fraction of the friction.
+- **Product shape:** menu-bar-first, mirroring the Android widget/app split.
+  - **Menu-bar icon** — the always-visible gauge, the Mac's answer to the Android
+    home-screen widget and the pinned notification. Fills as the 5-hour window burns.
+  - **Click/hover preview** — a popover with the 5-hour, 7-day and per-model bars plus
+    countdowns. The glanceable layer.
+  - **Full window on open** — details, history, charts and settings, same information
+    architecture as the Android app.
+- **New repo, not this one.** The decisive reason is the release stream:
+  [UpdateCheck.kt:25](app/src/main/java/com/robin/claudeusage/data/UpdateCheck.kt#L25)
+  polls `releases/latest`, which GitHub resolves **repo-wide** regardless of tag
+  naming. Publish a Mac release here and it becomes "latest" for every installed
+  Android client; `normalize()` only strips a leading `v`, so a `mac-v0.1` tag splits
+  to a non-numeric first component, compares as 0, and every phone silently reports
+  "you're up to date" forever — while the update checker is the only channel we have
+  for telling people to update. Already-shipped v1.1 clients cannot be patched out of
+  this. Secondary reasons: no shared build tooling (Gradle/JDK vs Xcode/SwiftPM), two
+  signing stories, and a public README/docs set framed entirely around Android.
+- **Shared code is deliberately *not* the plan.** Only ~510 of 6,770 lines are
+  Android-free, and they are Kotlin against OkHttp/`org.json` — unusable from Swift.
+  Real sharing would mean a KMP core (Ktor + kotlinx.serialization + an expect/actual
+  settings layer), i.e. rewriting the most empirically fragile code we own — the
+  byte-identical authorize-URL encoding and the usage parser — on a shipped app. Poor
+  trade, and the menu bar needs Swift regardless.
+- **Shared *contract* instead — written 2026-07-30, lives in the Mac repo under
+  `contract/`.** Platform-neutral spec and test data, deliberately **not** kept here:
+  this repo stays Android-only. Three parts: `API-CONTRACT.md` (endpoints, the
+  two-opposite-User-Agents rule, PKCE details, token semantics, backoff),
+  `BEHAVIOR-SPEC.md` (thresholds, colour breakpoints, projection maths, history
+  bucketing, alert dedupe), and `fixtures/` (captured payloads with expected parse
+  results, plus projection and history cases, all language-neutral JSON). A new client
+  implements against the fixtures rather than rediscovering the schema. **Do not fork
+  this repo to start another client** — start clean and copy the contract in.
+  - If a third client ever appears, split `contract/` into its own repo and submodule
+    it into each. With two clients and one developer that was over-engineering.
+  - The Android client does **not** currently run against these fixtures — its own
+    `UsageParserTest` still holds the captured payload separately. Wiring Android to
+    the shared fixtures would make parser drift between clients impossible to miss;
+    worth doing if the two ever disagree.
+- **Platform mapping:** Keychain for tokens (replaces `EncryptedSharedPreferences`),
+  `ASWebAuthenticationSession` for the OAuth browser trip, `NSBackgroundActivityScheduler`
+  or a `launchd` agent for polling (replaces WorkManager),
+  `NSStatusItem` + `NSPopover` for the menu bar, `UNUserNotificationCenter` for alerts.
+  **Unverified risk:** the token endpoint's WAF blocks empty and browser-shaped
+  User-Agents; `URLSession`'s default is library-shaped and should pass, but set an
+  explicit `CCooldown/<version>` UA and confirm a real exchange before shipping —
+  see API-CONTRACT §2.
+- **Sync discipline once there are two clients:** keep `CCRM`/`CCBG` here as the single
+  ID space; label every issue `layer:core` (must reach both) or `layer:platform` (stays
+  local); when a core bug is found, **add a failing fixture to `contract/` first** so
+  both clients go red until fixed. Android at v1.1 is the reference implementation —
+  where behaviour is disputed, it is correct until the spec is deliberately changed.
+- **Parity is bandwidth-bound, not architecture-bound.** Android leads; Mac follows and
+  may lag. Say so publicly rather than implying parity we won't sustain.
 
 ---
 
