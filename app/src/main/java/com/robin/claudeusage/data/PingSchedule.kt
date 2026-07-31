@@ -31,8 +31,36 @@ object PingSchedule {
      */
     const val MOVED_THRESHOLD_MS = 60_000L
 
-    /** How long after a failed attempt to try again, escalating. Then give up on that slot. */
+    /**
+     * How long after a **send** failure to try again, escalating. Then give up on that
+     * slot and notify. Only send failures retry — a ping we merely can't confirm yet
+     * must never retry, which is what turned one ping into four (CCBG-5).
+     */
     val RETRY_BACKOFF_MS = listOf(60_000L, 3 * 60_000L, 8 * 60_000L)
+
+    /**
+     * Verification runs on its own alarm, not inline (CCBG-5). The usage endpoint lags
+     * the inference: a *successful* usage read seconds after a ping still showed no
+     * window, and the window appeared within about five minutes. So "no window yet"
+     * immediately after a ping carries no information at all.
+     */
+    const val VERIFY_DELAY_MS = 90_000L
+
+    /** Gap before the second and final check. 90s + 4min covers the observed lag. */
+    const val VERIFY_RETRY_MS = 4 * 60_000L
+
+    /** After this many checks, report Unverified — never failure, and never a retry. */
+    const val MAX_VERIFY_ATTEMPTS = 2
+
+    /**
+     * A hard floor between two sends, whatever else the logic concludes. This is the
+     * backstop against a ping storm: if verification is confused, or a window opened
+     * but stayed invisible, the worst case is one wasted ping rather than a burst.
+     */
+    const val MIN_SEND_INTERVAL_MS = 10 * 60_000L
+
+    fun tooSoonToSend(lastSentAtMs: Long, nowMs: Long): Boolean =
+        lastSentAtMs > 0L && nowMs - lastSentAtMs < MIN_SEND_INTERVAL_MS
 
     data class Config(
         val enabled: Boolean,

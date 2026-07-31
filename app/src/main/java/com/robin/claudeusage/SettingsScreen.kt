@@ -49,6 +49,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -75,6 +76,7 @@ import androidx.browser.customtabs.CustomTabsIntent
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import com.robin.claudeusage.data.AuthState
+import com.robin.claudeusage.data.PingSchedule
 import com.robin.claudeusage.data.Profile
 import com.robin.claudeusage.data.Projection
 import com.robin.claudeusage.data.UpdateCheck
@@ -1646,6 +1648,19 @@ private fun WindowPingsSection(
     var testing by remember { mutableStateOf(false) }
     var exactOk by remember(tick) { mutableStateOf(PingScheduler.canScheduleExact(context)) }
 
+    // The outcome is written by an alarm in another process-entry, so nothing here would
+    // otherwise recompose — the row sat on a day-old result while a ping came and went.
+    // Poll the revision counter while the section is on screen.
+    var outcomeRevision by remember(profile) {
+        mutableIntStateOf(cacheSettings.pingOutcomeRevision(profile))
+    }
+    LaunchedEffect(profile) {
+        while (true) {
+            kotlinx.coroutines.delay(2_000)
+            outcomeRevision = cacheSettings.pingOutcomeRevision(profile)
+        }
+    }
+
     fun rearm() = PingScheduler.reschedule(context, profile)
 
     Text(
@@ -1677,7 +1692,8 @@ private fun WindowPingsSection(
 
     ToggleRow(
         title = "Schedule window pings",
-        subtitle = "Off unless you turn it on, separately for each account",
+        subtitle = "Off unless you turn it on, separately for each account. Turning it on " +
+            "starts a window right away if none is open.",
         checked = enabled,
     ) {
         enabled = it
@@ -1776,6 +1792,7 @@ private fun WindowPingsSection(
         }
 
         RowDivider()
+        @Suppress("UNUSED_EXPRESSION") outcomeRevision // read so the row recomposes
         val lastResult = cacheSettings.pingLastResult(profile)
         val lastAt = cacheSettings.pingLastAttemptAt(profile)
         if (lastResult != null && lastAt > 0) {
@@ -1792,7 +1809,16 @@ private fun WindowPingsSection(
             onClick = {
                 testing = true
                 scope.launch {
-                    repo.sendWindowPing(profile)
+                    val result = repo.sendWindowPing(profile)
+                    // The window isn't visible on the usage endpoint for a minute or
+                    // more, so confirmation arrives later on its own alarm (CCBG-5).
+                    if (result.sent) {
+                        PingScheduler.armVerify(
+                            context,
+                            profile,
+                            System.currentTimeMillis() + PingSchedule.VERIFY_DELAY_MS,
+                        )
+                    }
                     testing = false
                     tick++
                     rearm()
@@ -1801,7 +1827,8 @@ private fun WindowPingsSection(
         ) { Text(if (testing) "Pinging…" else "Test ping now") }
         Spacer(Modifier.height(6.dp))
         Text(
-            "Sends one straight away and reports what happened. If a window is already open " +
+            "Sends one straight away. The window takes a minute or two to show up, so the " +
+                "line above updates again once it's confirmed. If a window is already open " +
                 "it will say so rather than starting another.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,

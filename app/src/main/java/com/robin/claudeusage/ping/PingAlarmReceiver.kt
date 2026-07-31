@@ -9,17 +9,22 @@ import com.robin.claudeusage.data.PingSchedule
 import com.robin.claudeusage.data.Profile
 import com.robin.claudeusage.data.UsageCache
 import com.robin.claudeusage.data.UsageRepository
+import com.robin.claudeusage.data.VerifyResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
 /**
- * Fires on a scheduled window ping (CCRM-17). Re-checks the decision before sending —
- * the alarm may be minutes stale by the time it runs, and the user may have opened a
- * window themselves in the meantime, in which case the right move is to skip and
- * re-arm for that window's real end.
+ * Drives window pings (CCRM-17). Two alarm kinds:
+ *
+ *  - **Ping** — re-decide (the alarm may be stale, and the user may have opened a window
+ *    themselves meanwhile), send, then hand off to a deferred check.
+ *  - **Verify** — the deferred check, because the usage endpoint lags the inference by
+ *    up to several minutes and an inline check reported working pings as failures
+ *    (CCBG-5).
  */
 class PingAlarmReceiver : BroadcastReceiver() {
 
@@ -27,22 +32,22 @@ class PingAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val profile = PingScheduler.profileOf(intent)
         val intendedAt = PingScheduler.intendedAt(intent)
+        val verifying = intent.action == PingScheduler.ACTION_VERIFY
         val app = context.applicationContext
         val pending = goAsync()
 
         GlobalScope.launch(Dispatchers.IO) {
             try {
-                run(app, profile, intendedAt)
+                if (verifying) runVerify(app, profile) else runPing(app, profile, intendedAt)
             } finally {
                 pending.finish()
             }
         }
     }
 
-    private suspend fun run(context: Context, profile: Profile, intendedAtMs: Long) {
+    private suspend fun runPing(context: Context, profile: Profile, intendedAtMs: Long) {
         val cache = UsageCache(context)
         val repo = UsageRepository(context)
-        val zone = PingScheduler.zone()
         val now = System.currentTimeMillis()
 
         // Fresh usage first: the decision hinges on whether a window is open, and a
@@ -51,14 +56,14 @@ class PingAlarmReceiver : BroadcastReceiver() {
 
         val decision = PingSchedule.decide(
             nowMs = now,
-            zone = zone,
+            zone = PingScheduler.zone(),
             config = cache.pingConfig(profile),
             day = cache.pingDayState(profile),
             sessionResetAtMs = repo.snapshot(profile).data?.session?.resetsAt?.toEpochMilli(),
         )
 
         when (decision) {
-            is PingSchedule.Decision.Ping -> sendAndRecord(context, repo, cache, profile, intendedAtMs, zone)
+            is PingSchedule.Decision.Ping -> send(context, repo, cache, profile, intendedAtMs)
             is PingSchedule.Decision.Wait -> {
                 cache.setPingOutcome(profile, now, decision.because, failed = false)
                 cache.setPingRetryIndex(profile, 0)
@@ -69,35 +74,39 @@ class PingAlarmReceiver : BroadcastReceiver() {
         PingScheduler.reschedule(context, profile)
     }
 
-    private suspend fun sendAndRecord(
+    private suspend fun send(
         context: Context,
         repo: UsageRepository,
         cache: UsageCache,
         profile: Profile,
         intendedAtMs: Long,
-        zone: ZoneId,
     ) {
+        val now = System.currentTimeMillis()
+
+        // Hard floor between sends, whatever the rest of the logic thinks. This is the
+        // backstop that keeps a confused verification from becoming a ping storm.
+        if (PingSchedule.tooSoonToSend(cache.pingLastSentAt(profile), now)) {
+            cache.setPingOutcome(profile, now, "Skipped — pinged moments ago", failed = false)
+            return
+        }
+
         val result = repo.sendWindowPing(profile)
         val at = System.currentTimeMillis()
         val late = if (intendedAtMs > 0) PingSchedule.latenessMs(intendedAtMs, at) else 0L
 
-        // Report lateness rather than hiding it: the window follows the ping, so a late
-        // alarm has genuinely shifted every boundary for the rest of the day.
+        // Report lateness rather than hiding it. With the boundary truncating to the
+        // hour this is usually cosmetic, but crossing an hour boundary costs a full one.
         val note = if (late >= 60_000L) " (fired ${late / 60_000}m late)" else ""
         cache.setPingOutcome(profile, at, result.message + note, result.failed)
 
-        if (result.startedWindow) {
-            cache.recordPingWindowStarted(profile, LocalDate.ofInstant(java.time.Instant.ofEpochMilli(at), zone))
+        if (result.sent) {
             cache.setPingRetryIndex(profile, 0)
+            PingScheduler.armVerify(context, profile, at + PingSchedule.VERIFY_DELAY_MS)
             return
         }
-        if (!result.failed) {
-            cache.setPingRetryIndex(profile, 0)
-            return
-        }
+        if (!result.failed) return // AlreadyOpen — nothing to do, nothing to retry.
 
-        // Failed: retry a couple of times before giving up on this slot, then tell the
-        // user. A silent 4am failure is the outcome this whole feature must not have.
+        // Only a genuine *send* failure retries. "Couldn't confirm" must never get here.
         val step = cache.pingRetryIndex(profile)
         if (step < PingSchedule.RETRY_BACKOFF_MS.size) {
             cache.setPingRetryIndex(profile, step + 1)
@@ -106,6 +115,48 @@ class PingAlarmReceiver : BroadcastReceiver() {
             cache.setPingRetryIndex(profile, 0)
             Alerts.notifyPingFailed(context, profile, result.message)
         }
+    }
+
+    /**
+     * The deferred check. Note what it never does: notify. An unconfirmed ping is not a
+     * failed one, and waking someone at 4am to report a success as a failure is exactly
+     * the bug this replaced.
+     */
+    private suspend fun runVerify(context: Context, profile: Profile) {
+        val cache = UsageCache(context)
+        val repo = UsageRepository(context)
+        val attempt = cache.pingVerifyAttempt(profile) + 1
+        val result = repo.verifyWindowPing(profile)
+        val at = System.currentTimeMillis()
+
+        when {
+            result is VerifyResult.Opened -> {
+                cache.setPingOutcome(profile, at, result.message, failed = false)
+                cache.recordPingWindowStarted(
+                    profile,
+                    LocalDate.ofInstant(Instant.ofEpochMilli(at), PingScheduler.zone()),
+                )
+                cache.clearPingVerification(profile)
+            }
+            attempt < PingSchedule.MAX_VERIFY_ATTEMPTS -> {
+                cache.setPingVerifyAttempt(profile, attempt)
+                cache.setPingOutcome(profile, at, result.message, failed = false)
+                PingScheduler.armVerify(context, profile, at + PingSchedule.VERIFY_RETRY_MS)
+                return // Don't reschedule the chain mid-verification.
+            }
+            else -> {
+                // Out of checks. Count the window as started anyway: every observation
+                // says pings do work, and MIN_SEND_INTERVAL_MS already prevents a burst.
+                // Miscounting one window is far cheaper than pinging in a loop.
+                cache.setPingOutcome(profile, at, VerifyResult.GaveUp().message, failed = false)
+                cache.recordPingWindowStarted(
+                    profile,
+                    LocalDate.ofInstant(Instant.ofEpochMilli(at), PingScheduler.zone()),
+                )
+                cache.clearPingVerification(profile)
+            }
+        }
+        PingScheduler.reschedule(context, profile)
     }
 }
 

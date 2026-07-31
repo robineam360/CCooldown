@@ -451,15 +451,52 @@ class UsageCache(context: Context) {
             .putLong(k(profile, "pingLastAttemptAt"), at)
             .putString(k(profile, "pingLastResult"), result)
             .putBoolean(k(profile, "pingLastFailed"), failed)
+            .putInt(k(profile, "pingRevision"), prefs.getInt(k(profile, "pingRevision"), 0) + 1)
             .apply()
     }
 
-    /** Which retry step the current slot is on; reset once the slot resolves. */
+    /** Which **send**-failure retry step the current slot is on; reset once it resolves. */
     fun pingRetryIndex(profile: Profile): Int = prefs.getInt(k(profile, "pingRetryIndex"), 0)
 
     fun setPingRetryIndex(profile: Profile, index: Int) {
         prefs.edit().putInt(k(profile, "pingRetryIndex"), index).apply()
     }
+
+    // --- deferred verification state (CCBG-5) ---
+
+    /** When we last actually sent a ping. Backs [PingSchedule.tooSoonToSend]. */
+    fun pingLastSentAt(profile: Profile): Long = prefs.getLong(k(profile, "pingLastSentAt"), 0L)
+
+    /**
+     * The `resets_at` observed immediately *before* the pending ping, so the deferred
+     * check knows what "moved" means. -1 means "no window was open", which is distinct
+     * from 0 ("nothing pending").
+     */
+    fun pingPendingBefore(profile: Profile): Long = prefs.getLong(k(profile, "pingPendingBefore"), 0L)
+
+    fun pingVerifyAttempt(profile: Profile): Int = prefs.getInt(k(profile, "pingVerifyAttempt"), 0)
+
+    fun startPingVerification(profile: Profile, sentAt: Long, beforeMs: Long?) {
+        prefs.edit()
+            .putLong(k(profile, "pingLastSentAt"), sentAt)
+            .putLong(k(profile, "pingPendingBefore"), beforeMs ?: -1L)
+            .putInt(k(profile, "pingVerifyAttempt"), 0)
+            .apply()
+    }
+
+    fun setPingVerifyAttempt(profile: Profile, attempt: Int) {
+        prefs.edit().putInt(k(profile, "pingVerifyAttempt"), attempt).apply()
+    }
+
+    fun clearPingVerification(profile: Profile) {
+        prefs.edit()
+            .remove(k(profile, "pingPendingBefore"))
+            .remove(k(profile, "pingVerifyAttempt"))
+            .apply()
+    }
+
+    /** Bumped whenever a ping outcome is written, so the settings row can observe it. */
+    fun pingOutcomeRevision(profile: Profile): Int = prefs.getInt(k(profile, "pingRevision"), 0)
 }
 
 /** Per-widget configuration chosen in the setup screen when a widget is placed. */

@@ -24,19 +24,32 @@ sealed class FetchResult(val message: String) {
 }
 
 /**
- * Result of a window ping (CCRM-17). [startedWindow] is the only thing that matters
- * operationally — a 200 that didn't move `resets_at` is a failure, not a success.
+ * Outcome of *sending* a window ping (CCRM-17). Deliberately says nothing about whether
+ * a window opened — that can't be known yet. The usage endpoint lags the inference, so
+ * verification happens later on its own alarm (CCBG-5); see [VerifyResult].
  */
-sealed class PingResult(val message: String, val startedWindow: Boolean, val failed: Boolean) {
-    class Started(boundary: String) : PingResult("Window opened, runs to $boundary", true, false)
+sealed class PingResult(val message: String, val sent: Boolean, val failed: Boolean) {
+    /** Accepted by the server. Whether a window appears is [VerifyResult]'s business. */
+    class Sent : PingResult("Ping sent, confirming…", true, false)
     class AlreadyOpen(boundary: String) :
         PingResult("Skipped — a window was already open to $boundary", false, false)
 
-    /** The request succeeded but no window appeared. Reported as a failure on purpose. */
-    class NoWindow : PingResult("Ping sent but no window opened — nothing scheduled", false, true)
     class AuthNeeded : PingResult("Ping failed — sign-in needs renewing", false, true)
     class NoCredentials : PingResult("Ping failed — not signed in", false, true)
     class Error(detail: String) : PingResult("Ping failed — $detail", false, true)
+}
+
+/**
+ * Outcome of the deferred check that a ping actually opened a window.
+ *
+ * [NotYet] is **not** a failure. The window may exist and simply not be visible on the
+ * usage endpoint yet, so treating it as failure is what made a working ping report
+ * itself as broken — and, via the retry path, fire three more pings (CCBG-5).
+ */
+sealed class VerifyResult(val message: String, val opened: Boolean) {
+    class Opened(boundary: String) : VerifyResult("Window opened, runs to $boundary", true)
+    class NotYet : VerifyResult("Sent, but no window visible yet", false)
+    class GaveUp : VerifyResult("Sent — couldn't confirm a window opened", false)
 }
 
 class UsageRepository(private val context: Context) {
@@ -228,24 +241,28 @@ class UsageRepository(private val context: Context) {
         }
 
     /**
-     * Sends a window ping and **verifies it landed** (CCRM-17).
+     * Sends a window ping (CCRM-17). **Does not verify** — see [verifyWindowPing].
      *
-     * The verification is the point: a 200 from `/v1/messages` only says the request
-     * was accepted. Whether a 5-hour window actually opened is a separate fact, read
-     * back from the usage endpoint. A silent failure here is the worst outcome the
-     * feature has — the user wakes up believing they have a fresh window and doesn't —
-     * so anything short of an observed window counts as a failure.
+     * Splitting these is the CCBG-5 fix. A 200 from `/v1/messages` only says the request
+     * was accepted; whether a 5-hour window opened is a separate fact that the usage
+     * endpoint does not reflect for up to several minutes. Checking inline meant a
+     * working ping reported itself as a failure.
      *
-     * The "did it move" test goes through [PingSchedule.windowMoved], never an exact
-     * comparison: `resets_at` is recomputed per request and drifts about a second
-     * (CCBG-4), so `before != after` would report success for drift alone.
+     * Records the pre-ping `resets_at` so the later check knows what "moved" means, and
+     * stamps the send time so [PingSchedule.tooSoonToSend] can prevent a burst.
      */
     suspend fun sendWindowPing(profile: Profile): PingResult = withContext(Dispatchers.IO) {
         val result = mutex.withLock {
-            val before = cache.snapshot(profile).data?.session?.resetsAt?.toEpochMilli()
+            val before = cache.snapshot(profile).data?.session?.resetsAt
             val now = System.currentTimeMillis()
-            val creds = credStore.load(profile) ?: return@withLock PingResult.NoCredentials()
 
+            // A window already open needs no ping; the caller's decide() normally
+            // catches this, but Test ping now can reach here directly.
+            if (before != null && before.toEpochMilli() > now) {
+                return@withLock PingResult.AlreadyOpen(Fmt.dayTime(before, cache.use24hTime()))
+            }
+
+            val creds = credStore.load(profile) ?: return@withLock PingResult.NoCredentials()
             var token = creds.accessToken
             if (creds.expiresAt in 1 until now + EXPIRY_MARGIN_MS) {
                 token = refreshAccessToken(profile, creds) ?: return@withLock PingResult.AuthNeeded()
@@ -259,23 +276,43 @@ class UsageRepository(private val context: Context) {
                     resp = ApiClient.sendPing(token)
                 }
                 if (resp.code != 200) {
-                    return@withLock PingResult.Error(pingErrorDetail(resp))
-                }
-                // Re-read usage to find out what actually happened. ignoreGates so the
-                // 180s manual floor can't make us skip the very check we need.
-                doFetch(profile, manual = false, ignoreGates = true)
-                val after = cache.snapshot(profile).data?.session?.resetsAt
-                val afterMs = after?.toEpochMilli()
-                val boundary = after?.let { Fmt.dayTime(it, cache.use24hTime()) }
-                when {
-                    boundary == null -> PingResult.NoWindow()
-                    PingSchedule.windowMoved(before, afterMs) -> PingResult.Started(boundary)
-                    else -> PingResult.AlreadyOpen(boundary)
+                    PingResult.Error(pingErrorDetail(resp))
+                } else {
+                    cache.startPingVerification(profile, now, before?.toEpochMilli())
+                    PingResult.Sent()
                 }
             } catch (e: IOException) {
                 PingResult.Error(e.message ?: "no network")
             } catch (e: Exception) {
                 PingResult.Error(e.message ?: "unexpected error")
+            }
+        }
+        result
+    }
+
+    /**
+     * The deferred half: refresh usage and see whether the pending ping opened a window.
+     *
+     * "Moved" goes through [PingSchedule.windowMoved], never an exact comparison —
+     * `resets_at` is recomputed per request and drifts about a second (CCBG-4), so
+     * `before != after` would count drift as success.
+     *
+     * A refresh that fails yields [VerifyResult.NotYet] rather than anything stronger:
+     * not being able to look is not evidence about what happened.
+     */
+    suspend fun verifyWindowPing(profile: Profile): VerifyResult = withContext(Dispatchers.IO) {
+        val result = mutex.withLock {
+            val beforeRaw = cache.pingPendingBefore(profile)
+            val before = if (beforeRaw <= 0L) null else beforeRaw
+            val fetch = doFetch(profile, manual = false, ignoreGates = true)
+            if (fetch !is FetchResult.Success) return@withLock VerifyResult.NotYet()
+
+            val after = cache.snapshot(profile).data?.session?.resetsAt
+            val boundary = after?.let { Fmt.dayTime(it, cache.use24hTime()) }
+            if (boundary != null && PingSchedule.windowMoved(before, after.toEpochMilli())) {
+                VerifyResult.Opened(boundary)
+            } else {
+                VerifyResult.NotYet()
             }
         }
         updateWidgets()

@@ -151,4 +151,37 @@ class PingScheduleTest {
         assertEquals(3 * 60_000L, PingSchedule.latenessMs(at(4), at(4, 3)))
         assertEquals(0L, PingSchedule.latenessMs(at(4), at(3, 59)))
     }
+
+    // --- the ping-storm guard (CCBG-5) ---
+
+    @Test
+    fun `a second send is refused inside the floor`() {
+        val sent = at(4)
+        assertTrue(PingSchedule.tooSoonToSend(sent, sent + 60_000L))
+        assertTrue(PingSchedule.tooSoonToSend(sent, sent + 9 * 60_000L))
+    }
+
+    @Test
+    fun `a send is allowed once the floor has passed`() {
+        val sent = at(4)
+        assertFalse(PingSchedule.tooSoonToSend(sent, sent + PingSchedule.MIN_SEND_INTERVAL_MS))
+        assertFalse(PingSchedule.tooSoonToSend(sent, sent + 30 * 60_000L))
+    }
+
+    @Test
+    fun `never having sent is not too soon`() {
+        assertFalse(PingSchedule.tooSoonToSend(0L, at(4)))
+    }
+
+    @Test
+    fun `the whole verification window covers the observed lag`() {
+        // Observed: invisible seconds after the ping, visible within ~5 minutes. Both
+        // checks together must reach past that or we'd give up while it's still coming.
+        val total = PingSchedule.VERIFY_DELAY_MS +
+            (PingSchedule.MAX_VERIFY_ATTEMPTS - 1) * PingSchedule.VERIFY_RETRY_MS
+        assertTrue("verification gives up after ${total}ms", total >= 5 * 60_000L)
+        // ...and must finish well inside the send floor, so a slot can never be
+        // re-pinged while its own verification is still outstanding.
+        assertTrue(total < PingSchedule.MIN_SEND_INTERVAL_MS)
+    }
 }

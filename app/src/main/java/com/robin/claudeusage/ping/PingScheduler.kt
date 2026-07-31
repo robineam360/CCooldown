@@ -23,6 +23,10 @@ import java.time.ZoneId
 object PingScheduler {
 
     private const val ACTION_PING = "com.robin.claudeusage.action.WINDOW_PING"
+
+    /** The deferred "did it actually open a window" check (CCBG-5). */
+    const val ACTION_VERIFY = "com.robin.claudeusage.action.WINDOW_PING_VERIFY"
+
     private const val EXTRA_PROFILE = "profile"
     private const val EXTRA_INTENDED_AT = "intendedAt"
 
@@ -77,9 +81,19 @@ object PingScheduler {
         }
     }
 
+    /** Arms the deferred verification check for a ping we just sent (CCBG-5). */
+    fun armVerify(context: Context, profile: Profile, atMs: Long) {
+        val am = context.getSystemService(AlarmManager::class.java) ?: return
+        val pi = pendingIntent(context, profile, atMs, ACTION_VERIFY)
+        // Verification is not time-critical the way a ping is — a minute either way
+        // costs nothing, so this deliberately doesn't consume an exact-alarm slot.
+        am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, atMs, pi)
+    }
+
     fun cancel(context: Context, profile: Profile) {
         val am = context.getSystemService(AlarmManager::class.java) ?: return
         am.cancel(pendingIntent(context, profile, 0L))
+        am.cancel(pendingIntent(context, profile, 0L, ACTION_VERIFY))
     }
 
     /**
@@ -95,16 +109,23 @@ object PingScheduler {
     private fun sessionResetAt(cache: UsageCache, profile: Profile): Long? =
         cache.snapshot(profile).data?.session?.resetsAt?.toEpochMilli()
 
-    private fun pendingIntent(context: Context, profile: Profile, intendedAtMs: Long): PendingIntent {
+    private fun pendingIntent(
+        context: Context,
+        profile: Profile,
+        intendedAtMs: Long,
+        action: String = ACTION_PING,
+    ): PendingIntent {
         val intent = Intent(context, PingAlarmReceiver::class.java).apply {
-            action = ACTION_PING
+            this.action = action
             putExtra(EXTRA_PROFILE, profile.key)
             putExtra(EXTRA_INTENDED_AT, intendedAtMs)
         }
-        // Request code per profile so Personal and Work hold independent alarms.
+        // Request code per profile *and* per action, so a profile's ping and verify
+        // alarms are independent and neither replaces the other.
+        val base = if (action == ACTION_VERIFY) 1750 else 1700
         return PendingIntent.getBroadcast(
             context,
-            1700 + profile.ordinal,
+            base + profile.ordinal,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )

@@ -11,40 +11,6 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
 
 ## Open
 
-### CCBG-5 · Ping Verification — a working ping is reported as a failure
-- **Status:** Open
-- **Severity:** High (reports the opposite of what happened, and the scheduled path
-  would notify on it)
-- **Symptom:** observed on the Fold 7, 2026-07-30. **Test ping now** on Personal, from a
-  genuinely cold state, reported `Ping sent but no window opened — nothing scheduled`.
-  The ping had in fact worked — 33 minutes later the 5-hour card showed a live window.
-- **Root cause: the usage endpoint lags the inference.** `sendWindowPing` sends the
-  ping, immediately re-reads usage, and treats "no window in the response" as failure.
-  But the window is not visible that soon.
-  - **It is not rate limiting.** That was my first guess and the evidence refutes it:
-    the main screen read `Last success: Thu 8:08 pm`, so the post-ping fetch *succeeded*
-    — it just still showed no window. (A 429 did appear at 8:09, but that was a later,
-    separate refresh triggered by returning to the main screen.)
-  - Timeline: 8:06 pm no window · 8:08 pm ping `200`, successful usage read still shows
-    no window · 8:41 pm window present, `[7:59 pm → 12:59 am]`.
-  - **Lag is bounded only as: longer than a few seconds, no more than 33 minutes.**
-    It needs measuring; the 15s settle in the spike script is not known to be enough.
-- **Consequence: synchronous verification cannot work.** Any read taken straight after a
-  ping may legitimately show nothing, so "no window yet" carries no information about
-  whether the ping succeeded.
-- **Fix:**
-  1. **Defer the check.** Ping, then verify on a separate alarm a minute or two later,
-     with one or two re-checks — not inline.
-  2. **Add an `Unverified` outcome** distinct from `Started` and from failure. It must
-     never fire `notifyPingFailed`; "we can't see it yet" is not "it didn't happen".
-     The current code would wake the user at 4am to report a success as a failure.
-  3. **Stop the extra inline fetch** burning the ~180s usage floor — it is what caused
-     the follow-on 429.
-- **Also worth fixing while here:** `sendWindowPing` ignores the `FetchResult` from its
-  own `doFetch`. Even once the check is deferred, a refresh that fails should read as
-  unverified rather than as evidence of anything.
-- **Found via:** the first on-device run of CCRM-17 (Window Pings).
-
 ### CCBG-3 · Credits Visibility — credits card ignores extra-usage being switched off
 - **Status:** Open
 - **Severity:** Low (misleading display, no data loss) — and possibly unreachable
@@ -65,6 +31,64 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
 ---
 
 ## Fixed
+
+### CCBG-5 · Ping Verification — a working ping is reported as a failure
+- **Status:** Fixed (2026-07-31)
+- **Severity:** High (reported the opposite of what happened, and turned one ping into
+  several)
+- **Symptom:** observed on the Fold 7, 2026-07-30. **Test ping now** on Personal, from a
+  genuinely cold state, reported `Ping sent but no window opened — nothing scheduled`.
+  The ping had in fact worked — the 5-hour card later showed a live window.
+- **Second symptom, worse than the first:** because "no window seen" counted as failure,
+  it entered the *send*-retry backoff and pinged again at 1/3/8 minutes. The 2026-07-30
+  run sent roughly four pings where one was wanted, and only recorded success at 8:13 pm
+  once the window finally became visible. The false report was cosmetic; the ping storm
+  was not.
+- **Root cause: the usage endpoint lags the inference.** `sendWindowPing` sends the
+  ping, immediately re-reads usage, and treats "no window in the response" as failure.
+  But the window is not visible that soon.
+  - **It is not rate limiting.** That was my first guess and the evidence refutes it:
+    the main screen read `Last success: Thu 8:08 pm`, so the post-ping fetch *succeeded*
+    — it just still showed no window. (A 429 did appear at 8:09, but that was a later,
+    separate refresh triggered by returning to the main screen.)
+  - Timeline: 8:06 pm no window · 8:08 pm ping `200`, successful usage read still shows
+    no window · 8:41 pm window present, `[7:59 pm → 12:59 am]`.
+  - **Measured lag:** invisible seconds after the ping; visible by 8:13 pm, i.e. within
+    about **five minutes**. (An earlier reading put it at "no more than 33 minutes"; the
+    8:13 pm success narrows it.) The 15s settle in the spike script would not have been
+    reliably enough.
+- **Consequence: synchronous verification cannot work at all.** Any read taken straight
+  after a ping may legitimately show nothing, so "no window yet" carries no information
+  about whether the ping succeeded.
+- **Fix — send and verify are now separate operations.**
+  - `UsageRepository.sendWindowPing()` reports only the *send* outcome (`Sent`,
+    `AlreadyOpen`, or a real failure). It records the pre-ping `resets_at` and stamps
+    the send time, then stops.
+  - `UsageRepository.verifyWindowPing()` runs later from its own alarm
+    (`PingScheduler.ACTION_VERIFY`) at +90s, with one re-check at +4min —
+    `VERIFY_DELAY_MS`, `VERIFY_RETRY_MS`, `MAX_VERIFY_ATTEMPTS`. Together they reach
+    past the observed lag, and a test pins that they do.
+  - **`NotYet` / `GaveUp` are not failures and never notify.** Only send failures
+    (non-200, auth, network) retry or raise `notifyPingFailed`.
+  - A refresh that fails during verification yields `NotYet`, not evidence — the old
+    code ignored its own `FetchResult` entirely.
+  - **`PingSchedule.tooSoonToSend` / `MIN_SEND_INTERVAL_MS` (10 min)** is a hard floor
+    between sends regardless of what the rest of the logic concludes. This is the
+    backstop against the storm: worst case is one wasted ping, never a burst.
+  - **On giving up, the window counts as started.** Every observation says pings work,
+    and the send floor already prevents a burst, so miscounting one window is far
+    cheaper than re-pinging in a loop.
+- **Also fixed:** the settings status row never refreshed — it read `pingLastResult`
+  during composition with nothing to trigger recomposition when the alarm wrote it, so
+  it sat on a day-old result while a ping came and went. Now polls a revision counter.
+- **Also:** the toggle's subtitle now says that turning it on starts a window
+  immediately, which is what it has always done — both 2026-07-30 pings were fired by
+  `rearm()` on enable, not by the Test button.
+- **Tests:** 4 cases in `PingScheduleTest` (16 → 20) covering the send floor and an
+  assertion that the verification window both covers the observed lag and finishes
+  inside the send floor. 60 tests, 0 failures.
+- **Found via:** the first on-device run of CCRM-17 (Window Pings).
+- **Not yet device-verified:** the deferred path has not run on the phone.
 
 ### CCBG-4 · Alert Dedup — threshold alerts re-fired every poll because `resets_at` isn't stable
 - **Status:** Fixed (2026-07-30)
