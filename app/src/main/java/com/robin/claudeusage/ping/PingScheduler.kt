@@ -71,6 +71,11 @@ object PingScheduler {
     fun armAt(context: Context, profile: Profile, atMs: Long) {
         val am = context.getSystemService(AlarmManager::class.java) ?: return
         val pi = pendingIntent(context, profile, atMs)
+        PingLog.log(
+            context, profile,
+            "ARM ping at ${java.time.Instant.ofEpochMilli(atMs)} " +
+                "in ${(atMs - System.currentTimeMillis()) / 60_000}m exact=${canScheduleExact(context)}",
+        )
         if (canScheduleExact(context)) {
             am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, atMs, pi)
         } else {
@@ -85,6 +90,7 @@ object PingScheduler {
     fun armVerify(context: Context, profile: Profile, atMs: Long) {
         val am = context.getSystemService(AlarmManager::class.java) ?: return
         val pi = pendingIntent(context, profile, atMs, ACTION_VERIFY)
+        PingLog.log(context, profile, "ARM verify in ${(atMs - System.currentTimeMillis()) / 1000}s")
         // Verification is not time-critical the way a ping is — a minute either way
         // costs nothing, so this deliberately doesn't consume an exact-alarm slot.
         am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, atMs, pi)

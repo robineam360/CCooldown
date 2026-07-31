@@ -83,6 +83,7 @@ import com.robin.claudeusage.data.UpdateCheck
 import com.robin.claudeusage.data.UpdateInfo
 import com.robin.claudeusage.data.UsageCache
 import com.robin.claudeusage.data.UsageRepository
+import com.robin.claudeusage.ping.PingLog
 import com.robin.claudeusage.ping.PingScheduler
 import com.robin.claudeusage.ui.Fmt
 import com.robin.claudeusage.ui.Palette
@@ -500,6 +501,8 @@ fun SettingsScreen(
             Spacer(Modifier.height(24.dp))
             SectionLabel("Debug")
             TrendDiagnostics(repo, use24h)
+            Spacer(Modifier.height(10.dp))
+            PingLogCard()
             Spacer(Modifier.height(10.dp))
             DebugSection(repo)
         }
@@ -1614,6 +1617,69 @@ private fun ResetModeRow(label: String, window: String, cache: UsageCache) {
                     shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
                 ) { Text(text) }
             }
+        }
+    }
+}
+
+/**
+ * The window-ping trace (CCRM-17). Shows the tail in-app and, more usefully, tells you
+ * where to pull the whole thing from — the interesting run is an unattended overnight
+ * one, so it has to survive being read hours later.
+ */
+@Composable
+private fun PingLogCard() {
+    val context = LocalContext.current
+    var tail by remember { mutableStateOf<List<String>>(emptyList()) }
+    var refreshTick by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(refreshTick) {
+        tail = withContext(Dispatchers.IO) {
+            try {
+                val f = PingLog.file(context)
+                if (f.exists()) f.readLines().takeLast(12) else emptyList()
+            } catch (_: Exception) {
+                emptyList()
+            }
+        }
+    }
+
+    SectionCard {
+        Text("Window ping log", style = MaterialTheme.typography.bodyLarge)
+        Text(
+            "Every alarm, decision, send and verification, with Doze state at the moment " +
+                "it fired. Pull the full file with:",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "adb pull ${PingLog.file(context).absolutePath}",
+            style = MaterialTheme.typography.bodySmall,
+            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+        )
+        Spacer(Modifier.height(10.dp))
+        if (tail.isEmpty()) {
+            Text(
+                "Nothing logged yet.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            for (line in tail) {
+                Text(
+                    line,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                )
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = { refreshTick++ }) { Text("Reload") }
+            OutlinedButton(onClick = {
+                PingLog.clear(context)
+                refreshTick++
+            }) { Text("Clear") }
         }
     }
 }

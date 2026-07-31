@@ -37,8 +37,17 @@ class PingAlarmReceiver : BroadcastReceiver() {
         val pending = goAsync()
 
         GlobalScope.launch(Dispatchers.IO) {
+            val late = if (intendedAt > 0) PingSchedule.latenessMs(intendedAt, System.currentTimeMillis()) else 0L
+            PingLog.log(
+                app, profile,
+                "ALARM ${if (verifying) "verify" else "ping"} late=${late / 1000}s " +
+                    "exact=${PingScheduler.canScheduleExact(app)} ${PingLog.powerState(app)}",
+            )
             try {
                 if (verifying) runVerify(app, profile) else runPing(app, profile, intendedAt)
+            } catch (e: Exception) {
+                PingLog.log(app, profile, "CRASH ${e.javaClass.simpleName}: ${e.message}")
+                throw e
             } finally {
                 pending.finish()
             }
@@ -60,6 +69,13 @@ class PingAlarmReceiver : BroadcastReceiver() {
             config = cache.pingConfig(profile),
             day = cache.pingDayState(profile),
             sessionResetAtMs = repo.snapshot(profile).data?.session?.resetsAt?.toEpochMilli(),
+        )
+
+        val resetAt = repo.snapshot(profile).data?.session?.resetsAt
+        PingLog.log(
+            context, profile,
+            "DECIDE ${decision.javaClass.simpleName} window=${resetAt ?: "none"} " +
+                "startedToday=${cache.pingDayState(profile).windowsStarted}",
         )
 
         when (decision) {
@@ -87,10 +103,12 @@ class PingAlarmReceiver : BroadcastReceiver() {
         // backstop that keeps a confused verification from becoming a ping storm.
         if (PingSchedule.tooSoonToSend(cache.pingLastSentAt(profile), now)) {
             cache.setPingOutcome(profile, now, "Skipped — pinged moments ago", failed = false)
+            PingLog.log(context, profile, "SEND skipped (inside ${PingSchedule.MIN_SEND_INTERVAL_MS / 60_000}m floor)")
             return
         }
 
         val result = repo.sendWindowPing(profile)
+        PingLog.log(context, profile, "SEND sent=${result.sent} failed=${result.failed} — ${result.message}")
         val at = System.currentTimeMillis()
         val late = if (intendedAtMs > 0) PingSchedule.latenessMs(intendedAtMs, at) else 0L
 
@@ -128,6 +146,11 @@ class PingAlarmReceiver : BroadcastReceiver() {
         val attempt = cache.pingVerifyAttempt(profile) + 1
         val result = repo.verifyWindowPing(profile)
         val at = System.currentTimeMillis()
+        PingLog.log(
+            context, profile,
+            "VERIFY attempt=$attempt/${PingSchedule.MAX_VERIFY_ATTEMPTS} " +
+                "opened=${result.opened} — ${result.message}",
+        )
 
         when {
             result is VerifyResult.Opened -> {
