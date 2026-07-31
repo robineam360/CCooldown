@@ -129,7 +129,33 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
 ## Needs design — decide the shape before building
 
 ### CCRM-17 · Window Pings — start a 5-hour window on a schedule
-- **Status:** **Built 2026-07-30, opt-in and off by default** · not yet device-verified
+- **Status:** **Built and the premise is confirmed** (2026-07-31) · opt-in, off by
+  default · one device test outstanding (a real 4am alarm in Doze)
+
+- **HOW THE SERVER PICKS A WINDOW — measured, and this is what the feature rests on.**
+  Two on-device observations on Personal:
+
+  | Ping | Previous window ended | Gap | Resulting window |
+  |---|---|---|---|
+  | 2026-07-30 20:08 | 19:59 | 9 min | `[19:59 → 00:59]` |
+  | 2026-07-31 07:09 | 00:59 | 6h 10m | `[07:00 → 12:00]` |
+
+  So: **ping soon after a window expires and it chains** — backdated to that expiry.
+  **Ping after a real idle gap and you get a fresh window, anchored at your message
+  truncated down to the hour.** That is exactly what this feature needs: a 04:00 ping
+  after an idle night yields `[04:00 → 09:00]`, and each renewal fires at the previous
+  expiry and continues the chain — 09:00–14:00, 14:00–19:00, 19:00–24:00.
+  - The competing hypothesis was a **fixed 5-hour grid** you can't move, which would
+    have made pinging a no-op: you'd get those boundaries whether you pinged or not.
+    It predicted `[05:59 → 10:59]` for the second test and is refuted.
+  - **Correction to an earlier note here:** a single Work reading of `09:20:00` was read
+    as "boundaries follow your message, so they never land on the hour". That was
+    under-determined — it was almost certainly a *chained* window. Fresh windows do
+    truncate to the hour.
+  - **This relaxes the exact-alarm requirement.** Hour truncation means a ping at 04:03
+    still yields `[04:00 → 09:00]`, so punctuality buys tolerance in *minutes*, not
+    seconds. Exact alarms are still worth having — crossing an hour boundary costs a
+    full hour — but the earlier "3 minutes late costs you all day" framing was wrong.
 - **Shipped:**
   - `ApiClient.sendPing()` — `POST /v1/messages`, Haiku, `max_tokens 1`, body `"hi"`.
     No UA rule (the endpoint has no UA gate) and no Claude Code system preamble.
@@ -164,10 +190,14 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
   - **`windowMoved` needs a minute of movement**, not inequality. `resets_at` drifts
     ~1.3s with nothing happening (CCBG-4), so an exact test would call drift a success
     and the feature's own safety check would be the thing lying.
-- **Still to verify on-device:** a ping opening a window **from cold** (every spike so
-  far ran with a window already open — `Test ping now` reports exactly this), whether
-  the boundary truncates to the minute or something coarser, and that a 4am alarm
-  really fires on time in Doze on the Fold 7.
+- **Verified on-device 2026-07-31:** a ping opens a window from cold, and the boundary
+  truncates to the hour (both in the table above).
+- **Still to verify:** that a 4am alarm actually fires on time in Doze on the Fold 7,
+  and that the deferred verification (CCBG-5) reports success once rather than
+  spuriously. Needs an unattended overnight run — see the ping log below.
+- **Fixed along the way:** [CCBG-5](BUGS.md) — verification ran inline, so a working
+  ping reported failure and then entered the *send*-retry backoff, firing roughly four
+  pings where one was wanted. Send and verify are now separate alarms.
 - **Not done:** no widget or tile surface for pings, and no battery-optimization
   exemption prompt — `setExactAndAllowWhileIdle` should be enough, so that only gets
   added if real drift shows up.
