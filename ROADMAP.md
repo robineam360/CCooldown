@@ -564,17 +564,31 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
 - **Deliberately not:** wiring it back into "Clear credentials". That's what CCBG-1 was.
 
 ### CCRM-15 · Above-Pace Verification — verify the above-pace chart state on a device
-- **Status:** Planned · small
+- **Status:** **Observed 2026-08-04** · synthetic-series override still worth building
 - **Why:** The pace chart's warning half — the amber overshoot fill, the wash over the
-  above-pace region, and the bold warning-coloured readout — has **never rendered on real
-  hardware**. Every window on every account we have sits below pace, so it has only ever
-  been seen in a wireframe. It shipped in v1.1 unobserved.
-- **Approach:** either wait for a window to genuinely cross (Work's 5-hour window has been
-  climbing at ~18%/h, so this may happen on its own), or add a debug-only override that
-  forces the chart to plot a synthetic above-pace series so the state can be inspected and
-  screenshotted on demand. The latter is worth having regardless — it's the only way to
-  screenshot the state for the docs.
-- **Then:** capture it for the guide, which currently illustrates only the below-pace case.
+  above-pace region, and the bold warning-coloured readout — had **never rendered on real
+  hardware**. Every window on every account sat below pace, so it had only ever been seen
+  in a wireframe. It shipped in v1.1 unobserved.
+- **It crossed on its own, exactly as this entry guessed it might.** Caught while
+  verifying CCRM-20 on the Fold's inner screen: the **Work** 5-hour window was at 32% with
+  pace at 24%, and every warning element rendered — the wash over the above-pace region,
+  the amber overshoot fill from the point the curve crossed the diagonal, and CCRM-20's tap
+  callout picking up the warning colour for `32% · +8 vs pace`. Captured as
+  `Release/screenshots/chart-above-pace-work-fold-inner.png`.
+- **No defect found in it.** A label collision was filed off this screenshot and
+  retracted the same day — the two labels are separated by construction, see
+  [CCBG-7](BUGS.md). Worth recording that the state came up *clean*, since the entry was
+  written on the assumption that an unobserved state is probably hiding something.
+- **The one blemish**, well under bug threshold: a 100% projection's `~100%` label is
+  drawn across the pace diagonal and its own dashes. A surface-coloured backing, like
+  CCRM-20's callout uses, would settle it. Not filed.
+- **Still worth building: the debug-only synthetic above-pace series.** This sighting was
+  luck, and it's *not* repeatable — the window resets and Work drops back below pace. The
+  override remains the only way to inspect the state on demand, which matters for any
+  future change to the warning colours, and for re-capturing the guide shot on a device
+  whose window isn't obliging.
+- **Then:** the guide still illustrates only the below-pace case, and the capture above is
+  usable for the swap as-is.
 
 ### CCRM-13 · Chart Widget — standalone chart widget
 - **Status:** Planned · gated on the in-app chart proving itself

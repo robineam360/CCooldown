@@ -32,6 +32,27 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
 
 ## Fixed
 
+### CCBG-7 · Chart Label Collision — RETRACTED, never a bug
+- **Status:** **Invalid — retracted 2026-08-04, same day it was filed.** Kept because IDs
+  are never reused, and because the way it was filed is the lesson.
+- **Claimed:** that a window projected to 100% drew its `~100%` label on top of the
+  `100%` threshold label in the right-hand gutter.
+- **Why it cannot happen.** The gutter labels are drawn at `plotRight + 3.dp`
+  ([Sparkline.kt:325](app/src/main/java/com/robin/claudeusage/ui/Sparkline.kt#L325)), and
+  the projection label's x is clamped to `coerceIn(0f, plotRight - width)`
+  ([Sparkline.kt:418](app/src/main/java/com/robin/claudeusage/ui/Sparkline.kt#L418)), so
+  its right edge can never pass `plotRight`. The two are separated by construction, in
+  every state — not just the one that was inspected.
+- **How it got filed:** from a screenshot downscaled to about 90% of its width, in which
+  the two labels sit close together and read as overlapping. At full resolution they are
+  plainly apart. The lesson is narrow and worth keeping: **verify a pixel-level claim at
+  pixel resolution**, and prefer the geometry in the source over a reading of an image.
+- **What is actually there**, at much lower severity and not filed as a bug: the `~100%`
+  label is drawn across the even-pace diagonal and its own projection dashes, so the
+  glyphs have dashed lines running through them. Legible, but not clean. A
+  surface-coloured backing behind the text — the same treatment CCRM-20's tap callout
+  already uses — would settle it if it ever becomes worth doing.
+
 ### CCBG-5 · Ping Verification — a working ping is reported as a failure
 - **Status:** Fixed (2026-07-31)
 - **Severity:** High (reported the opposite of what happened, and turned one ping into
