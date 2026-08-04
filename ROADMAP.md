@@ -12,6 +12,107 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
 
 ## Next — small, high value, ready to build
 
+### CCRM-20 · Wide Chart — one profile at full width, and a chart you can touch
+- **Status:** Done (2026-08-04) · successor to CCRM-12
+- **Verified on the Fold 7's inner screen** (1968×2184 @ 420dpi = **750×832dp**, which
+  confirms the ~750dp figure this file has been asserting, and that MEDIUM is the right
+  class for it). Chart went from ~335dp to **~655dp** wide — the 2× the table below
+  predicted. Tap, tap-to-clear, and long-press scrub all confirmed against real history;
+  the pager hand-off confirmed by swiping the chart and landing on Work.
+- **Why the wide layout is wrong today:** unfolding the Fold makes the chart *smaller*.
+  `ProfileTabs` early-returns to `ProfilePanes` at any `twoPane` width
+  ([MainActivity.kt:281](app/src/main/java/com/robin/claudeusage/MainActivity.kt#L281)),
+  which splits the window into two scrolling profile columns. Measure both screens:
+
+  | | chart width |
+  |---|---|
+  | Cover (~410dp): column − 20dp padding ×2 − card 16dp ×2 | ~338dp |
+  | Inner (~750dp): pane 375dp − 20dp padding ×2 − card 16dp ×2 | ~335dp |
+
+  You pay the fold and the thing you actually read doesn't grow at all. That's true
+  regardless of the use-case argument, and it's the real defect.
+- **Decision: one profile, full width, swipe for the other.** This reverses the note at
+  [MainActivity.kt:279](app/src/main/java/com/robin/claudeusage/MainActivity.kt#L279) —
+  "both accounts at once is the whole point of the app". It isn't, in practice: the
+  question you open the app with is "how much have I got left *right now*", about the one
+  account you're about to spend. Both-at-once is a comparison you rarely make, and paying
+  for it in halved chart width on the only screen wide enough to draw a good chart is the
+  wrong trade. A compact both-accounts summary strip was considered and rejected as a
+  half-measure; the tab strip already says which profile you're on, and a swipe reaches
+  the other. **Both accounts at once still exists on the home screen** — that's what the
+  widgets are for, and they're the surface where the glance actually happens.
+- **What one column buys:** ~678dp of chart on the inner screen, 2× today.
+- **Approach:**
+  1. Delete the `twoPane` branch in `ProfileTabs` and the `ProfilePanes` composable with
+     it. Tabs + `HorizontalPager` then serve every width. `WidthClass.twoPane` stays —
+     `HistoryScreen` still uses it.
+  2. New `ChartColumnMaxWidth = 760.dp` in `ui/Adaptive.kt`, passed to the pager's
+     `ContentColumn`. Deliberately unconditional: on a phone it never binds, so there's no
+     branch to reason about. It **overrides the `ContentMaxWidth = 640` reasoning**
+     ([Adaptive.kt:56](app/src/main/java/com/robin/claudeusage/ui/Adaptive.kt#L56)) for
+     MAIN only — that cap protects bars and prose from stretching, and here the chart is
+     the payload. The doc comment has to say so, or the next reader will "fix" it back.
+  3. Size the chart to the window instead of a hardcoded 192dp
+     ([MainActivity.kt:627](app/src/main/java/com/robin/claudeusage/MainActivity.kt#L627)):
+     `(width * 0.35f).coerceIn(180.dp, 300.dp).coerceAtMost(windowHeight * 0.45f)`.
+     678×192 is 3.5:1 and reads as letterboxed. `ProvideWidthClass` already sits in a
+     `BoxWithConstraints`, so it can publish `LocalWindowHeight` beside the width for
+     free — and that height clamp is what stops a **landscape phone** (also MEDIUM width,
+     but ~400dp tall) getting a chart taller than its window.
+- **Touch: tap to inspect, long-press to scrub.** The chart has no `pointerInput` at all
+  today. Tap selects the nearest sample and shows a callout; tapping it again clears it.
+  - **Load-bearing refactor:** every coordinate lives inside the `Canvas` lambda, so a hit
+    test can't ask "which sample is at x=340?". Extract `plotRight`/`plotTop`/`plotBottom`/
+    `x(t)`/`y(pct)`/`nearestSample(px)` into a plain `SparkGeometry(size, density,
+    windowStartMs, windowEndMs)`. The draw pass builds it from `size`; the gesture handler
+    builds it from a size captured via `onSizeChanged`. Same function of the same inputs,
+    so they cannot disagree — and `nearestSample` becomes unit-testable with no Compose UI.
+  - **Snap to real samples, never interpolate.** The chart exists to make polling gaps
+    visible ([Sparkline.kt:33](app/src/main/java/com/robin/claudeusage/ui/Sparkline.kt#L33));
+    a readout that invented a value inside a gap would undo the feature.
+  - **Why the scrub is long-press-gated.** A plain horizontal drag would fight the
+    `HorizontalPager` for the pointer on the cover screen.
+    `detectDragGesturesAfterLongPress` claims the pointer only after the press, so
+    ordinary swipes still page. Haptic tick on engage, so the mode change announces
+    itself. Two separate `pointerInput` modifiers, drag registered first.
+  - **Do not use `detectTapGestures` here** — found on device, 2026-08-04. It calls
+    `down.consume()` unconditionally, and an ancestor sees pointer events only *after*
+    its descendants, so that single consume stopped the `HorizontalPager` ever starting:
+    swiping across the chart did nothing while swiping across the usage bar 20dp above
+    it paged to the other profile. Gating the scrub behind a long press was meant to
+    protect paging, and the tap handler broke it anyway. Replaced with a hand-rolled
+    `awaitEachGesture` + `waitForUpOrCancellation()` that never consumes the down; a
+    null return means the pager (or the vertical scroll, or our own scrub) claimed the
+    gesture, and a real up within touch slop is the tap.
+  - **`longPressFired` flag.** `onDragStart` selects a point but consumes nothing, so a
+    long press *released without moving* looked exactly like a tap to the handler above
+    and toggled the fresh selection straight back off — haptic, then nothing. The flag
+    is cleared on down, set at the long-press timeout, and read on release, which is a
+    deterministic order.
+  - **Selection stores the sample's timestamp, not its index**, so it survives a poll
+    appending a new sample rather than silently sliding to a different point.
+  - **Callout** drawn in-canvas like the existing labels: ring on the selected dot, a
+    crosshair visually distinct from the "now" hairline, and a two-line pill —
+    `14:32` / `47% · +6 vs pace`. The pace delta is the number worth paying a tap for:
+    it's the one thing the static chart can't tell you at an *arbitrary* point. Pill
+    clamps inside the plot and flips side near the right edge; suppress the "now" label on
+    collision, as
+    [Sparkline.kt:218](app/src/main/java/com/robin/claudeusage/ui/Sparkline.kt#L218)
+    already does for the projection label.
+  - **Semantics:** the Canvas has no `contentDescription`. Add a one-line summary of
+    latest %, pace and projection while we're in the file.
+- **Testing:** `SparkGeometry` gets unit tests (nearest-sample snapping, edge clamping).
+  The tap/long-press detector interaction and the pager hand-off are device checks, not
+  unit-testable. **CCRM-15's debug synthetic above-pace series earns its keep here** —
+  it's the only way to see the callout against the amber overshoot fill, since every
+  window on both accounts currently sits below pace.
+- **Not in scope, deliberately:** `HistoryScreen` keeps its 5-hour | 7-day side-by-side
+  ([HistoryScreen.kt:119](app/src/main/java/com/robin/claudeusage/HistoryScreen.kt#L119)) —
+  that's two *different* bar charts using the width, not one chart halved. Settings keeps
+  `hasTwoColumns`. A two-column MAIN layout at ≥1100dp (real tablet, where each column
+  would still be ≥500dp) is a later question — at 750dp it would put us straight back to
+  ~345dp columns, which is the bug being fixed.
+
 ### CCRM-1 · Credits Display — show usage credits used / total available
 - **Status:** Done (2026-07-27)
 - **Why:** Percentages answer "how close am I to the limit"; credits answer "how much

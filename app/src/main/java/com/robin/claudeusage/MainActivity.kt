@@ -12,6 +12,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -24,9 +25,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DateRange
@@ -46,7 +45,6 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -54,7 +52,6 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -74,14 +71,17 @@ import com.robin.claudeusage.data.Profile
 import com.robin.claudeusage.data.Projection
 import com.robin.claudeusage.data.UsageRepository
 import com.robin.claudeusage.data.UsageWindow
+import com.robin.claudeusage.ui.ChartColumnMaxWidth
 import com.robin.claudeusage.ui.ContentColumn
 import com.robin.claudeusage.ui.ContentMaxWidth
 import com.robin.claudeusage.ui.Fmt
 import com.robin.claudeusage.ui.LocalWidthClass
+import com.robin.claudeusage.ui.LocalWindowHeight
 import com.robin.claudeusage.ui.Palette
 import com.robin.claudeusage.ui.ProvideWidthClass
 import com.robin.claudeusage.ui.UsageSparkline
 import com.robin.claudeusage.ui.WideMaxWidth
+import com.robin.claudeusage.ui.chartHeight
 import com.robin.claudeusage.ui.hasTwoColumns
 import com.robin.claudeusage.ui.PACE_DEAD_ZONE
 import com.robin.claudeusage.ui.elapsedPercent
@@ -275,14 +275,13 @@ private fun ProfileTabs(
     modifier: Modifier,
 ) {
     val profiles = Profile.entries
-    // Both accounts at once is the whole point of the app, and on a wide window
-    // there's finally room for it — so the tabs and the swipe go away rather than
-    // making you page between two things that now fit side by side.
-    if (LocalWidthClass.current.twoPane) {
-        ProfilePanes(repo, use24h, tick, modifier)
-        return
-    }
-
+    // One profile at a time at every width, tabs and swipe included. A wide window used
+    // to split into two side-by-side profile panes, on the theory that both accounts at
+    // once was the point — but each pane then drew a chart no wider than the one on the
+    // cover screen, so unfolding cost a gesture and bought nothing. The question you
+    // open this app with is how much is left on the account you're about to spend, and
+    // both-at-once already has a better home on the home screen: the widgets. See
+    // CCRM-20.
     val pagerState = rememberPagerState(
         initialPage = profiles.indexOf(startProfile).coerceAtLeast(0),
         pageCount = { profiles.size },
@@ -304,50 +303,10 @@ private fun ProfileTabs(
             modifier = Modifier.fillMaxSize(),
             verticalAlignment = Alignment.Top,
         ) { page ->
-            ContentColumn {
+            ContentColumn(maxWidth = ChartColumnMaxWidth) {
                 Spacer(Modifier.height(16.dp))
                 ProfileScreen(repo, profiles[page], use24h, tick)
                 Spacer(Modifier.height(24.dp))
-            }
-        }
-    }
-}
-
-/**
- * Every profile side by side, one scrolling pane each. Each pane carries its own
- * heading, which is what the tab strip used to do — without it the two columns of
- * near-identical cards are impossible to tell apart.
- */
-@Composable
-private fun ProfilePanes(
-    repo: UsageRepository,
-    use24h: Boolean,
-    tick: Int,
-    modifier: Modifier,
-) {
-    Row(modifier = modifier.fillMaxSize()) {
-        for ((index, profile) in Profile.entries.withIndex()) {
-            if (index > 0) VerticalDivider()
-            // Keyed so each pane keeps its own scroll position rather than
-            // inheriting its neighbour's by loop position.
-            key(profile) {
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .padding(horizontal = 20.dp)
-                        .verticalScroll(rememberScrollState()),
-                ) {
-                    Spacer(Modifier.height(16.dp))
-                    Text(
-                        repo.cacheSettings().profileLabel(profile),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    ProfileScreen(repo, profile, use24h, tick)
-                    Spacer(Modifier.height(24.dp))
-                }
             }
         }
     }
@@ -615,17 +574,24 @@ private fun TrendBlock(
     val atLimit = (window.percent ?: 0.0) >= 100.0
 
     Spacer(Modifier.height(10.dp))
-    UsageSparkline(
-        samples = samples,
-        windowStartMs = resetMs - windowLengthMs,
-        windowEndMs = resetMs,
-        projectedEnd = est?.let { e ->
-            if (e.hitsLimitAtMs != null) e.hitsLimitAtMs to 100.0 else resetMs to e.pctAtReset
-        },
-        color = barFill(window.percent),
-        use24h = use24h,
-        modifier = Modifier.fillMaxWidth().height(192.dp),
-    )
+    // Measured here rather than derived from the window width: the chart sits inside a
+    // card inside a capped column, so only this box knows what it actually got.
+    val windowHeight = LocalWindowHeight.current
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        UsageSparkline(
+            samples = samples,
+            windowStartMs = resetMs - windowLengthMs,
+            windowEndMs = resetMs,
+            projectedEnd = est?.let { e ->
+                if (e.hitsLimitAtMs != null) e.hitsLimitAtMs to 100.0 else resetMs to e.pctAtReset
+            },
+            color = barFill(window.percent),
+            use24h = use24h,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(chartHeight(maxWidth, windowHeight)),
+        )
+    }
     // The pace readout: what the retired "Days elapsed" bar used to say, as a
     // number rather than a row. A ±3 point dead zone around the line stops it
     // flapping between above and below — with its colour — on every poll.

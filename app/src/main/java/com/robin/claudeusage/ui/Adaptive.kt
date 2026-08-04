@@ -40,6 +40,14 @@ val LocalWidthClass = staticCompositionLocalOf { WidthClass.COMPACT }
 val LocalWindowWidth = staticCompositionLocalOf { 0.dp }
 
 /**
+ * The measured window height. Only width has breakpoints, but anything that grows
+ * with width needs this to stay honest in a short window: a phone in landscape is
+ * MEDIUM wide and about 400dp tall, so a chart sized from width alone would end up
+ * taller than the window it's in.
+ */
+val LocalWindowHeight = staticCompositionLocalOf { 0.dp }
+
+/**
  * The width at which a screen can usefully split its own content into two
  * columns. Deliberately not the Material [WidthClass.EXPANDED] boundary: a
  * Fold's inner screen is ~750dp wide, which is only MEDIUM, yet it fits two
@@ -67,6 +75,33 @@ val ContentMaxWidth: Dp = 640.dp
  */
 val WideMaxWidth: Dp = 1100.dp
 
+/**
+ * The cap for a single column whose centrepiece is a chart, deliberately wider than
+ * [ContentMaxWidth]. That cap is right for bars and prose and wrong here: it exists
+ * to stop a usage bar running the width of your hand, but on this screen the chart is
+ * the payload, and holding it to 640dp is what made a Fold's inner display draw the
+ * *same size* chart as its cover screen. A slightly wide bar is a real cost, paid
+ * knowingly for double the plot area — so don't narrow this back to [ContentMaxWidth]
+ * without re-reading CCRM-20.
+ *
+ * Unconditional on purpose: below this a phone never reaches the cap, so there's no
+ * width branch to reason about.
+ */
+val ChartColumnMaxWidth: Dp = 760.dp
+
+/**
+ * Height for a chart that should grow with the room it's given. Keyed off the chart's
+ * own width so the aspect ratio stays sane — a 678dp-wide plot at the old fixed 192dp
+ * reads as letterboxed — then clamped against the window so a short landscape window
+ * doesn't get a chart taller than itself.
+ */
+fun chartHeight(width: Dp, windowHeight: Dp): Dp {
+    val fromWidth = (width * 0.35f).coerceIn(180.dp, 300.dp)
+    // A zero window height means nothing has measured yet; trust the width instead of
+    // collapsing the chart to nothing.
+    return if (windowHeight <= 0.dp) fromWidth else minOf(fromWidth, windowHeight * 0.45f)
+}
+
 /** Measures the window once and publishes the result as [LocalWidthClass]. */
 @Composable
 fun ProvideWidthClass(content: @Composable () -> Unit) {
@@ -79,6 +114,7 @@ fun ProvideWidthClass(content: @Composable () -> Unit) {
         CompositionLocalProvider(
             LocalWidthClass provides widthClass,
             LocalWindowWidth provides maxWidth,
+            LocalWindowHeight provides maxHeight,
         ) { content() }
     }
 }
