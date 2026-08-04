@@ -227,6 +227,237 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
 
 ---
 
+<!--
+CCRM-21 … CCRM-38 came out of a 2026-08-04 review of OpenQuota
+(github.com/deviffyy/OpenQuota, MIT, Tauri 2 + Rust + Svelte) — a desktop tray app for
+Windows/Linux/macOS that aggregates ten AI coding providers. Its Claude payload mapping is
+a near-sibling of ours (same `five_hour` / `seven_day` / `limits[]` / `extra_usage`), so the
+transferable value is *product surface and behaviour*, not data access. Read the "Not
+portable" note at the end of this file before mining it again.
+
+**Dropped from that review deliberately:** its whole multi-provider premise (Codex, Cursor,
+Copilot, Antigravity, OpenCode, Devin, Grok, OpenRouter, Z.ai). Claude Cooldown is a Claude
+app. Even setting intent aside, six of those read local CLI credential files that don't
+exist on a phone, and the two that *would* port (OpenRouter and Z.ai, both plain pasted API
+keys) would still make this a different product. Not filed, not an open question.
+-->
+
+### CCRM-21 · Pace Alerts — warn on the projection, not just the absolute percent
+- **Status:** Planned · medium · **highest-value item from the OpenQuota review**
+- **Why:** Our alerts only fire on absolute thresholds — `sessionAlertThresholds` 80/95,
+  weekly 90, model caps 90 ([UsageCache.kt:134](app/src/main/java/com/robin/claudeusage/data/UsageCache.kt#L134)).
+  That tells you where you *are*, never where you're *heading*. Burning a 5-hour window in
+  40 minutes is the situation worth interrupting someone for, and at 35% used we say
+  nothing. We already compute the whole projection for CCRM-12's chart and
+  `Projection` — the number exists and never leaves the screen.
+- **Three milestones, separately toggleable** (OpenQuota's `Milestone`, and its copy is
+  good):
+  - **Almost Out** — under 10% of the window remaining.
+  - **Cutting It Close** — projected to finish *near* the limit.
+  - **Will Run Out** — projected past 100% before the reset.
+- **Severity ladder:** `Untracked` → `Healthy` → `Close` → `RunningOut` → `Spent`, from
+  `used / elapsedFraction` — the same maths our chart's even-pace diagonal already draws,
+  which is why the chart and the alerts will agree for free.
+- **Copy the state machine, not just the thresholds.** `src-tauri/src/pacing.rs` has five
+  guards that each exist because of a way this feature gets annoying, and re-deriving them
+  from scratch would mean re-learning them from the user's notification shade:
+  1. **A `primed` flag** — the first observation of a window never alerts. Otherwise
+     enabling the feature (or a reboot, or any process death) fires the full backlog for a
+     window that was already at 95% and which the user already knows about.
+  2. **Dedupe keyed on `resets_at`**, cleared when the reset genuinely advances — the same
+     lesson as [CCBG-4](BUGS.md), so it must go through `Projection.sameWindow` rather than
+     comparing timestamps, or drift will re-fire it every poll.
+  3. **Hysteresis** — a milestone re-arms only when severity actually *drops* past it, so a
+     window hovering on a boundary doesn't alternate.
+  4. **Young-window suppression** — no projection until 1% of the period (min 60s) has
+     elapsed, and none at all under 5% used. A 5-hour window at 2% after four minutes
+     projects to 150% and means nothing.
+  5. **Rollback on delivery failure** — if the notification doesn't post, un-fire the
+     milestone so it retries rather than being silently lost.
+- **Also:** an `alwaysShowPacing` pref (their `always_show_pacing`) for whether the pace
+  readout shows always or only once it's saying something.
+- **Lands in:** `alerts/Alerts.kt` beside the existing threshold evaluation, with the
+  ladder and the transition rules in `data/Projection.kt` as pure functions so they're
+  unit-testable the way `PingSchedule` is.
+- **Keep the absolute thresholds.** These are a second, orthogonal signal — "close to the
+  wall" vs "moving too fast" — exactly the split CCRM-12 made deliberately across two
+  visual channels. Don't replace one with the other.
+
+### CCRM-22 · Used or Left — one global "consumed vs remaining" preference
+- **Status:** Planned · small
+- **Why:** The app only ever says "47% used". Half the people who look at this want "53%
+  left", and it's the same number. OpenQuota ships `UsageDisplay::{Used, Left}` and
+  defaults to **Left**, which is worth noting — they think remaining is the more natural
+  reading of a quota, and they may be right.
+- **Approach:** one token, read by every render site rather than reimplemented per surface:
+  the main screen bars, the credits card, both widgets, the pinned notification, the tile,
+  and the chart's callout. Belongs in `ui/Palette.kt`/`Fmt` next to the 24-hour setting.
+  Default **Used**, so nobody's existing reading flips under them.
+- **Watch:** the warning colours stay keyed on *used* percent regardless of the display
+  mode, or a red bar will sit next to "8% left" and read as backwards.
+
+### CCRM-23 · Reset Display — countdown or clock time, on every surface
+- **Status:** Planned · small · pairs with CCRM-22
+- **Why:** We already built this and scoped it to one surface — `tileSubtitle`, countdown
+  vs clock, from CCRM-11. The reasoning there (the countdown reads better; the clock can't
+  go stale) applies to the whole app, and the widgets and notification currently have no
+  say.
+- **Approach:** generalise `tileSubtitle` into a global `resetDisplay` token; the tile keeps
+  reading it and stops owning it. Mostly deletion.
+- **Steal one detail:** OpenQuota's countdown collapses to "Resets soon" under five
+  minutes instead of counting down the last seconds — a widget that refreshes every 15
+  minutes has no business rendering "resets in 43s".
+
+### CCRM-26 · Quick Links — the Anthropic status page and the usage dashboard
+- **Status:** Planned · small
+- **Why:** When the app shows a network error the first question is "is it me or is it
+  them", and we make the user leave the app to find out. OpenQuota puts two links on every
+  provider card: `status.anthropic.com` and `claude.ai/settings/usage`.
+- **Approach:** two buttons on the account card, and surface the status link *specifically*
+  in the network-error state (see CCRM-27) rather than only in a settings list. Scheme-check
+  before launching an intent, as their `ProviderLink::visible()` does — https/http only.
+- **Also useful:** `claude.ai/settings/usage` is the authority our numbers are derived from,
+  so a "check the real dashboard" escape hatch is worth having whenever someone disputes a
+  reading.
+
+### CCRM-38 · Plan Tier — show the rate-limit multiplier, not just the plan
+- **Status:** Planned · small
+- **Why:** We store and display `subscriptionType` — "pro", "max"
+  ([UsageRepository.kt:228](app/src/main/java/com/robin/claudeusage/data/UsageRepository.kt#L228),
+  shown on the account card at [SettingsScreen.kt:604](app/src/main/java/com/robin/claudeusage/SettingsScreen.kt#L604)).
+  We never read `rate_limit_tier`. A Max 5x and a Max 20x have very different windows and
+  currently render identically, which makes the label almost decorative.
+- **Approach:** OpenQuota composes the two into **"Pro 5x"** by pulling the `5x` out of a
+  tier string like `default_5x` — split on non-alphanumerics, take the part ending in `x`
+  whose stem parses as an integer. Two lines of parsing.
+- **Verify first:** we haven't confirmed `rate_limit_tier` is present in *our* token
+  response (we read `subscriptionType` off the same object). Check before designing the
+  label, and fall back to the bare plan when it's absent.
+
+### CCRM-29 · Display Mode — light/dark override, and a "follow system" time format
+- **Status:** Planned · small
+- **Two independent gaps, both one-liners:**
+  - **Theme mode.** We read `isSystemInDarkTheme()` with no override
+    ([MainActivity.kt:170](app/src/main/java/com/robin/claudeusage/MainActivity.kt#L170)).
+    OpenQuota has `ThemePreference::{System, Light, Dark}`. Note the chart's dark-mode
+    opacities are chosen per-mode (CCRM-12), so a forced mode has to drive *that* decision
+    too, not just the Material colour scheme — the light-mode 7% wash over near-black is
+    invisible, which is the whole reason those separate opacities exist.
+  - **Time format.** `use24hTime` is a boolean defaulting to **false**, so a phone in a
+    24-hour locale shows 12-hour time until the user finds the switch. OpenQuota's
+    `TimeFormatPreference::{System, TwelveHour, TwentyFourHour}` defaults to System.
+    Android gives us `DateFormat.is24HourFormat(context)` for the System case.
+- **Migration:** existing installs keep their explicit boolean; only fresh installs get
+  System. Silently switching someone's clock format on upgrade is worse than the default
+  being wrong.
+
+### CCRM-28 · Auto Update Check — check in the background, and let a version be dismissed
+- **Status:** Planned · small
+- **Why:** Our update check is a button someone has to think to press
+  ([SettingsScreen.kt:1206](app/src/main/java/com/robin/claudeusage/SettingsScreen.kt#L1206)).
+  CCRM-8 established that this checker is **the only channel we have for reaching installed
+  clients** — the app is sideload-only, so there's no store to notify anyone. A channel that
+  only opens when the user volunteers is close to no channel.
+- **Approach** (OpenQuota's `updateSchedule.ts`, which is small and sensible):
+  - `autoCheckUpdates` toggle, default on.
+  - A startup delay (~10s) so a launch is never blocked on a network call.
+  - A 6-hour interval, with `lastUpdateCheckAt` persisted so a restart doesn't re-check —
+    the remaining delay is computed from the last *successful* check.
+  - `dismissedUpdateVersion`, so declining an update silences that version only and the
+    next one still gets through.
+- **Ride the existing WorkManager poll** (`work/Polling.kt`) rather than adding a scheduler;
+  this wants none of CCRM-17's exactness.
+- **Do not auto-install.** Their signed auto-updater has no sideload-safe equivalent, and
+  silently swapping an APK is not something this app should do. Notify and link the release.
+
+### CCRM-27 · Error Taxonomy — typed failures, each with the fix rather than the symptom
+- **Status:** Planned · small-to-medium
+- **Why:** We keep the failure as a bare string and print it: `Status: ${snapshot.lastStatus}`
+  ([MainActivity.kt:541](app/src/main/java/com/robin/claudeusage/MainActivity.kt#L541)).
+  That's an HTTP code or an exception name in front of someone who wants to know what to do
+  next.
+- **Approach:** a sealed error kind on the fetch result — OpenQuota's set is
+  `authentication` / `permission` / `rateLimited` / `network` / `invalidResponse` /
+  `credentialStorage` / `storage` / `internal` (their `localData` has no analogue here) —
+  each mapped to copy that **names the fix**. Read their `ClaudeError` variants directly:
+  every one is phrased as an instruction, and the difference in tone from ours is the point
+  of the exercise.
+- **Plus structured notice rows:** an in-card notice with an info/warning tone, instead of a
+  status line, so the remediation sits where the broken thing is. Their
+  `detectionNoticeDismissed` pattern also covers dismissible first-run guidance.
+- **Already right, keep it:** we retain the last-good snapshot and show the error *beside*
+  it rather than replacing the data — the same call OpenQuota makes explicitly ("a refresh
+  error can coexist with a retained last-good snapshot"). Don't regress that while
+  refactoring the error path.
+
+### CCRM-30 · Estimate Honesty — mark inferred numbers as inferred
+- **Status:** Planned · small
+- **Why:** Every metric in OpenQuota carries an `estimated` flag and an optional
+  `sourceNote`, and the UI renders both — so a number the app *inferred* never wears the
+  same confidence as a number the server *reported*. We currently render several inferences
+  in the same weight as measured values:
+  - the projection and burn rate (`Projection`, CCRM-12);
+  - the ~30-day refresh-family expiry, which is a flat guess and has never been observed
+    (`OAuthSignIn.ESTIMATED_FAMILY_MS` — this is precisely CCRM-16's complaint, and the two
+    items should be built together);
+  - the credits percentage, which we compute from minor units rather than take from
+    `spend.percent` (CCRM-1) — that one is *more* accurate than the server's, so the note
+    should say so rather than hedge.
+- **Approach:** a flag plus a one-line provenance string on the model, surfaced as a subtle
+  marker in the app and expanded in a long-press or an info row. Widgets and the
+  notification are too tight — they get nothing.
+
+### CCRM-32 · Reduce Motion — honour the system animation setting
+- **Status:** Planned · small
+- **Why:** An accessibility floor we don't currently meet. Users who set animations off at
+  the OS level mean it.
+- **Approach:** read `Settings.Global.ANIMATOR_DURATION_SCALE` (0 means off) and collapse
+  animation durations to zero rather than swapping to a different easing — OpenQuota's
+  `springMotion(reducedMotion)` does exactly this, and keeping the same curve means only one
+  visual behaviour to reason about. Affects the pager, the chart's entry animation, and the
+  bar fills.
+
+### CCRM-33 · App Shortcuts — launcher long-press entries
+- **Status:** Planned · small
+- **Why:** OpenQuota's global keyboard shortcut has no Android equivalent, but the intent —
+  reach the number without navigating — maps cleanly onto launcher shortcuts.
+- **Approach:** static/dynamic shortcuts for **Personal**, **Work** and **Refresh now**,
+  deep-linking into the right pager page. Complements the Quick Settings tile (CCRM-11)
+  rather than duplicating it: the tile is for the shade, shortcuts are for the home screen.
+- **Note:** shortcut labels should follow the user's renamed profile labels
+  (`UsageCache.profileLabel`), which means they're dynamic shortcuts, not static XML.
+
+### CCRM-34 · Diagnostics Log — widen the ping log into a general app log
+- **Status:** Planned · small
+- **Why:** CCRM-17 just built `ping/PingLog.kt` with a pullable in-app view, and it earned
+  its keep immediately. Everything else the app does in the background — polls, widget
+  updates, alert delivery, token renewals — is invisible unless it's attached to logcat.
+  For a sideload-only app with an email feedback channel, "paste your log" is the only
+  realistic way to diagnose someone else's phone.
+- **Approach:** generalise `PingLog` into a levelled ring-buffer log with a category string
+  (OpenQuota's `LogLevel::{Error, Warn, Info, Debug}` is a *user-facing setting*, which is
+  the right call — default Info, Debug only when someone is chasing something). Keep the
+  existing pull-to-view UI and add share/export.
+- **Hard rule:** never log tokens, authorization headers, or the `code_verifier`. The v0.14
+  history scrub is the precedent — this is a public repo and logs get pasted into emails.
+
+### CCRM-36 · Repo Hygiene — the `.github/` directory we don't have
+- **Status:** Planned · small
+- **Why:** The repo is public and has no `.github/` at all. OpenQuota's set is the standard
+  one and costs an afternoon:
+  - **`SECURITY.md`** pointing at GitHub private vulnerability reporting, with an explicit
+    "do not include real credentials or tokens in a report". **This is the one not to skip**
+    — given what this app holds and the v0.14 scrub, the failure mode is someone opening a
+    public issue containing a working OAuth token.
+  - **`CONTRIBUTING.md`** — including the "do not fork this repo to start another client"
+    rule that currently only exists inside CCRM-8.
+  - Structured **issue templates** (bug / feature) and a **PR template**.
+  - **`dependabot.yml`** for Gradle and Actions.
+- **Note:** issue templates should ask for the app version and the phone/skin, since CCRM-3
+  phase 1 already flagged the `big` notification style as skin-dependent.
+
+---
+
 ## Needs design — decide the shape before building
 
 ### CCRM-17 · Window Pings — start a 5-hour window on a schedule
@@ -497,6 +728,62 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
   widget ring — phase 3 only, nothing earlier needs it. *(Resolved: "how many themes is
   enough" — the four-control cap above.)*
 
+### CCRM-25 · Card Layout — reorder cards, hide rows, and move the rest behind "more"
+- **Status:** Needs design · medium · **needs a call on CCRM-3's in-app decision first**
+- **Why:** The main screen is a fixed vertical list and its real complaint is length — CCRM-3
+  says so directly: "Its real complaint is length, not looks — two 192dp charts stand between
+  the 5-hour bar and the credits card — and that is density, not theming." That entry then
+  deferred the fix to a hypothetical single chip ("trend charts: always / when they project /
+  off"). OpenQuota's answer is better and more general.
+- **What OpenQuota does:** every metric carries three independent properties — `enabled`
+  (show at all), a `MetricSection` of `AlwaysVisible` or `OnDemand` (above or behind a
+  "more" disclosure), and a position in a drag-to-reorder list. Its normalization then
+  guarantees **at least one enabled metric stays always-visible**, so the screen can never be
+  configured into blankness. That invariant is the part people forget to build.
+- **The decision this needs:** CCRM-3 ruled that "the in-app screen gets tokens only — no
+  per-card configuration", on the grounds that it should be the *reference* rendering of the
+  token set. **This item argues that ruling was about the wrong axis.** Visibility and order
+  are not styling: they don't create a second look to keep consistent, and they're the direct
+  fix for the density complaint CCRM-3 itself raised and punted. If that reading is rejected,
+  the fallback is CCRM-3's one-chip version and this item closes.
+- **If it proceeds:**
+  - Order and visibility per profile, since Personal and Work are used differently.
+  - Their `MAX_PINS_PER_PROVIDER = 2` maps onto **which readings reach the pinned
+    notification and the tile** — both surfaces are space-starved and currently hardcode
+    their content (CCRM-1 notes the notification is "already tight on space").
+  - Bundle `DensityPreference::{Default, Compact}` — a compact mode is a one-token answer to
+    the same complaint and doesn't need the reorder UI to ship first.
+- **Interacts with CCRM-6:** a dynamic profile registry would change what "per profile"
+  means here. Cheaper to build this on the two-slot model and migrate than to wait.
+
+### CCRM-31 · Combined Total — one aggregate reading across both accounts
+- **Status:** Needs design · medium
+- **Why:** Nothing in the app answers "how much have I spent in total". Personal and Work are
+  always shown separately — and CCRM-20 deliberately went further, giving each profile the
+  full width and pointing at the widgets for both-at-once. That decision was about *windows*,
+  which genuinely aren't comparable across accounts. **Money is.**
+- **What OpenQuota does:** a donut ring with one slice per provider, a period switcher (Today
+  / Yesterday / 30 days) and a metric switcher (cost / cost-per-million-tokens / tokens),
+  with a `MINIMUM_SPEND_SLICE_SHARE = 0.025` floor so a tiny slice stays visible rather than
+  collapsing to a hairline.
+- **What ports:** the ring and the slice-floor, over `SpendCredits` (CCRM-1) — two slices,
+  Personal and Work, against the combined limit. **Not** the period or metric switchers:
+  those are driven by local token logs we don't have (see the not-portable note below), and
+  our credits figure is a running monthly total, not a per-day series.
+- **Open questions:**
+  - Where does it live — its own card at the top of each profile, a third pager page, or the
+    History screen? A third pager page reopens the CCRM-20 question about what the pager is
+    for, so probably not.
+  - What happens when only one account has a credit budget, or the two are in different
+    currencies. `SpendCredits` carries `currency` per account and we have never seen anything
+    but USD — so the honest behaviour is to refuse to sum across currencies and show them
+    separately, not to assume.
+  - **Gated on [CCBG-6](BUGS.md).** If the credits denominator is wrong, an aggregate of two
+    wrong denominators is worse than not shipping — it looks more authoritative and is no
+    more correct.
+- **Shares the ring drawing** with CCRM-3 phase 3 and CCRM-13. Whichever lands first owns the
+  Canvas-to-bitmap extraction.
+
 ---
 
 ## Later — larger, still on the path
@@ -644,6 +931,61 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
   Non-trivial — scope it as its own milestone, ideally before CCRM-7 so iOS inherits
   the flexible model instead of the 2-slot one.
 
+### CCRM-24 · Share Card — share a usage snapshot as an image
+- **Status:** Planned · medium · **gated on the Canvas-to-bitmap extraction**
+- **Why:** People screenshot this app today. A composed card is better than a crop of a
+  screenshot, and unlike on desktop, sharing is a first-class Android surface — this feature
+  is a better fit here than in the app it's being copied from.
+- **What OpenQuota does:** `src/lib/shareCard.ts` is 757 deliberate lines — a 360pt-wide card
+  rendered at **4× scale**, with the quota bars, their pace labels, a trend sparkline and the
+  spend ring, all drawn from the same palette as the live UI.
+- **Approach:** draw to a bitmap, write to cache, hand out a `content://` URI via
+  `FileProvider` and `ACTION_SEND`. **This is the third caller for the same extraction**
+  CCRM-13 and CCRM-3 phase 3 both need (Glance has no Canvas; `PinnedNotification` already
+  works this way) — three callers is enough to justify doing it properly once rather than
+  three times.
+- **Privacy, decided up front:** the card must not carry the account's email, the plan tier,
+  or anything identifying beyond the profile's own label — the user is about to post it. A
+  render-then-preview step before the share sheet, so nothing leaves without being seen.
+- **Nice detail worth keeping:** the 4× scale. A card that looks crisp in a chat thread has to
+  be drawn well above display density.
+
+### CCRM-37 · Contract Tests — fail the build when copy or colour drifts
+- **Status:** Planned · medium
+- **Why:** The sharpest idea in the OpenQuota repo, and it lands on a problem we already
+  named. CCRM-8 asks for exactly this discipline across clients — "when a core bug is found,
+  add a failing fixture to `contract/` first so both clients go red until fixed" — and
+  CCRM-15 exists *because a visual state shipped unobserved*. Right now nothing mechanical
+  stops Android drifting from `BEHAVIOR-SPEC`.
+- **What OpenQuota does — three distinct kinds:**
+  - `verify-provider-registry-contract.js` greps named source files and **fails CI if an
+    identifier is hardcoded outside the registry**. Our analogue is the threshold and
+    breakpoint constants: `Palette.barColor`'s 80/90/100, the alert thresholds, and
+    `PACE_DEAD_ZONE` should exist in exactly one place, and a test should prove it.
+  - `uiLanguage.test.ts` asserts against **raw component source** that the type scale, the
+    warning colour on the critical marker, and specific Settings labels haven't changed. Ugly
+    and effective: it catches the class of change that compiles, renders, and is wrong.
+  - `visual-parity.test.ts` renders each icon and asserts its **exact brand fill**.
+- **What we'd build:** unit tests pinning the `BEHAVIOR-SPEC` §2 and §5 numbers (the
+  truncate-never-round rule for windows, the rounding rule for credits — CCRM-3 phase 2a
+  settled that they deliberately disagree, which is exactly the kind of decision that gets
+  "fixed" by a future reader), plus the dark-mode chart opacities from CCRM-12, which are
+  currently four magic numbers with a comment.
+- **Then the bigger prize:** run the Android parser against the Mac repo's `contract/fixtures/`
+  instead of its own captured payload. CCRM-8 flags this as not done and notes it "would make
+  parser drift between clients impossible to miss".
+
+### CCRM-35 · Layout Reset — undo a customization mistake
+- **Status:** Planned · small · **gated on CCRM-25** (nothing to reset before then)
+- **Why:** Any reorder/hide UI needs a way back, and "put it back how it was" is not something
+  a user can reconstruct by hand once they've dragged six things.
+- **Approach:** OpenQuota's `reset_provider()` restores one account's layout to defaults while
+  **preserving its enabled and detected state** — the reset is scoped to layout, not identity,
+  which is the distinction that makes it safe. Then `customizationHistory.ts` snapshots the
+  previous layout so the reset itself can be undone, gated behind a confirmation sheet.
+- **Fits an existing pattern:** CCRM-14 already specifies a confirmed destructive action for
+  clearing history. Same component, and worth building it once for both.
+
 ---
 
 ## Bookends — major efforts, gated on the above
@@ -718,10 +1060,11 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
   `ASWebAuthenticationSession` for the OAuth browser trip, `NSBackgroundActivityScheduler`
   or a `launchd` agent for polling (replaces WorkManager),
   `NSStatusItem` + `NSPopover` for the menu bar, `UNUserNotificationCenter` for alerts.
-  **Unverified risk:** the token endpoint's WAF blocks empty and browser-shaped
-  User-Agents; `URLSession`'s default is library-shaped and should pass, but set an
-  explicit `CCooldown/<version>` UA and confirm a real exchange before shipping —
-  see API-CONTRACT §2.
+  **The WAF risk is resolved (2026-07-31):** an explicit `CCooldown/1.0` UA on the token
+  endpoint is accepted — a real code exchange returned 200 on the Work/Team account and
+  the Mac app has been polling since. Useful new fact for both clients: the gate is not
+  an allow-list of known libraries, it rejects *recognisable* shapes (`claude-code`,
+  browser-like, `curl`) and empty. Recorded in API-CONTRACT §2.
 - **Sync discipline once there are two clients:** keep `CCRM`/`CCBG` here as the single
   ID space; label every issue `layer:core` (must reach both) or `layer:platform` (stays
   local); when a core bug is found, **add a failing fixture to `contract/` first** so
@@ -729,6 +1072,70 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
   where behaviour is disputed, it is correct until the spec is deliberately changed.
 - **Parity is bandwidth-bound, not architecture-bound.** Android leads; Mac follows and
   may lag. Say so publicly rather than implying parity we won't sustain.
+
+### CCRM-18 · Mac Desktop Widget — a WidgetKit widget on the macOS desktop
+- **Status:** Planned · gated on CCRM-8's menu bar working · **Mac repo**
+- **Why:** macOS 14+ lets a widget be dragged out of Notification Center onto the
+  desktop. That's the closest Mac analogue to the Android home-screen widget, and the
+  original point of the project — usage visible without opening anything.
+- **Why it's attractive here and wasn't on iOS:** WidgetKit widgets normally live on an
+  opportunistic timeline budget (~40-70 reloads/day), which is what made the iOS story
+  weak (CCRM-7). On the Mac that constraint doesn't bind: the menu-bar app is **always
+  running**, so it writes each fresh reading into a shared container and calls
+  `WidgetCenter.shared.reloadAllTimelines()`. The widget is then exactly as fresh as the
+  app's own polling, with no dependence on its own budget.
+- **Approach:** a WidgetKit extension target in the Mac app. Needs three things that
+  don't exist yet, which is why it's gated:
+  1. A real `.app` bundle (a bare SwiftPM executable can't host an extension).
+  2. An **App Group** container so the app and the widget share the last reading —
+     the widget must never fetch or hold a token itself.
+  3. **Consistent code signing** across app and extension. The self-signed local
+     certificate CCRM-8 needs anyway (to stop the Keychain re-prompting on every
+     rebuild) covers this.
+- **Sizes:** small (one window's ring + reset), medium (5-hour + 7-day bars), large
+  (both windows, per-model caps, credits) — mirroring the Android widget buckets so the
+  layouts can be reasoned about once. Reuse `BEHAVIOR-SPEC` §5 breakpoints; desktop
+  widgets get a tinted/monochrome treatment in some modes, so don't rely on colour
+  alone to carry the warning.
+- **Not a replacement for the menu bar.** The menu-bar item is the always-visible
+  surface; the widget is a second, larger one. Ship it after the menu bar is solid.
+
+### CCRM-19 · Mac Surface Themes — glass / plain / character, beyond the accent colour
+- **Status:** Backlog · **Mac repo** · gated on the main window existing
+- **Why:** The 12 accents (BEHAVIOR-SPEC §5) only change one hue. On the Mac the
+  *material* of the popover and window is a bigger part of how the app feels than the
+  accent is, and it's the one place a Mac client should look like a Mac app rather than a
+  port. Three candidates, in ascending order of effort:
+  1. **Glass** — the macOS 26 material. Verified present in the MacOSX26.5 SDK:
+     `NSGlassEffectView`, `NSGlassEffectContainerView`, `NSGlassEffectViewStyle`
+     (`Regular` / `Clear`), plus SwiftUI's `GlassButtonStyle`. **Constraint:** the package
+     targets macOS 14, and glass is 26+, so this has to sit behind
+     `if #available(macOS 26, *)` with a graceful fall back to the current material —
+     or the minimum gets bumped, which is a bigger decision than a theme.
+  2. **Plain** — a flat opaque background, no vibrancy or blur. Not just a taste option:
+     translucency over a busy wallpaper is the main legibility complaint about menu-bar
+     popovers, and a solid panel is the accessible answer. Pairs with
+     `NSWorkspace.accessibilityDisplayShouldReduceTransparency`, which should force this
+     theme regardless of the setting.
+  3. **Character** — a Claude-flavoured skin: mascot glyph in the popover header, warmer
+     terracotta surfaces, softer corners.
+- **Trademark constraint on the character theme — decide before building.** Shipping
+  Anthropic's actual mascot artwork means redistributing their asset from a public repo,
+  which is a step beyond the "unofficial client" position the project already occupies
+  (see the README's risk notice). Two safe versions: *original* art that evokes the
+  aesthetic without copying the asset, or artwork the user draws themselves. Either is
+  fine; lifting the official file is the thing to avoid. Personal-use-only lowers the
+  practical risk but doesn't change what a public repo is doing.
+- **Approach:** extend `DisplaySettings` with a `surfaceTheme` alongside `accent`, and
+  resolve material in the view layer only — `CCooldownCore` must stay free of AppKit, so
+  the theme is a token the core carries and the view interprets, exactly as `accent`
+  works now.
+- **Gated on the main window** because a theme picker needs somewhere to live, and
+  because judging three materials on the popover alone would be judging them on the
+  smallest surface.
+- **Android note:** glass has no Android counterpart, and Material You already covers
+  dynamic colour there. This one is deliberately platform-specific — it does **not** go
+  into the shared `BEHAVIOR-SPEC`, unlike the accent palette.
 
 ---
 
@@ -754,3 +1161,47 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
 - **Why:** Reading a public X timeline reliably now needs a paid API tier, and
   scrape-based approaches break constantly. Not worth coupling the app's stability to
   it. Superseded by CCRM-9 (free-source news only).
+
+---
+
+## Appendix — what does *not* port from OpenQuota
+
+Written 2026-08-04 with CCRM-21 … CCRM-38, so the same ground isn't re-covered. OpenQuota
+(github.com/deviffyy/OpenQuota) is a desktop app that reads the developer's own machine. Most
+of what looks enviable in it depends on that, and no amount of Android work recovers it.
+
+**Everything downstream of local Claude Code JSONL logs.** OpenQuota scans `~/.claude` (and
+`CLAUDE_CONFIG_DIR`) for the CLI's own usage records. A phone has no Claude Code install and
+no logs, so all of this is structurally unavailable, not merely unbuilt:
+- Today / Yesterday / Last-30-days **token counts**, and the daily series behind them.
+- **Estimated spend in dollars** for a subscription account — their headline number.
+- The **per-model token breakdown** with variants, and its `unknownModels` reporting.
+- The whole **`pricing/`** subsystem: bundled LiteLLM and models.dev snapshots, refetched
+  daily, with a compact codec and defaulting rules (cache-write defaults to the input rate,
+  cache-read to a tenth of it). Impressive and irrelevant to us.
+
+Our history is percent-over-time from polling (`HistoryStore`, `SessionLog`), which answers a
+different question and is the only question a phone client *can* answer. **Do not read
+"estimated spend" in their README as something we're missing** — the one money figure we can
+show, we already show (`SpendCredits`, CCRM-1), and we get it from the API rather than by
+pricing tokens ourselves.
+
+**Desktop-platform features with no Android counterpart:** launch at login, the tray and
+menu-bar rendering (`MenuBarStyle::{Text, Bars}`), the global keyboard shortcut (nearest
+analogue filed as CCRM-33 (App Shortcuts)), the single-instance contract, webview memory
+trimming, XDG autostart, and cryptographically signed auto-installing updates (deliberately
+not wanted — see CCRM-28 (Auto Update Check)).
+
+**Their multi-account discovery mechanism** — scanning for separate `CLAUDE_CONFIG_DIR` homes
+— is inapplicable. The *model* is still a useful reference for CCRM-6 (Multi-Account):
+accounts as their own cards, hidden when the login disappears, and their customization
+restored intact when it returns.
+
+**Already covered, checked line by line — no gap:** cache-first render then background
+refresh; retaining the last-good snapshot *and* showing the error; per-account rate-limit
+backoff (`bumpBackoff`); renameable account labels (`profileLabel`, their "rename account
+cards"); model-scoped weekly caps — **our `limits[]` walk is strictly more general than
+theirs**, which hardcodes a lookup for `display_name == "Fable"`; the trend chart (CCRM-12
+(Trend Chart) is richer than their `UsageTrend.svelte`); notification tap-to-open (CCRM-2
+(Notification Tap Target)); and the pace projection maths, where our `Projection` and their
+`pacing.rs` independently agree on `used / elapsedFraction`.

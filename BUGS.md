@@ -11,6 +11,149 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
 
 ## Open
 
+### CCBG-7 · Credits Vanish — the whole credits section disappears when the server reports no monthly limit
+- **Status:** Open — **observed live**, 2026-08-04, Personal profile
+- **Severity:** Medium (a whole section silently gone, and a widget stating something
+  false) — no data loss
+- **Symptom:** The Usage credits card is **absent from the main screen** even though
+  $2.97 has been spent this month. Worse, a `BarWidget` placed on *Usage credits* reads
+  **"No credits · This account has no credit budget"**, which is untrue: spend is live,
+  `spend.enabled` is `true`, `credits_ever_enabled` is `true`, and the Claude app shows a
+  91.04-credit balance.
+- **What changed:** yesterday's capture had `spend.limit.amount_minor: 10000`. Today the
+  same account returns **`spend.limit: null`, `spend.cap: null`, and
+  `extra_usage.monthly_limit: null`**, while still reporting
+  `spend.used.amount_minor: 297`. So the monthly cap can disappear from the payload while
+  spend continues — an account state we never handled.
+- **Root cause — both branches of `creditsFrom()` bail on a null limit**
+  ([Models.kt](app/src/main/java/com/robin/claudeusage/data/Models.kt)):
+  - `optJSONObject("limit")` returns null for a JSON `null`, so the preferred `spend`
+    branch is skipped despite `used` being present and valid.
+  - the fallback then hits `if (extra.isNull("monthly_limit")) return null`.
+
+  `UsageData.credits` is therefore null, and every consumer's `limitMinor > 0` render gate
+  fails. **Verified** by parsing the captured payload: windows parse fine
+  (`session 15.0`, `weekly 31.0`) and `credits` comes back `null`.
+- **Why the current design does this:** the visibility rule was written as "render whenever
+  `limit > 0`" ([CCRM-1](ROADMAP.md)) on the assumption that no limit means no credits.
+  This payload disproves the assumption — no limit plus real spend plus a real balance.
+- **Fix — treat the limit as optional, not as the existence test.**
+  - `SpendCredits.limitMinor` becomes nullable; credits exist when `spend.used` parses (or
+    `extra_usage.used_credits` is present) **and** `enabled` isn't false, regardless of
+    the limit.
+  - With no limit there is no denominator, so **render no bar** rather than a bar against
+    zero: the card becomes `Usage credits · $2.97 spent this month · no monthly cap`.
+    `percent` must not be synthesised — a 0% bar would imply headroom that has no ceiling.
+  - `BarWidget`'s credits bucket needs the same treatment; its current copy asserts the
+    opposite of the truth. A bar widget with nothing to divide by should show the amount
+    spent, not a bar.
+  - Pin the captured 2026-08-04 payload in `UsageParserTest` alongside the 2026-07-27 one,
+    asserting credits are present, `limitMinor` is null, and no percentage is invented.
+- **Interaction with [CCBG-6](#ccbg-6--credits-denominator--the-bar-measures-the-monthly-limit-not-the-balance-that-would-actually-stop-you):**
+  this makes the balance line *more* important, not less — with no monthly cap, the
+  balance is the **only** ceiling that exists. Fix CCBG-7 first; it's observable today and
+  needs no new data source.
+
+### CCBG-6 · Credits Denominator — the bar measures the monthly limit, not the balance that would actually stop you
+- **Status:** Open — source **located** 2026-08-04 (`api.claude.ai`, not the OAuth
+  endpoint we use); blocked on whether our token can authenticate there. The balance is
+  definitively *not* in `/api/oauth/usage`. Display fix designed and agreed.
+- **Severity:** Medium now, and it worsens on its own — see the divergence note below
+- **Symptom:** The credits meter always reads `$X / $100.00`, because the denominator is
+  the *monthly spend limit*. The Claude app's own Usage tab shows a third figure we don't
+  read at all — a **Balance** — and it is the number that actually runs out.
+- **Confirmed against the Claude Android app, 2026-08-03.** Its Usage → Credits section
+  showed three rows where we show one:
+
+  | Row | Value |
+  | --- | --- |
+  | This month | `$2.97 of $100.00 spent` |
+  | Monthly spend limit | `100 credits` |
+  | Balance | `91.04 credits` |
+
+- **What the arithmetic settles:** our captured 2026-07-27 payload had `used` = `$5.99`,
+  and August's spend is `$2.97`. `100 − 5.99 − 2.97 = 91.04` **exactly**. So the balance
+  is a **cumulative pot that does not reset monthly**, while `spend.used` / "This month"
+  does. The monthly limit caps a month; the balance is the money that exists. Real
+  headroom is `min(monthly limit − used, balance)` — today `min(97.03, 91.04)`.
+- **Why it gets worse rather than staying cosmetic:** the balance only ever decreases
+  while the monthly counter resets, so the two diverge monotonically. At a balance of 8
+  credits our card would still read `$2.97 of $100.00 · 3% used · $97.03 left` — a full
+  bar's worth of headroom that isn't there. The bug is mildest on the day it's filed.
+- **The blocker, established 2026-08-03 and not a guess.** Both profiles' raw responses
+  were captured minutes after the screenshot above. **`"balance":null` on both.** The
+  Personal payload pins itself to that exact screenshot — `spend.used.amount_minor: 297`
+  = the `$2.97` row, `limits[weekly_all].percent: 24` = the `24% used` row — so this is
+  the same account in the same state, showing `91.04 credits` in the Claude app while
+  this endpoint reports no balance at all.
+  - So it is **not** a shape or denomination question, and not a field we failed to
+    parse: the number is absent from the response. The Claude app sources it elsewhere.
+  - `can_purchase_credits: false` and `auto_reload: null` on both profiles, so the pot
+    is **granted, not purchased** — `balance`/`auto_reload` being null is evidently about
+    the *purchase* flow, not about whether a balance exists.
+  - Also captured: a batch of new all-null experiment windows (`seven_day_cowork`,
+    `nimbus_quill`, `cinder_cove`, `amber_ladder`, …). The parser ignores unknown keys,
+    so they cost nothing — but none of them carries a balance either.
+- **Rejected: deriving it locally.** `cap.credits − Σ(monthly spend)` would need a spend
+  history we don't have, and would be silently wrong for any install that starts
+  mid-life — which is every install. A wrong balance is worse than no balance line.
+- **Source located 2026-08-04 — the Claude app uses a different API family entirely.**
+  Method: pulled `base.apk` from the phone over wireless adb (Claude `1.260721.20`,
+  `com.anthropic.claude`) and string-searched `classes*.dex`, the same technique
+  [ApiClient.kt](app/src/main/java/com/robin/claudeusage/data/ApiClient.kt) records for
+  the token endpoint. Findings:
+  - **Zero `api/oauth/` literals in the whole dex.** The app never calls the endpoint we
+    call, so there is no OAuth-side sibling to find — that search is closed.
+  - Base URL `https://api.claude.ai`; the only usage path is the Retrofit template
+    **`organizations/{orgId}/usage`**. Comparable templates
+    (`organizations/{organization}/chat_conversations`) match known `claude.ai/api/…`
+    URLs, so the full shape is `https://api.claude.ai/api/organizations/{uuid}/usage`.
+  - Models: `com.anthropic.claude.api.usage.UsageResponse`,
+    `com.anthropic.claude.api.common.SpendSummary`,
+    `com.anthropic.claude.api.common.Credits`.
+  - Serialized names in the dex include **`balance_credits`** and **`granted_credits`**,
+    plus `free_credits_status`, `amount_minor`, `exponent`, `org_spend_cap_reached`,
+    `out_of_credits`. `granted_credits` corroborates the granted-pot reading above.
+  - **Caveat on the field names:** the dex string table is sorted, so adjacency proves
+    nothing about which class owns which name. `balance_credits_after` reads like
+    purchase analytics, not a response field. Treat the list as candidates.
+  - Also present: `organizations/{organization_uuid}/prepaid/iap/android` — Play-billing
+    credit purchase, i.e. the flow the support article's "Add funds" describes.
+- **What's still open, and it's now one specific question:** does our subscription OAuth
+  bearer authenticate against `api.claude.ai`? Ours is proven only on `api.anthropic.com`
+  with `anthropic-beta: oauth-2025-04-20`. Two GETs settle it — a `bootstrap` call for the
+  org uuid (our payload carries no org id), then the usage path above. If `api.claude.ai`
+  rejects third-party OAuth tokens, this goes to **Won't fix** until the server populates
+  `spend.balance`, and that is a real possible outcome.
+- **Dead ends, so nobody repeats them:** release logcat carries no request URLs; there is
+  no DevTools socket to attach to; and `run-as` is refused because the installed build is
+  release-signed — so the token cannot be read off the device (by design).
+- **Where the denominator comes from:** `spend.limit.amount_minor` in `creditsFrom()`
+  ([Models.kt](app/src/main/java/com/robin/claudeusage/data/Models.kt)), fed into
+  `SpendCredits.percent` / `remainingMinor` and read by the card in `MainActivity`, the
+  large bucket of `UsageWidget`, and `BarWidget`. `extra_usage.monthly_limit` reports the
+  same figure on the fallback path — this is the user-set monthly extra-usage cap.
+- **Fields in play, none of them parsed:**
+  - `spend.balance` — the one we want. `null` on both profiles, even with a live balance.
+  - `spend.cap` — `{"money": null, "credits": {"amount_minor": 10000, "exponent": 2}}`.
+    `cap.credits` = `10000` lines up with the app's **`100 credits`** monthly-limit row,
+    while `spend.limit` = `10000` lines up with **`$100.00`**. So credits and money are
+    1:1 on this account but reported through different fields — don't collapse them.
+- **Fix, decided (agreed 2026-08-03) — do NOT fold the balance into the denominator.** The Claude app shows
+  three separate rows rather than one derived ratio, and it's right to: `used / (used +
+  balance)` mixes a monthly counter with a cumulative pot and would print a `$94.01`
+  that appears nowhere in the payload. Instead:
+  - Keep the bar against the monthly limit — that *is* a true monthly ratio, and it
+    matches the upstream "This month" row.
+  - Add a balance line, and make the trailing "left" figure report **whichever
+    constraint binds**: the balance when it is below the monthly remainder, the monthly
+    remainder otherwise. The misleading part today is the `left` number, not the bar.
+  - Parse into `SpendCredits.balanceMinor: Long?` so absence stays distinguishable from
+    zero, and keep `remainingMinor` as-is (`limit − used`) so nothing silently changes
+    meaning under existing callers — `MainActivity`, `UsageWidget`, `BarWidget`.
+  - Pin it with a `UsageParserTest` case on the real captured payload, asserting both
+    the non-null balance and the binding-constraint choice.
+
 ### CCBG-3 · Credits Visibility — credits card ignores extra-usage being switched off
 - **Status:** Open
 - **Severity:** Low (misleading display, no data loss) — and possibly unreachable
@@ -27,6 +170,39 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
   the worse failure. Fix it when someone can actually produce the state.
 - **Fix when confirmed:** treat `enabled == false` as "no credits" in `SpendCredits`, and
   add a `UsageParserTest` case with the real payload for that state.
+
+### CCBG-8 · Sonnet Cap Fallback — model caps vanish silently if the `limits` array is absent
+- **Status:** Open · **Low** · latent, never observed
+- **Found:** 2026-08-04, reading OpenQuota's Claude mapper (`src-tauri/src/providers/claude/
+  mapper.rs`) alongside ours during the CCRM-21…38 review. Not a live failure — a gap in the
+  fallback path.
+- **What's wrong:** `UsageParser.parse()` reads the `limits` array first and derives the
+  session window, the weekly window and every `weekly_scoped` model cap from it. When
+  `limits` is missing it falls back to the flat sibling fields — but only two of them:
+
+  ```
+  if (session == null) session = windowFrom(root.optJSONObject("five_hour"))
+  if (weekly == null)  weekly  = windowFrom(root.optJSONObject("seven_day"))
+  ```
+
+  There is no fallback for **`seven_day_sonnet`**, which OpenQuota reads directly as its
+  Sonnet window. So if `limits` ever disappears from the payload, the two main bars degrade
+  correctly and the model caps **silently become an empty list** — no cap rows on the main
+  screen, no cap alerts, and no error anywhere, because `UsageData` with a session and a
+  weekly window is a perfectly valid parse.
+- **Why it matters despite being latent:** the schema is undocumented and carries transient
+  experiment fields — the parser's own doc comment says so. `limits` is the newer shape; the
+  flat fields are the older one. A rollback on Anthropic's side is exactly the scenario the
+  fallback exists for, and it's the scenario where this half-works. The failure is also the
+  hardest kind to notice: a *missing* row reads as "this account has no model caps", which is
+  a legitimate state for some accounts.
+- **Fix:** add `if (caps.isEmpty()) windowFrom(root.optJSONObject("seven_day_sonnet"))` as a
+  `ModelCap("Sonnet", …)`, and cover it in `UsageParserTest` with a payload that has the flat
+  fields and no `limits` — the test matters more than the two lines, since the whole point is
+  that nothing currently proves the fallback path is complete.
+- **Check while in there:** whether any other `weekly_scoped` model has a flat sibling field
+  (an Opus- or Fable-shaped `seven_day_*`). Only `seven_day_sonnet` is confirmed to exist, via
+  OpenQuota reading it; the rest is unknown and shouldn't be guessed at.
 
 ---
 
