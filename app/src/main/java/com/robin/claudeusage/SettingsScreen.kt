@@ -75,6 +75,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.browser.customtabs.CustomTabsIntent
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
+import com.robin.claudeusage.data.ApiClient
 import com.robin.claudeusage.data.AuthState
 import com.robin.claudeusage.data.PingSchedule
 import com.robin.claudeusage.data.Profile
@@ -1370,6 +1371,121 @@ private fun DebugSection(repo: UsageRepository) {
             SelectionContainer {
                 Text(
                     raw,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    lineHeight = 15.sp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            MaterialTheme.colorScheme.surfaceVariant,
+                            RoundedCornerShape(8.dp),
+                        )
+                        .padding(12.dp),
+                )
+            }
+        }
+    }
+    EndpointProbe(repo)
+}
+
+/**
+ * Paths worth trying first, in order. The first is a control: it is the endpoint we
+ * already read successfully, so a non-200 there means the probe itself is broken and
+ * nothing below it can be trusted. `bootstrap` is included because the org uuid the
+ * balance path needs appears nowhere in our own payload.
+ */
+private val PROBE_PRESETS = listOf(
+    "/api/oauth/usage",
+    "/api/bootstrap",
+    "/api/organizations",
+    "/api/account",
+)
+
+/**
+ * Endpoint probe (CCBG-6). GETs a path on an allowlisted host with a profile's token and
+ * shows status + body.
+ *
+ * It exists because the credit **balance** the Claude app displays is not in the payload
+ * we read: its APK fetches `organizations/{uuid}/usage` on `api.claude.ai`, while we read
+ * `/api/oauth/usage` on `api.anthropic.com`, where `spend.balance` is permanently null.
+ * The open question is whether our subscription OAuth token authenticates there at all.
+ *
+ * Deliberately GET-only, host-allowlisted, and non-caching — see `ApiClient.probe` and
+ * `UsageRepository.probeEndpoint`. Request headers are never rendered, because the output
+ * is meant to be copied out and the bearer token must not ride along with it.
+ */
+@Composable
+private fun EndpointProbe(repo: UsageRepository) {
+    val scope = rememberCoroutineScope()
+    var profile by remember { mutableStateOf(Profile.PERSONAL) }
+    var host by remember { mutableStateOf(ApiClient.ProbeHost.CLAUDE_AI) }
+    var path by remember { mutableStateOf(PROBE_PRESETS.first()) }
+    var running by remember { mutableStateOf(false) }
+    var result by remember { mutableStateOf<String?>(null) }
+
+    SectionCard {
+        Text("Endpoint probe", style = MaterialTheme.typography.titleSmall)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "GET only, on an allowlisted host, with this profile's token. Nothing is " +
+                "parsed or cached. Skim the body for an org id or email before sharing it.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(8.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(onClick = {
+                profile = if (profile == Profile.PERSONAL) Profile.WORK else Profile.PERSONAL
+            }) { Text(profile.label) }
+            Spacer(Modifier.width(8.dp))
+            OutlinedButton(onClick = {
+                host = if (host == ApiClient.ProbeHost.CLAUDE_AI) {
+                    ApiClient.ProbeHost.ANTHROPIC
+                } else {
+                    ApiClient.ProbeHost.CLAUDE_AI
+                }
+            }) { Text(host.origin.removePrefix("https://")) }
+        }
+        Spacer(Modifier.height(8.dp))
+        OutlinedTextField(
+            value = path,
+            onValueChange = { path = it },
+            label = { Text("Path") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(4.dp))
+        FlowRow {
+            PROBE_PRESETS.forEach { preset ->
+                FilterChip(
+                    selected = path == preset,
+                    onClick = { path = preset },
+                    label = { Text(preset, style = MaterialTheme.typography.bodySmall) },
+                    modifier = Modifier.padding(end = 6.dp),
+                )
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Button(
+            enabled = !running,
+            onClick = {
+                scope.launch {
+                    running = true
+                    result = "Probing ${host.origin}$path …"
+                    val resp = repo.probeEndpoint(profile, host, path)
+                    result = when (resp) {
+                        null -> "No credentials for ${profile.label}"
+                        else -> "GET ${host.origin}$path\nHTTP ${resp.code}\n\n${resp.body}"
+                    }
+                    running = false
+                }
+            },
+        ) { Text(if (running) "Probing…" else "Probe") }
+        result?.let { text ->
+            Spacer(Modifier.height(8.dp))
+            SelectionContainer {
+                Text(
+                    text,
                     fontFamily = FontFamily.Monospace,
                     fontSize = 11.sp,
                     lineHeight = 15.sp,

@@ -122,6 +122,66 @@ object ApiClient {
         return postToken(payload)
     }
 
+    /**
+     * Hosts a debug probe may target. An allowlist, not a free-text URL, so a mistyped
+     * or pasted path can never ship the bearer token to a host we didn't intend.
+     *
+     * [CLAUDE_AI] is where the Claude Android app reads the credit **balance** —
+     * `organizations/{uuid}/usage` on this host, per its APK (CCBG-6). Whether our
+     * subscription OAuth token authenticates there at all is the open question the
+     * probe exists to answer.
+     */
+    enum class ProbeHost(val origin: String) {
+        ANTHROPIC("https://api.anthropic.com"),
+        CLAUDE_AI("https://api.claude.ai"),
+    }
+
+    /**
+     * GET an arbitrary path on an allowlisted host with a profile's bearer token, for
+     * endpoint discovery (CCBG-6). **GET only, deliberately** — a probe that could POST
+     * to a billing API could change a spend limit or buy credits, so no other method is
+     * reachable from here.
+     *
+     * Sends the same headers as [fetchUsage], including the claude-code User-Agent that
+     * keeps `api.anthropic.com` out of the aggressive rate-limit bucket. Results are
+     * returned raw and are never parsed or cached — see `UsageRepository.probeEndpoint`.
+     */
+    fun probe(accessToken: String, host: ProbeHost, path: String): HttpResult {
+        val request = Request.Builder()
+            .url(host.origin + normalizeProbePath(path))
+            .get()
+            .header("Authorization", "Bearer $accessToken")
+            .header("anthropic-beta", "oauth-2025-04-20")
+            .header("User-Agent", USER_AGENT)
+            .header("Content-Type", "application/json")
+            .build()
+        client.newCall(request).execute().use { resp ->
+            return HttpResult(resp.code, resp.body?.string() ?: "")
+        }
+    }
+
+    /**
+     * Reduces a typed path to something that can only ever resolve on the chosen host:
+     * exactly one leading slash, and no scheme, authority, userinfo or `..` traversal.
+     *
+     * The rejections matter more than the tidying. `//evil.example` is a protocol-
+     * relative URL — appended to an origin it silently retargets the whole request, and
+     * the bearer token would go with it. Throws rather than sanitising, so a suspicious
+     * path fails loudly in the debug UI instead of quietly probing something else.
+     */
+    fun normalizeProbePath(path: String): String {
+        val trimmed = path.trim()
+        require(trimmed.isNotEmpty()) { "empty path" }
+        require(!trimmed.contains("://")) { "path must not contain a scheme" }
+        require(!trimmed.contains("@")) { "path must not contain userinfo" }
+        require(!trimmed.contains("\\")) { "path must not contain a backslash" }
+        require(trimmed.none { it.isWhitespace() }) { "path must not contain whitespace" }
+        val withSlash = if (trimmed.startsWith("/")) trimmed else "/$trimmed"
+        require(!withSlash.startsWith("//")) { "path must not start with //" }
+        require(!withSlash.split('/').contains("..")) { "path must not traverse with .." }
+        return withSlash
+    }
+
     private fun postToken(jsonPayload: String): HttpResult {
         // Do NOT send a claude-code User-Agent here. The token endpoint sits behind a
         // WAF that returns an opaque 429 (type rate_limit_error) for any request whose

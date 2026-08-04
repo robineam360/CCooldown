@@ -319,6 +319,48 @@ class UsageRepository(private val context: Context) {
         result
     }
 
+    /**
+     * Debug-only endpoint probe (CCBG-6). GETs [path] on [host] with this profile's
+     * token, refreshing first if it's near expiry and retrying once on a 401, so a probe
+     * can't be reported as a 401 that was really just a stale token.
+     *
+     * **Nothing is written.** The response never reaches [UsageParser] or
+     * `cache.saveSuccess`, so an unexpected body can't poison the snapshot, the widgets
+     * or history — and the probe deliberately does not touch the manual-refresh rate
+     * gates, since it isn't a usage read.
+     *
+     * Returns the raw [HttpResult], or null when there's no usable credential.
+     */
+    suspend fun probeEndpoint(
+        profile: Profile,
+        host: ApiClient.ProbeHost,
+        path: String,
+    ): HttpResult? = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            val creds = credStore.load(profile) ?: return@withLock null
+            val now = System.currentTimeMillis()
+            var token = creds.accessToken
+            if (creds.expiresAt in 1 until now + EXPIRY_MARGIN_MS) {
+                token = refreshAccessToken(profile, creds) ?: return@withLock null
+            }
+            try {
+                var resp = ApiClient.probe(token, host, path)
+                if (resp.code == 401) {
+                    val fresh = refreshAccessToken(profile, credStore.load(profile) ?: creds)
+                    if (fresh != null) resp = ApiClient.probe(fresh, host, path)
+                }
+                resp
+            } catch (e: IllegalArgumentException) {
+                // A rejected path (scheme, //, ..) — report it rather than probing.
+                HttpResult(0, "Bad path: ${e.message}")
+            } catch (e: IOException) {
+                HttpResult(0, e.message ?: "no network")
+            } catch (e: Exception) {
+                HttpResult(0, e.message ?: "unexpected error")
+            }
+        }
+    }
+
     /** Pulls the server's own error text out of a non-200 ping response when present. */
     private fun pingErrorDetail(resp: HttpResult): String {
         val fromBody = try {
