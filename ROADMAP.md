@@ -260,11 +260,12 @@ keys) would still make this a different product. Not filed, not an open question
 - **Deliberately not shipped:** `alwaysShowPacing` — a display preference, not an
   alerting one; it belongs with CCRM-22 (Used or Left)'s display-token batch. Flagged
   at wireframe review and approved out.
-- **Still to look at on hardware:** the Settings block (built to the approved wireframe
-  from the existing `ToggleRow` idiom, master-off dimming included) and a real
-  milestone notification — the phone dropped off wireless adb before the install.
-  CCRM-15 (Above-Pace Verification)'s synthetic above-pace series would be the way to
-  fire one on demand; until then the first Will Run Out in the wild is the check.
+- **Settings block seen on hardware** (2026-08-07, Fold 7 inner screen, two-column
+  settings): renders per the approved wireframe — master on with the three milestone
+  rows, and the master-off state dims all three and disables their switches. **Still
+  unobserved: a real milestone notification.** CCRM-15 (Above-Pace Verification)'s
+  synthetic above-pace series is the way to fire one on demand; until that exists the
+  first Will Run Out in the wild is the check.
 - **Was:** Planned · medium · **highest-value item from the OpenQuota review**
 - **Why:** Our alerts only fire on absolute thresholds — `sessionAlertThresholds` 80/95,
   weekly 90, model caps 90 ([UsageCache.kt:134](app/src/main/java/com/robin/claudeusage/data/UsageCache.kt#L134)).
