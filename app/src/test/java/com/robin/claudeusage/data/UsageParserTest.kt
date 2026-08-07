@@ -192,6 +192,38 @@ class UsageParserTest {
         assertNull(UsageParser.parse("{}"))
     }
 
+    /**
+     * CCBG-8: the fallback path must be *complete*. With no `limits` array the two main
+     * windows already degraded to their flat siblings, but the model caps silently
+     * became an empty list — a state indistinguishable from "this account has no caps".
+     * The flat-fields-only shape below is the older schema, i.e. exactly what a
+     * server-side rollback would send.
+     */
+    @Test
+    fun `model caps survive the limits array being absent`() {
+        val data = UsageParser.parse(
+            """{"five_hour":{"utilization":12.0,"resets_at":"2026-08-07T15:10:00.000000+00:00"},
+               "seven_day":{"utilization":31.0,"resets_at":"2026-08-12T19:00:00.000000+00:00"},
+               "seven_day_sonnet":{"utilization":44.0,"resets_at":"2026-08-12T19:00:00.000000+00:00"},
+               "seven_day_opus":{"utilization":7.0,"resets_at":"2026-08-12T19:00:00.000000+00:00"}}"""
+                .replace("\n", "")
+        )
+        assertNotNull(data)
+        assertEquals(12.0, data!!.session?.percent)
+        assertEquals(31.0, data.weekly?.percent)
+        assertEquals(listOf("Sonnet", "Opus"), data.modelCaps.map { it.modelName })
+        assertEquals(44.0, data.modelCaps[0].window.percent)
+        assertEquals(7.0, data.modelCaps[1].window.percent)
+    }
+
+    @Test
+    fun `a null flat cap field never materialises a cap`() {
+        // realPayload carries "seven_day_opus":null alongside a limits array with no
+        // scoped caps, so the fallback runs and must come back empty-handed — an
+        // account with no caps stays an account with no caps.
+        assertTrue(UsageParser.parse(realPayload)!!.modelCaps.isEmpty())
+    }
+
     // ---- CCBG-6: the balance and the binding constraint ------------------------------
     //
     // `spend.balance` is null in every payload the endpoint has ever returned, and the

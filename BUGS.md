@@ -28,8 +28,23 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
 - **Fix when confirmed:** treat `enabled == false` as "no credits" in `SpendCredits`, and
   add a `UsageParserTest` case with the real payload for that state.
 
+---
+
+## Fixed
+
 ### CCBG-8 · Sonnet Cap Fallback — model caps vanish silently if the `limits` array is absent
-- **Status:** Open · **Low** · latent, never observed
+- **Status:** Fixed (2026-08-07)
+- **Fix as specced below**, plus one extension the captured payloads justify:
+  when `limits` yields no caps, `UsageParser.parse()` now falls back to **both**
+  attested flat siblings — `seven_day_sonnet` (OpenQuota reads it) *and*
+  `seven_day_opus`, which is not a guess: it appears (as `null`) in our own 2026-07-27
+  captured payload, so the field exists in the schema. No other `seven_day_*` model
+  field is attested anywhere, and none was added.
+- **Tests, which were the point:** a flat-fields-only payload (the older schema — what a
+  server-side rollback would send) must yield both caps with their percents, and
+  `realPayload` — `limits` present, `seven_day_opus: null` — must keep an empty cap
+  list, pinning that a null flat field never materialises a cap. 85 tests, 0 failures.
+- **Severity was:** Open · **Low** · latent, never observed
 - **Found:** 2026-08-04, reading OpenQuota's Claude mapper (`src-tauri/src/providers/claude/
   mapper.rs`) alongside ours during the CCRM-21…38 review. Not a live failure — a gap in the
   fallback path.
@@ -60,10 +75,6 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
 - **Check while in there:** whether any other `weekly_scoped` model has a flat sibling field
   (an Opus- or Fable-shaped `seven_day_*`). Only `seven_day_sonnet` is confirmed to exist, via
   OpenQuota reading it; the rest is unknown and shouldn't be guessed at.
-
----
-
-## Fixed
 
 ### CCBG-6 · Credits Denominator — the bar measures the monthly limit, not the balance that would actually stop you
 - **Status:** **Won't fix (2026-08-07)** — until the server populates `spend.balance`.

@@ -151,6 +151,16 @@ object UsageParser {
 
         if (session == null) session = windowFrom(root.optJSONObject("five_hour"))
         if (weekly == null) weekly = windowFrom(root.optJSONObject("seven_day"))
+        // The model caps need the same fallback or they silently vanish when `limits`
+        // is absent — a missing row reads as "no caps on this account", which is a
+        // legitimate state, so nothing would ever flag it (CCBG-8). Only the two
+        // attested flat siblings: `seven_day_sonnet` (OpenQuota reads it) and
+        // `seven_day_opus` (null-present in our own captured payloads). Anything else
+        // would be a guess.
+        if (caps.isEmpty()) {
+            windowFrom(root.optJSONObject("seven_day_sonnet"))?.let { caps += ModelCap("Sonnet", it) }
+            windowFrom(root.optJSONObject("seven_day_opus"))?.let { caps += ModelCap("Opus", it) }
+        }
 
         val credits = creditsFrom(root)
 
