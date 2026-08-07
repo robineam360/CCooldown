@@ -39,6 +39,16 @@ data class SpendCredits(
     val exponent: Int,
     val currency: String,
     val serverSeverity: String?,
+    /**
+     * The cumulative credit balance — the pot that actually runs out (CCBG-6). The
+     * Claude app shows it as its "Balance" row; `/api/oauth/usage` reports the field
+     * but has only ever returned `null` for it, and the endpoint the Claude app reads
+     * it from (`claude.ai/api/organizations/{uuid}/usage`) rejects our OAuth bearer
+     * (403 `account_session_invalid`, probed 2026-08-07). Parsed anyway so the display
+     * corrects itself the day the server populates it. Null means "not reported",
+     * which is not the same as a zero balance.
+     */
+    val balanceMinor: Long? = null,
 ) {
     /** Whether there is a cap to measure spend against at all. */
     val hasLimit: Boolean
@@ -75,6 +85,24 @@ data class SpendCredits(
     /** Headroom under the cap, or null when uncapped. */
     val remainingMinor: Long?
         get() = limitMinor?.takeIf { it > 0L }?.let { (it - usedMinor).coerceAtLeast(0L) }
+
+    /**
+     * The headroom that actually constrains spending: the smaller of the monthly
+     * remainder and the balance, whichever exists. `min(97.03, 91.04)` — a full-looking
+     * monthly bar is a lie once the balance underneath it is smaller (CCBG-6). With no
+     * balance reported this is exactly [remainingMinor], so today's rendering is
+     * unchanged; with no cap the balance is the only ceiling.
+     */
+    val bindingRemainingMinor: Long?
+        get() {
+            val balance = balanceMinor?.coerceAtLeast(0L)
+            val monthly = remainingMinor
+            return when {
+                balance == null -> monthly
+                monthly == null -> balance
+                else -> minOf(monthly, balance)
+            }
+        }
 }
 
 data class UsageData(
@@ -158,6 +186,11 @@ object UsageParser {
                     limit?.optString("currency").orEmpty().ifEmpty { used.optString("currency") }
                     ).ifEmpty { "USD" },
                 serverSeverity = spend.optString("severity").ifEmpty { null },
+                // Null on every payload seen so far (see the field's doc) — parsed so a
+                // server-side change lights the balance up without an app update.
+                balanceMinor = spend.optJSONObject("balance")?.let {
+                    if (it.isNull("amount_minor")) null else it.optLong("amount_minor")
+                },
             )
         }
 

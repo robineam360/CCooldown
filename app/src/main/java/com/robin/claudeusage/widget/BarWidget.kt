@@ -113,7 +113,9 @@ private fun BarContent(
                 CenteredMessage("No credits · $profileLabel", "This account has no credit budget")
             credits != null -> {
                 val pct = credits.percent
-                val remaining = credits.remainingMinor
+                // Binding constraint, not the monthly remainder — identical until the
+                // server reports a balance (CCBG-6).
+                val remaining = credits.bindingRemainingMinor
                 HeaderRow(
                     profile, "Credits · $profileLabel", pct, "%",
                     showRefresh = true,

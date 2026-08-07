@@ -11,11 +11,93 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
 
 ## Open
 
+### CCBG-3 · Credits Visibility — credits card ignores extra-usage being switched off
+- **Status:** Open
+- **Severity:** Low (misleading display, no data loss) — and possibly unreachable
+- **Symptom:** Suspected, not observed. The credits card renders whenever
+  `limit > 0`, so an account that has *switched extra usage off* while keeping a
+  non-zero monthly limit would still be shown a credits bar as though it were live.
+- **Detail:** the payload carries `spend.enabled` and `extra_usage.is_enabled`, and
+  `UsageParser` reads neither — see `creditsFrom()` in
+  [Models.kt](app/src/main/java/com/robin/claudeusage/data/Models.kt). The render gate is
+  the `limitMinor > 0` check in `MainActivity`, `UsageWidget` and `BarWidget`.
+- **Why it's still open rather than fixed:** both flags read `true` on every account we
+  can see, so the disabled-with-a-limit state has never been observed. Gating on a flag
+  whose behaviour we can't verify risks hiding the card from people who should see it —
+  the worse failure. Fix it when someone can actually produce the state.
+- **Fix when confirmed:** treat `enabled == false` as "no credits" in `SpendCredits`, and
+  add a `UsageParserTest` case with the real payload for that state.
+
+### CCBG-8 · Sonnet Cap Fallback — model caps vanish silently if the `limits` array is absent
+- **Status:** Open · **Low** · latent, never observed
+- **Found:** 2026-08-04, reading OpenQuota's Claude mapper (`src-tauri/src/providers/claude/
+  mapper.rs`) alongside ours during the CCRM-21…38 review. Not a live failure — a gap in the
+  fallback path.
+- **What's wrong:** `UsageParser.parse()` reads the `limits` array first and derives the
+  session window, the weekly window and every `weekly_scoped` model cap from it. When
+  `limits` is missing it falls back to the flat sibling fields — but only two of them:
+
+  ```
+  if (session == null) session = windowFrom(root.optJSONObject("five_hour"))
+  if (weekly == null)  weekly  = windowFrom(root.optJSONObject("seven_day"))
+  ```
+
+  There is no fallback for **`seven_day_sonnet`**, which OpenQuota reads directly as its
+  Sonnet window. So if `limits` ever disappears from the payload, the two main bars degrade
+  correctly and the model caps **silently become an empty list** — no cap rows on the main
+  screen, no cap alerts, and no error anywhere, because `UsageData` with a session and a
+  weekly window is a perfectly valid parse.
+- **Why it matters despite being latent:** the schema is undocumented and carries transient
+  experiment fields — the parser's own doc comment says so. `limits` is the newer shape; the
+  flat fields are the older one. A rollback on Anthropic's side is exactly the scenario the
+  fallback exists for, and it's the scenario where this half-works. The failure is also the
+  hardest kind to notice: a *missing* row reads as "this account has no model caps", which is
+  a legitimate state for some accounts.
+- **Fix:** add `if (caps.isEmpty()) windowFrom(root.optJSONObject("seven_day_sonnet"))` as a
+  `ModelCap("Sonnet", …)`, and cover it in `UsageParserTest` with a payload that has the flat
+  fields and no `limits` — the test matters more than the two lines, since the whole point is
+  that nothing currently proves the fallback path is complete.
+- **Check while in there:** whether any other `weekly_scoped` model has a flat sibling field
+  (an Opus- or Fable-shaped `seven_day_*`). Only `seven_day_sonnet` is confirmed to exist, via
+  OpenQuota reading it; the rest is unknown and shouldn't be guessed at.
+
+---
+
+## Fixed
+
 ### CCBG-6 · Credits Denominator — the bar measures the monthly limit, not the balance that would actually stop you
-- **Status:** Open — source **located** 2026-08-04 (`api.claude.ai`, not the OAuth
-  endpoint we use); blocked on whether our token can authenticate there. The balance is
-  definitively *not* in `/api/oauth/usage`. Display fix designed and agreed.
-- **Severity:** Medium now, and it worsens on its own — see the divergence note below
+- **Status:** **Won't fix (2026-08-07)** — until the server populates `spend.balance`.
+  The one open question is answered, and the answer is no: **our subscription OAuth
+  bearer does not authenticate on `claude.ai/api/…`.** Probed on-device through the
+  Settings → Debug endpoint probe, both profiles, same result:
+  `GET https://claude.ai/api/organizations` → **HTTP 403**,
+  `{"type":"error","error":{"type":"permission_error","message":"Invalid authorization",
+  "details":{"error_visibility":"user_facing","error_code":"account_session_invalid"}}}`
+  (request ids `req_011CdoXhGxQMXVmApE7kF1Kt` Personal, `req_011CdoXw5TjibmHrYrm1dUG6`
+  Work). That is a clean JSON auth rejection from the API itself — not a WAF shape, so
+  no UA-variant retry applies; the endpoint wants a claude.ai browser *session*
+  (`account_session_invalid`), which we don't have and shouldn't fake. `/api/bootstrap`
+  returned 200 with anonymous content (feature-gate config), consistent with a
+  session-gated API. This was the outcome the entry named as possible.
+- **Shipped anyway — the inert remnant, so the fix arms itself** (2026-08-07):
+  `SpendCredits.balanceMinor: Long?` parsed from `spend.balance` (null in every payload
+  ever captured; absence ≠ zero), and `bindingRemainingMinor` =
+  `min(monthly remainder, balance)` — the balance alone when uncapped, the remainder
+  alone while the balance is absent. Every "left" figure (`MainActivity` card,
+  `UsageWidget` large bucket, `BarWidget` credits mode) now reads the binding figure.
+  With no balance it equals `remainingMinor` in every state, so **today's rendering is
+  unchanged — pinned by test, not by inspection**; the day the server populates
+  `spend.balance`, the binding constraint lights up without an app update. The balance
+  *line* from the agreed display fix is deliberately **not** built — it would be a
+  visual state that cannot be observed on any device, which is the CCRM-15 (Above-Pace
+  Verification) failure mode. 6 new `UsageParserTest` cases (83 total, 0 failures)
+  cover both captured payloads' null balance, binding in all four states, and a
+  hypothetical populated `spend.balance`.
+- **Reopen when:** `spend.balance` stops being null on `/api/oauth/usage` (the parser
+  and binding maths are already live — what remains then is the balance line, per the
+  agreed three-row display fix below), or Anthropic exposes the balance to OAuth
+  clients some other way.
+- **Severity:** Medium, and it worsens on its own — see the divergence note below
 - **Symptom:** The credits meter always reads `$X / $100.00`, because the denominator is
   the *monthly spend limit*. The Claude app's own Usage tab shows a third figure we don't
   read at all — a **Balance** — and it is the number that actually runs out.
@@ -83,12 +165,9 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
   `160.79.104.10`. So it isn't DNS filtering on our network; that hostname has no
   addresses at all, and the live origin is **`claude.ai`**. `ApiClient.ProbeHost.CLAUDE_AI`
   now points there, pinned by `ProbePathTest`.
-- **What's still open, and it's now one specific question:** does our subscription OAuth
-  bearer authenticate against `claude.ai/api/…`? Ours is proven only on `api.anthropic.com`
-  with `anthropic-beta: oauth-2025-04-20`. Two GETs settle it — `/api/bootstrap` for the
-  org uuid (our payload carries no org id), then `/api/organizations/{uuid}/usage`. If
-  `claude.ai` rejects third-party OAuth tokens, this goes to **Won't fix** until the server
-  populates `spend.balance`, and that is a real possible outcome.
+- **The question that decided it** (answered 2026-08-07 — see the status above): does our
+  subscription OAuth bearer authenticate against `claude.ai/api/…`? It was proven only on
+  `api.anthropic.com` with `anthropic-beta: oauth-2025-04-20`, and claude.ai rejects it.
 - **Probe control verified:** `/api/oauth/usage` on `api.anthropic.com` returns 200 through
   the probe, so the plumbing is sound and any non-200 elsewhere is a real answer.
 - **Dead ends, so nobody repeats them:** release logcat carries no request URLs; there is
@@ -99,8 +178,9 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
   `SpendCredits.percent` / `remainingMinor` and read by the card in `MainActivity`, the
   large bucket of `UsageWidget`, and `BarWidget`. `extra_usage.monthly_limit` reports the
   same figure on the fallback path — this is the user-set monthly extra-usage cap.
-- **Fields in play, none of them parsed:**
+- **Fields in play:**
   - `spend.balance` — the one we want. `null` on both profiles, even with a live balance.
+    **Parsed as of 2026-08-07** (the inert remnant above), waiting for the server.
   - `spend.cap` — `{"money": null, "credits": {"amount_minor": 10000, "exponent": 2}}`.
     `cap.credits` = `10000` lines up with the app's **`100 credits`** monthly-limit row,
     while `spend.limit` = `10000` lines up with **`$100.00`**. So credits and money are
@@ -119,60 +199,6 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
     meaning under existing callers — `MainActivity`, `UsageWidget`, `BarWidget`.
   - Pin it with a `UsageParserTest` case on the real captured payload, asserting both
     the non-null balance and the binding-constraint choice.
-
-### CCBG-3 · Credits Visibility — credits card ignores extra-usage being switched off
-- **Status:** Open
-- **Severity:** Low (misleading display, no data loss) — and possibly unreachable
-- **Symptom:** Suspected, not observed. The credits card renders whenever
-  `limit > 0`, so an account that has *switched extra usage off* while keeping a
-  non-zero monthly limit would still be shown a credits bar as though it were live.
-- **Detail:** the payload carries `spend.enabled` and `extra_usage.is_enabled`, and
-  `UsageParser` reads neither — see `creditsFrom()` in
-  [Models.kt](app/src/main/java/com/robin/claudeusage/data/Models.kt). The render gate is
-  the `limitMinor > 0` check in `MainActivity`, `UsageWidget` and `BarWidget`.
-- **Why it's still open rather than fixed:** both flags read `true` on every account we
-  can see, so the disabled-with-a-limit state has never been observed. Gating on a flag
-  whose behaviour we can't verify risks hiding the card from people who should see it —
-  the worse failure. Fix it when someone can actually produce the state.
-- **Fix when confirmed:** treat `enabled == false` as "no credits" in `SpendCredits`, and
-  add a `UsageParserTest` case with the real payload for that state.
-
-### CCBG-8 · Sonnet Cap Fallback — model caps vanish silently if the `limits` array is absent
-- **Status:** Open · **Low** · latent, never observed
-- **Found:** 2026-08-04, reading OpenQuota's Claude mapper (`src-tauri/src/providers/claude/
-  mapper.rs`) alongside ours during the CCRM-21…38 review. Not a live failure — a gap in the
-  fallback path.
-- **What's wrong:** `UsageParser.parse()` reads the `limits` array first and derives the
-  session window, the weekly window and every `weekly_scoped` model cap from it. When
-  `limits` is missing it falls back to the flat sibling fields — but only two of them:
-
-  ```
-  if (session == null) session = windowFrom(root.optJSONObject("five_hour"))
-  if (weekly == null)  weekly  = windowFrom(root.optJSONObject("seven_day"))
-  ```
-
-  There is no fallback for **`seven_day_sonnet`**, which OpenQuota reads directly as its
-  Sonnet window. So if `limits` ever disappears from the payload, the two main bars degrade
-  correctly and the model caps **silently become an empty list** — no cap rows on the main
-  screen, no cap alerts, and no error anywhere, because `UsageData` with a session and a
-  weekly window is a perfectly valid parse.
-- **Why it matters despite being latent:** the schema is undocumented and carries transient
-  experiment fields — the parser's own doc comment says so. `limits` is the newer shape; the
-  flat fields are the older one. A rollback on Anthropic's side is exactly the scenario the
-  fallback exists for, and it's the scenario where this half-works. The failure is also the
-  hardest kind to notice: a *missing* row reads as "this account has no model caps", which is
-  a legitimate state for some accounts.
-- **Fix:** add `if (caps.isEmpty()) windowFrom(root.optJSONObject("seven_day_sonnet"))` as a
-  `ModelCap("Sonnet", …)`, and cover it in `UsageParserTest` with a payload that has the flat
-  fields and no `limits` — the test matters more than the two lines, since the whole point is
-  that nothing currently proves the fallback path is complete.
-- **Check while in there:** whether any other `weekly_scoped` model has a flat sibling field
-  (an Opus- or Fable-shaped `seven_day_*`). Only `seven_day_sonnet` is confirmed to exist, via
-  OpenQuota reading it; the rest is unknown and shouldn't be guessed at.
-
----
-
-## Fixed
 
 ### CCBG-9 · Credits Vanish — the whole credits section disappeared when the account had no monthly limit
 - **Status:** Fixed (2026-08-04)
@@ -223,10 +249,12 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
 - **Consequence for CCBG-6 (Credits Denominator):** with the cap off, the balance is now
   the **only** ceiling that exists — so the missing balance line is the whole story on this
   account, not a refinement.
-- **Not device-verified yet:** the uncapped card and both widget layouts have not been seen
-  on the phone. Per CLAUDE.md rule 2 this is a restored-design fix rather than a new
-  layout, but CCRM-15 (Above-Pace Verification) exists because a visual state shipped
-  unobserved — so look at it.
+- **Device verification:** the uncapped **card** was seen on the phone 2026-08-07 while
+  verifying CCBG-6 (Credits Denominator)'s remnant build — `Usage credits · $10.75 spent ·
+  No cap`, with the no-limit trailing line, exactly as designed. The two **widget**
+  layouts (UsageWidget large row, BarWidget credits mode) are still unobserved; CCRM-15
+  (Above-Pace Verification) exists because a visual state shipped unobserved — so look at
+  them when one is next placed.
 
 ### CCBG-7 · Chart Label Collision — RETRACTED, never a bug
 - **Status:** **Invalid — retracted 2026-08-04, same day it was filed.** Kept because IDs

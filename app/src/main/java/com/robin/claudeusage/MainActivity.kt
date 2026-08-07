@@ -458,7 +458,10 @@ private fun ProfileScreen(repo: UsageRepository, profile: Profile, use24h: Boole
             ?.takeIf { it.isReportable && repo.cacheSettings().creditsVisible(profile) }
         if (credits != null) {
             val pct = credits.percent
-            val remaining = credits.remainingMinor
+            // The binding constraint, not the monthly remainder: identical while the
+            // server reports no balance, but the day it does, "left" must mean the
+            // smaller of the two ceilings (CCBG-6).
+            val remaining = credits.bindingRemainingMinor
             Spacer(Modifier.height(12.dp))
             Card {
                 Column(Modifier.padding(16.dp)) {
@@ -499,7 +502,14 @@ private fun ProfileScreen(repo: UsageRepository, profile: Profile, use24h: Boole
                                 "No monthly spend limit — credits cover you when you hit your plan limits"
                             remaining > 0L ->
                                 "${Fmt.money(remaining, credits.exponent, credits.currency)} left · " +
-                                    "covers you when you hit your plan limits"
+                                    if (credits.limitMinor != null) {
+                                        "covers you when you hit your plan limits"
+                                    } else {
+                                        // Only reachable once the server reports a balance
+                                        // for an uncapped account — the balance is then the
+                                        // one ceiling that exists.
+                                        "no monthly spend limit"
+                                    }
                             else -> "All credits spent — nothing left to cover plan overruns"
                         },
                         style = MaterialTheme.typography.bodySmall,

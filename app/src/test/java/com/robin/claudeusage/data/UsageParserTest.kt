@@ -78,13 +78,15 @@ class UsageParserTest {
         assertEquals(120.0, over.percent!!, 0.0001)
     }
 
-    private fun credits(usedMinor: Long, limitMinor: Long) = SpendCredits(
-        usedMinor = usedMinor,
-        limitMinor = limitMinor,
-        exponent = 2,
-        currency = "USD",
-        serverSeverity = null,
-    )
+    private fun credits(usedMinor: Long, limitMinor: Long?, balanceMinor: Long? = null) =
+        SpendCredits(
+            usedMinor = usedMinor,
+            limitMinor = limitMinor,
+            exponent = 2,
+            currency = "USD",
+            serverSeverity = null,
+            balanceMinor = balanceMinor,
+        )
 
     @Test
     fun `renders credits the way Claude does`() {
@@ -188,5 +190,67 @@ class UsageParserTest {
     fun `junk is rejected rather than half-parsed`() {
         assertNull(UsageParser.parse("not json"))
         assertNull(UsageParser.parse("{}"))
+    }
+
+    // ---- CCBG-6: the balance and the binding constraint ------------------------------
+    //
+    // `spend.balance` is null in every payload the endpoint has ever returned, and the
+    // endpoint the Claude app reads the balance from (claude.ai) rejects our OAuth
+    // bearer — 403 `account_session_invalid`, probed on-device 2026-08-07, both
+    // profiles. These tests pin two things: that today's rendering inputs are untouched
+    // (binding == remaining while the balance is absent), and that the display corrects
+    // itself the day the server populates the field.
+
+    @Test
+    fun `both captured payloads report no balance — absence, not zero`() {
+        assertNull(UsageParser.parse(realPayload)!!.credits!!.balanceMinor)
+        assertNull(UsageParser.parse(uncappedPayload)!!.credits!!.balanceMinor)
+    }
+
+    @Test
+    fun `without a balance the binding remainder IS the monthly remainder`() {
+        // The byte-identity guarantee: every "left" figure in the app now reads
+        // bindingRemainingMinor, so with balance null it must equal remainingMinor
+        // in every state — capped, over-limit, and uncapped.
+        val capped = UsageParser.parse(realPayload)!!.credits!!
+        assertEquals(capped.remainingMinor, capped.bindingRemainingMinor)
+        assertEquals(9401L, capped.bindingRemainingMinor)
+
+        assertEquals(0L, credits(12000, 10000).bindingRemainingMinor)
+        assertNull(UsageParser.parse(uncappedPayload)!!.credits!!.bindingRemainingMinor)
+    }
+
+    @Test
+    fun `the balance binds when it is below the monthly remainder`() {
+        // The Claude app's own arithmetic from the CCBG-6 filing: $2.97 spent of $100,
+        // balance 91.04 — real headroom is min(97.03, 91.04).
+        assertEquals(9104L, credits(297, 10000, balanceMinor = 9104).bindingRemainingMinor)
+    }
+
+    @Test
+    fun `the monthly remainder binds when it is below the balance`() {
+        assertEquals(9703L, credits(297, 10000, balanceMinor = 15000).bindingRemainingMinor)
+    }
+
+    @Test
+    fun `with no cap a known balance is the only ceiling`() {
+        assertEquals(9104L, credits(297, null, balanceMinor = 9104).bindingRemainingMinor)
+        // And a spent-out balance reports zero rather than vanishing.
+        assertEquals(0L, credits(297, null, balanceMinor = 0).bindingRemainingMinor)
+    }
+
+    @Test
+    fun `a populated balance field is parsed the day the server ships it`() {
+        val credits = UsageParser.parse(
+            """{"spend":{"used":{"amount_minor":297,"currency":"USD","exponent":2},
+               "limit":{"amount_minor":10000,"currency":"USD","exponent":2},
+               "balance":{"amount_minor":9104,"currency":"USD","exponent":2}}}"""
+                .replace("\n", "")
+        )?.credits
+        assertNotNull(credits)
+        assertEquals(9104L, credits!!.balanceMinor)
+        assertEquals(9104L, credits.bindingRemainingMinor)
+        // remainingMinor keeps its meaning — the monthly remainder, untouched.
+        assertEquals(9703L, credits.remainingMinor)
     }
 }

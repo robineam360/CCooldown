@@ -190,9 +190,18 @@ private fun WidgetContent(
                         // headroom against a ceiling that doesn't exist (CCBG-9), so
                         // report the spend on a plain row instead.
                         if (pct == null || limit == null) {
+                            // The trailing figure is the binding constraint: "no cap"
+                            // until the server reports a balance, the balance once it
+                            // does — with the cap off it is the only ceiling (CCBG-6).
+                            val binding = it.bindingRemainingMinor
                             SubTextRow(
                                 "Credits",
-                                "${Fmt.money(it.usedMinor, it.exponent, it.currency)} spent · no cap",
+                                "${Fmt.money(it.usedMinor, it.exponent, it.currency)} spent · " +
+                                    if (binding == null) {
+                                        "no cap"
+                                    } else {
+                                        "${Fmt.money(binding, it.exponent, it.currency)} left"
+                                    },
                             )
                         } else {
                             LabeledBar(
