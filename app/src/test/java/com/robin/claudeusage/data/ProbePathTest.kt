@@ -60,10 +60,14 @@ class ProbePathTest {
         }
     }
 
+    /**
+     * `api.claude.ai` — the APK's own base-URL constant — has no A record, so the live
+     * origin is `claude.ai`. Pinned so nobody "corrects" it back to the constant.
+     */
     @Test
     fun `probe hosts are an allowlist of the two we intend`() {
         assertEquals(
-            listOf("https://api.anthropic.com", "https://api.claude.ai"),
+            listOf("https://api.anthropic.com", "https://claude.ai"),
             ApiClient.ProbeHost.entries.map { it.origin },
         )
     }

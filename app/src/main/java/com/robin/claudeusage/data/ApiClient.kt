@@ -127,13 +127,18 @@ object ApiClient {
      * or pasted path can never ship the bearer token to a host we didn't intend.
      *
      * [CLAUDE_AI] is where the Claude Android app reads the credit **balance** —
-     * `organizations/{uuid}/usage` on this host, per its APK (CCBG-6). Whether our
-     * subscription OAuth token authenticates there at all is the open question the
-     * probe exists to answer.
+     * `organizations/{uuid}/usage`, per its APK (CCBG-6). Whether our subscription OAuth
+     * token authenticates there at all is the open question the probe exists to answer.
+     *
+     * Note the host: the APK's base-URL constant is `https://api.claude.ai`, but that
+     * name has **no A record** (verified 2026-08-04 — it fails with "No address
+     * associated with hostname" on the device, while `claude.ai` and `api.anthropic.com`
+     * both resolve, to the same address). So the constant is dead in this build and the
+     * live origin is `claude.ai`.
      */
     enum class ProbeHost(val origin: String) {
         ANTHROPIC("https://api.anthropic.com"),
-        CLAUDE_AI("https://api.claude.ai"),
+        CLAUDE_AI("https://claude.ai"),
     }
 
     /**

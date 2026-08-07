@@ -450,22 +450,31 @@ private fun ProfileScreen(repo: UsageRepository, profile: Profile, use24h: Boole
             }
         }
 
-        // Pay-as-you-go credits. Only meaningful once a budget exists — a plan with
-        // no credits reports a zero limit, and "$0.00 of $0.00" tells nobody anything.
+        // Pay-as-you-go credits. Shown once there is either a cap or real spend to
+        // report — an account with neither has no credit budget, and "$0.00 of $0.00"
+        // tells nobody anything. The *limit* is not the existence test: switching the
+        // monthly cap off leaves real spend with no ceiling (CCBG-9).
         val credits = data.credits
-            ?.takeIf { it.limitMinor > 0L && repo.cacheSettings().creditsVisible(profile) }
+            ?.takeIf { it.isReportable && repo.cacheSettings().creditsVisible(profile) }
         if (credits != null) {
+            val pct = credits.percent
+            val remaining = credits.remainingMinor
             Spacer(Modifier.height(12.dp))
             Card {
                 Column(Modifier.padding(16.dp)) {
                     // Same shape as the 5-hour card: name on the left, the headline
-                    // percentage on the right, bar underneath.
+                    // percentage on the right, bar underneath. With no cap there is no
+                    // percentage and no bar — just what has been spent.
                     Row(verticalAlignment = Alignment.Bottom) {
                         Text("Usage credits", style = MaterialTheme.typography.titleSmall)
                         Spacer(Modifier.width(6.dp))
                         Text(
-                            "${Fmt.money(credits.usedMinor, credits.exponent, credits.currency)} / " +
-                                Fmt.money(credits.limitMinor, credits.exponent, credits.currency),
+                            if (credits.limitMinor != null) {
+                                "${Fmt.money(credits.usedMinor, credits.exponent, credits.currency)} / " +
+                                    Fmt.money(credits.limitMinor, credits.exponent, credits.currency)
+                            } else {
+                                "${Fmt.money(credits.usedMinor, credits.exponent, credits.currency)} spent"
+                            },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -473,23 +482,28 @@ private fun ProfileScreen(repo: UsageRepository, profile: Profile, use24h: Boole
                             modifier = Modifier.weight(1f),
                         )
                         Text(
-                            "${credits.percentDisplay}% used",
+                            if (pct != null) "${credits.percentDisplay}% used" else "No cap",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface,
                         )
                     }
-                    Spacer(Modifier.height(8.dp))
-                    UsageBarLine(credits.percent, barFill(credits.percent))
+                    if (pct != null) {
+                        Spacer(Modifier.height(8.dp))
+                        UsageBarLine(pct, barFill(pct))
+                    }
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        if (credits.remainingMinor > 0L)
-                            "${Fmt.money(credits.remainingMinor, credits.exponent, credits.currency)} left · " +
-                                "covers you when you hit your plan limits"
-                        else
-                            "All credits spent — nothing left to cover plan overruns",
+                        when {
+                            remaining == null ->
+                                "No monthly spend limit — credits cover you when you hit your plan limits"
+                            remaining > 0L ->
+                                "${Fmt.money(remaining, credits.exponent, credits.currency)} left · " +
+                                    "covers you when you hit your plan limits"
+                            else -> "All credits spent — nothing left to cover plan overruns"
+                        },
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (credits.remainingMinor > 0L) MaterialTheme.colorScheme.onSurfaceVariant
+                        color = if (remaining == null || remaining > 0L) MaterialTheme.colorScheme.onSurfaceVariant
                         else MaterialTheme.colorScheme.error,
                     )
                 }

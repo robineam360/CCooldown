@@ -28,24 +28,53 @@ data class ModelCap(val modelName: String, val window: UsageWindow)
  */
 data class SpendCredits(
     val usedMinor: Long,
-    val limitMinor: Long,
+    /**
+     * The monthly spend cap, or **null when the account has none** — the user can switch
+     * the limit off and spend without a ceiling. Nullable rather than 0 because "no cap"
+     * and "capped at zero" are different states that must not render the same way
+     * (CCBG-9); treating the limit as credits' existence test is what made the whole
+     * section vanish for an unlimited account.
+     */
+    val limitMinor: Long?,
     val exponent: Int,
     val currency: String,
     val serverSeverity: String?,
 ) {
-    /** 0-100, computed from the money rather than the server's rounded integer. */
-    val percent: Double
-        get() = if (limitMinor <= 0L) 0.0 else usedMinor * 100.0 / limitMinor
+    /** Whether there is a cap to measure spend against at all. */
+    val hasLimit: Boolean
+        get() = (limitMinor ?: 0L) > 0L
+
+    /**
+     * Worth showing: either a cap to measure against, or real spend to report. An
+     * account with neither has no credit budget and is better off showing nothing than
+     * "$0.00 of $0.00".
+     *
+     * Note the deliberate gap: an uncapped account that has spent nothing yet stays
+     * hidden until its first spend. Conservative on purpose — it can't be told apart
+     * from a no-credits account without trusting `spend.enabled`, which is still
+     * unverified (CCBG-3).
+     */
+    val isReportable: Boolean
+        get() = hasLimit || usedMinor > 0L
+
+    /**
+     * 0-100, computed from the money rather than the server's rounded integer, and
+     * **null when there is no cap** — with no denominator there is no percentage, and
+     * synthesising 0 would draw an empty bar implying headroom that has no ceiling.
+     */
+    val percent: Double?
+        get() = limitMinor?.takeIf { it > 0L }?.let { usedMinor * 100.0 / it }
 
     /**
      * The percentage as displayed. Rounded, not truncated like the window bars:
      * money is precise, so $5.99 of $100 should read 6%, not 5%.
      */
-    val percentDisplay: Int
-        get() = Math.round(percent).toInt()
+    val percentDisplay: Int?
+        get() = percent?.let { Math.round(it).toInt() }
 
-    val remainingMinor: Long
-        get() = (limitMinor - usedMinor).coerceAtLeast(0L)
+    /** Headroom under the cap, or null when uncapped. */
+    val remainingMinor: Long?
+        get() = limitMinor?.takeIf { it > 0L }?.let { (it - usedMinor).coerceAtLeast(0L) }
 }
 
 data class UsageData(
@@ -107,27 +136,40 @@ object UsageParser {
      * Usage credits. Prefers the `spend` block — it carries currency and exponent on
      * each amount — and falls back to the looser `extra_usage` shape, which reports
      * the same figures in minor units with a single `decimal_places`.
+     *
+     * **`spend.used` is what proves credits exist, never the limit** (CCBG-9). An
+     * account with its monthly cap switched off reports `limit: null` while still
+     * reporting real spend, and the old "no limit means no credits" reading made the
+     * entire section disappear for exactly that state.
      */
     private fun creditsFrom(root: JSONObject): SpendCredits? {
         val spend = root.optJSONObject("spend")
         val used = spend?.optJSONObject("used")
-        val limit = spend?.optJSONObject("limit")
-        if (used != null && limit != null) {
+        if (used != null) {
+            val limit = spend.optJSONObject("limit")
             return SpendCredits(
                 usedMinor = used.optLong("amount_minor", 0L),
-                limitMinor = limit.optLong("amount_minor", 0L),
-                exponent = limit.optInt("exponent", used.optInt("exponent", 2)),
-                currency = limit.optString("currency").ifEmpty { used.optString("currency") }
-                    .ifEmpty { "USD" },
+                limitMinor = limit?.let {
+                    if (it.isNull("amount_minor")) null else it.optLong("amount_minor")
+                },
+                exponent = limit?.optInt("exponent", used.optInt("exponent", 2))
+                    ?: used.optInt("exponent", 2),
+                currency = (
+                    limit?.optString("currency").orEmpty().ifEmpty { used.optString("currency") }
+                    ).ifEmpty { "USD" },
                 serverSeverity = spend.optString("severity").ifEmpty { null },
             )
         }
 
+        // Fallback shape. Either figure alone is enough to say credits exist; only an
+        // account reporting neither has no credit budget.
         val extra = root.optJSONObject("extra_usage") ?: return null
-        if (extra.isNull("monthly_limit")) return null
+        val hasLimit = !extra.isNull("monthly_limit")
+        val hasUsed = !extra.isNull("used_credits")
+        if (!hasLimit && !hasUsed) return null
         return SpendCredits(
             usedMinor = extra.optDouble("used_credits", 0.0).toLong(),
-            limitMinor = extra.optLong("monthly_limit", 0L),
+            limitMinor = if (hasLimit) extra.optLong("monthly_limit", 0L) else null,
             exponent = extra.optInt("decimal_places", 2),
             currency = extra.optString("currency").ifEmpty { "USD" },
             serverSeverity = null,

@@ -100,7 +100,7 @@ private fun BarContent(
 
     // Credits were picked explicitly at placement, so they aren't gated on the
     // "show on widgets" setting — that one is about crowding *other* layouts.
-    val credits = if (bar == "credits") data?.credits?.takeIf { it.limitMinor > 0L } else null
+    val credits = if (bar == "credits") data?.credits?.takeIf { it.isReportable } else null
 
     Column(modifier = rootModifier, verticalAlignment = Alignment.CenterVertically) {
         when {
@@ -112,19 +112,39 @@ private fun BarContent(
             bar == "credits" && credits == null ->
                 CenteredMessage("No credits · $profileLabel", "This account has no credit budget")
             credits != null -> {
+                val pct = credits.percent
+                val remaining = credits.remainingMinor
                 HeaderRow(
-                    profile, "Credits · $profileLabel", credits.percent, "%",
-                    showRefresh = true, valueText = "${credits.percentDisplay}%",
+                    profile, "Credits · $profileLabel", pct, "%",
+                    showRefresh = true,
+                    // Uncapped: the headline becomes the amount, since there is no
+                    // percentage to report (CCBG-9).
+                    valueText = if (pct != null) {
+                        "${credits.percentDisplay}%"
+                    } else {
+                        Fmt.money(credits.usedMinor, credits.exponent, credits.currency)
+                    },
                 )
                 Spacer(GlanceModifier.height(5.dp))
-                WidgetBar(credits.percent, theme, dark, 12.dp)
-                Spacer(GlanceModifier.height(4.dp))
+                // A bar needs a denominator. Without one it would render empty and read
+                // as "plenty left", so it is omitted entirely.
+                if (pct != null) {
+                    WidgetBar(pct, theme, dark, 12.dp)
+                    Spacer(GlanceModifier.height(4.dp))
+                }
                 SubTextRow(
-                    "${Fmt.money(credits.usedMinor, credits.exponent, credits.currency)} / " +
-                        Fmt.money(credits.limitMinor, credits.exponent, credits.currency),
-                    if (credits.remainingMinor > 0L)
-                        "${Fmt.money(credits.remainingMinor, credits.exponent, credits.currency)} left"
-                    else "spent",
+                    if (credits.limitMinor != null) {
+                        "${Fmt.money(credits.usedMinor, credits.exponent, credits.currency)} / " +
+                            Fmt.money(credits.limitMinor, credits.exponent, credits.currency)
+                    } else {
+                        "${Fmt.money(credits.usedMinor, credits.exponent, credits.currency)} spent"
+                    },
+                    when {
+                        remaining == null -> "no monthly cap"
+                        remaining > 0L ->
+                            "${Fmt.money(remaining, credits.exponent, credits.currency)} left"
+                        else -> "spent"
+                    },
                 )
             }
             else -> {

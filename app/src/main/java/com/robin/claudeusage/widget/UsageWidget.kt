@@ -166,7 +166,7 @@ private fun WidgetContent(
             large -> {
                 val data = snapshot.data!!
                 // Only the large bucket has the height for a fourth bar.
-                val credits = data.credits?.takeIf { showCredits && it.limitMinor > 0L }
+                val credits = data.credits?.takeIf { showCredits && it.isReportable }
                 SessionBlock(profile, data.session, use24h, theme, dark, label = "5-hour · $profileLabel", barHeight = 14.dp)
                 Spacer(GlanceModifier.height(12.dp))
                 Column(modifier = GlanceModifier.fillMaxWidth()) {
@@ -184,12 +184,24 @@ private fun WidgetContent(
                         LabeledBar(cap.modelName, cap.window.percent, "%", theme, dark)
                     }
                     credits?.let {
-                        LabeledBar(
-                            "Credits · ${Fmt.money(it.usedMinor, it.exponent, it.currency)} / " +
-                                Fmt.money(it.limitMinor, it.exponent, it.currency),
-                            it.percent, "%", theme, dark,
-                            valueText = "${it.percentDisplay}%",
-                        )
+                        val pct = it.percent
+                        val limit = it.limitMinor
+                        // No cap, no denominator — a bar would sit at 0% and imply
+                        // headroom against a ceiling that doesn't exist (CCBG-9), so
+                        // report the spend on a plain row instead.
+                        if (pct == null || limit == null) {
+                            SubTextRow(
+                                "Credits",
+                                "${Fmt.money(it.usedMinor, it.exponent, it.currency)} spent · no cap",
+                            )
+                        } else {
+                            LabeledBar(
+                                "Credits · ${Fmt.money(it.usedMinor, it.exponent, it.currency)} / " +
+                                    Fmt.money(limit, it.exponent, it.currency),
+                                pct, "%", theme, dark,
+                                valueText = "${it.percentDisplay}%",
+                            )
+                        }
                     }
                     Spacer(GlanceModifier.height(4.dp))
                     FooterRow(snapshot, data.weekly, use24h)

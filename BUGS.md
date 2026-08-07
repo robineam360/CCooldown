@@ -11,49 +11,6 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
 
 ## Open
 
-### CCBG-7 · Credits Vanish — the whole credits section disappears when the server reports no monthly limit
-- **Status:** Open — **observed live**, 2026-08-04, Personal profile
-- **Severity:** Medium (a whole section silently gone, and a widget stating something
-  false) — no data loss
-- **Symptom:** The Usage credits card is **absent from the main screen** even though
-  $2.97 has been spent this month. Worse, a `BarWidget` placed on *Usage credits* reads
-  **"No credits · This account has no credit budget"**, which is untrue: spend is live,
-  `spend.enabled` is `true`, `credits_ever_enabled` is `true`, and the Claude app shows a
-  91.04-credit balance.
-- **What changed:** yesterday's capture had `spend.limit.amount_minor: 10000`. Today the
-  same account returns **`spend.limit: null`, `spend.cap: null`, and
-  `extra_usage.monthly_limit: null`**, while still reporting
-  `spend.used.amount_minor: 297`. So the monthly cap can disappear from the payload while
-  spend continues — an account state we never handled.
-- **Root cause — both branches of `creditsFrom()` bail on a null limit**
-  ([Models.kt](app/src/main/java/com/robin/claudeusage/data/Models.kt)):
-  - `optJSONObject("limit")` returns null for a JSON `null`, so the preferred `spend`
-    branch is skipped despite `used` being present and valid.
-  - the fallback then hits `if (extra.isNull("monthly_limit")) return null`.
-
-  `UsageData.credits` is therefore null, and every consumer's `limitMinor > 0` render gate
-  fails. **Verified** by parsing the captured payload: windows parse fine
-  (`session 15.0`, `weekly 31.0`) and `credits` comes back `null`.
-- **Why the current design does this:** the visibility rule was written as "render whenever
-  `limit > 0`" ([CCRM-1](ROADMAP.md)) on the assumption that no limit means no credits.
-  This payload disproves the assumption — no limit plus real spend plus a real balance.
-- **Fix — treat the limit as optional, not as the existence test.**
-  - `SpendCredits.limitMinor` becomes nullable; credits exist when `spend.used` parses (or
-    `extra_usage.used_credits` is present) **and** `enabled` isn't false, regardless of
-    the limit.
-  - With no limit there is no denominator, so **render no bar** rather than a bar against
-    zero: the card becomes `Usage credits · $2.97 spent this month · no monthly cap`.
-    `percent` must not be synthesised — a 0% bar would imply headroom that has no ceiling.
-  - `BarWidget`'s credits bucket needs the same treatment; its current copy asserts the
-    opposite of the truth. A bar widget with nothing to divide by should show the amount
-    spent, not a bar.
-  - Pin the captured 2026-08-04 payload in `UsageParserTest` alongside the 2026-07-27 one,
-    asserting credits are present, `limitMinor` is null, and no percentage is invented.
-- **Interaction with [CCBG-6](#ccbg-6--credits-denominator--the-bar-measures-the-monthly-limit-not-the-balance-that-would-actually-stop-you):**
-  this makes the balance line *more* important, not less — with no monthly cap, the
-  balance is the **only** ceiling that exists. Fix CCBG-7 first; it's observable today and
-  needs no new data source.
-
 ### CCBG-6 · Credits Denominator — the bar measures the monthly limit, not the balance that would actually stop you
 - **Status:** Open — source **located** 2026-08-04 (`api.claude.ai`, not the OAuth
   endpoint we use); blocked on whether our token can authenticate there. The balance is
@@ -119,12 +76,21 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
     purchase analytics, not a response field. Treat the list as candidates.
   - Also present: `organizations/{organization_uuid}/prepaid/iap/android` — Play-billing
     credit purchase, i.e. the flow the support article's "Add funds" describes.
+- **`api.claude.ai` does not exist — the APK constant is dead.** First probe run
+  (2026-08-04) returned `HTTP 0 · Unable to resolve host "api.claude.ai": No address
+  associated with hostname`. Confirmed off-device: `dig api.claude.ai` returns **no A
+  record**, while `claude.ai` and `api.anthropic.com` both resolve — to the same address,
+  `160.79.104.10`. So it isn't DNS filtering on our network; that hostname has no
+  addresses at all, and the live origin is **`claude.ai`**. `ApiClient.ProbeHost.CLAUDE_AI`
+  now points there, pinned by `ProbePathTest`.
 - **What's still open, and it's now one specific question:** does our subscription OAuth
-  bearer authenticate against `api.claude.ai`? Ours is proven only on `api.anthropic.com`
-  with `anthropic-beta: oauth-2025-04-20`. Two GETs settle it — a `bootstrap` call for the
-  org uuid (our payload carries no org id), then the usage path above. If `api.claude.ai`
-  rejects third-party OAuth tokens, this goes to **Won't fix** until the server populates
-  `spend.balance`, and that is a real possible outcome.
+  bearer authenticate against `claude.ai/api/…`? Ours is proven only on `api.anthropic.com`
+  with `anthropic-beta: oauth-2025-04-20`. Two GETs settle it — `/api/bootstrap` for the
+  org uuid (our payload carries no org id), then `/api/organizations/{uuid}/usage`. If
+  `claude.ai` rejects third-party OAuth tokens, this goes to **Won't fix** until the server
+  populates `spend.balance`, and that is a real possible outcome.
+- **Probe control verified:** `/api/oauth/usage` on `api.anthropic.com` returns 200 through
+  the probe, so the plumbing is sound and any non-200 elsewhere is a real answer.
 - **Dead ends, so nobody repeats them:** release logcat carries no request URLs; there is
   no DevTools socket to attach to; and `run-as` is refused because the installed build is
   release-signed — so the token cannot be read off the device (by design).
@@ -207,6 +173,60 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
 ---
 
 ## Fixed
+
+### CCBG-9 · Credits Vanish — the whole credits section disappeared when the account had no monthly limit
+- **Status:** Fixed (2026-08-04)
+- **Severity:** Medium (a whole section silently gone, and a widget asserting something
+  false) — no data loss
+- **Symptom:** The Usage credits card was **absent from the main screen** despite $2.97 of
+  spend, and a `BarWidget` set to *Usage credits* read **"No credits · This account has no
+  credit budget"** — untrue: spend was live, `spend.enabled` was `true`, and the Claude app
+  showed a 91.04-credit balance.
+- **Trigger, confirmed by the user:** they **switched the monthly spend limit off**
+  (unlimited). The payload then returns `spend.limit: null`, `spend.cap: null` and
+  `extra_usage.monthly_limit: null` while still reporting `spend.used.amount_minor: 297`.
+  So this is a **user-reachable setting**, not a server glitch — anyone who turns the cap
+  off loses the whole section.
+- **Root cause — both branches of `creditsFrom()` bailed on a null limit**
+  ([Models.kt](app/src/main/java/com/robin/claudeusage/data/Models.kt)):
+  `optJSONObject("limit")` returns null for a JSON `null`, so the preferred `spend` branch
+  was skipped even though `used` parsed fine; the fallback then hit
+  `if (extra.isNull("monthly_limit")) return null`. `UsageData.credits` came back null and
+  every consumer's `limitMinor > 0` render gate failed. Verified before fixing by parsing
+  the captured payload: windows fine (`session 15.0`, `weekly 31.0`), `credits` null.
+- **The bad assumption:** CCRM-1 (Credits Display)'s visibility rule, "render whenever
+  `limit > 0`", equated *having a cap* with *having credits*. An uncapped account has
+  credits and no cap.
+- **Fix — the limit is optional data, never the existence test.**
+  - `SpendCredits.limitMinor` is now `Long?`. `null` (no cap) and `0` (capped at zero) are
+    different states and no longer render alike.
+  - `percent`, `percentDisplay` and `remainingMinor` are **nullable, and null when
+    uncapped**. Nothing is synthesised — a 0% bar would draw empty and read as "plenty of
+    headroom" against a ceiling that doesn't exist.
+  - New `isReportable` (`hasLimit || usedMinor > 0`) replaces `limitMinor > 0` as the
+    render gate in `MainActivity`, `UsageWidget` and `BarWidget`. Accounts with no cap and
+    no spend stay hidden — deliberately conservative, since they can't be told from a
+    no-credits account without trusting `spend.enabled`, still unverified (CCBG-3
+    (Credits Visibility)).
+  - **Uncapped rendering:** the card reads `Usage credits · $2.97 spent · No cap` with
+    **no bar**, and the trailing line "No monthly spend limit — credits cover you when you
+    hit your plan limits". `UsageWidget`'s large bucket swaps its bar for a plain
+    `Credits · $2.97 spent · no cap` row; `BarWidget` drops the bar, promotes the amount
+    into the headline slot, and its sub-row reads `no monthly cap`.
+- **Tests:** 3 new `UsageParserTest` cases pinning the captured 2026-08-04 payload — that
+  credits survive a null limit, that no percentage or remainder is invented, and that the
+  `extra_usage` fallback behaves identically. Two existing cases updated for the nullable
+  contract. `./gradlew testDebugUnitTest` → 77 tests, 0 failures.
+- **Found via:** the CCBG-6 (Credits Denominator) endpoint probe's *control* request. The
+  probe was built to chase the balance and caught a live defect in its first payload
+  instead.
+- **Consequence for CCBG-6 (Credits Denominator):** with the cap off, the balance is now
+  the **only** ceiling that exists — so the missing balance line is the whole story on this
+  account, not a refinement.
+- **Not device-verified yet:** the uncapped card and both widget layouts have not been seen
+  on the phone. Per CLAUDE.md rule 2 this is a restored-design fix rather than a new
+  layout, but CCRM-15 (Above-Pace Verification) exists because a visual state shipped
+  unobserved — so look at it.
 
 ### CCBG-7 · Chart Label Collision — RETRACTED, never a bug
 - **Status:** **Invalid — retracted 2026-08-04, same day it was filed.** Kept because IDs

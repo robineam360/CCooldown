@@ -2,6 +2,7 @@ package com.robin.claudeusage.data
 
 import com.robin.claudeusage.ui.Fmt
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -56,7 +57,7 @@ class UsageParserTest {
         assertEquals(2, credits.exponent)
         assertEquals("USD", credits.currency)
         // Computed from the money, not the server's rounded `"percent":6`.
-        assertEquals(5.99, credits.percent, 0.0001)
+        assertEquals(5.99, credits.percent!!, 0.0001)
         assertEquals(9401L, credits.remainingMinor)
     }
 
@@ -74,7 +75,7 @@ class UsageParserTest {
     fun `spending past the limit clamps remaining but not the percentage`() {
         val over = credits(12000, 10000)
         assertEquals(0L, over.remainingMinor)
-        assertEquals(120.0, over.percent, 0.0001)
+        assertEquals(120.0, over.percent!!, 0.0001)
     }
 
     private fun credits(usedMinor: Long, limitMinor: Long) = SpendCredits(
@@ -89,8 +90,8 @@ class UsageParserTest {
     fun `renders credits the way Claude does`() {
         val c = UsageParser.parse(realPayload)!!.credits!!
         assertEquals("$5.99", Fmt.money(c.usedMinor, c.exponent, c.currency))
-        assertEquals("$100.00", Fmt.money(c.limitMinor, c.exponent, c.currency))
-        assertEquals("$94.01", Fmt.money(c.remainingMinor, c.exponent, c.currency))
+        assertEquals("$100.00", Fmt.money(c.limitMinor!!, c.exponent, c.currency))
+        assertEquals("$94.01", Fmt.money(c.remainingMinor!!, c.exponent, c.currency))
     }
 
     @Test
@@ -124,7 +125,63 @@ class UsageParserTest {
         )?.credits
         assertNotNull(credits)
         assertEquals(0L, credits!!.limitMinor)
-        assertEquals(0.0, credits.percent, 0.0001)
+        // Capped at zero with nothing spent: no percentage, and nothing to report.
+        assertNull(credits.percent)
+        assertFalse(credits.isReportable)
+    }
+
+    /**
+     * Captured 2026-08-04 from the Personal profile after the monthly spend limit was
+     * switched **off** — `spend.limit`, `spend.cap` and `extra_usage.monthly_limit` all
+     * null while `spend.used` keeps reporting real money. This state made the whole
+     * credits section disappear (CCBG-9).
+     */
+    private val uncappedPayload = """
+        {"five_hour":{"utilization":15.0,"resets_at":"2026-08-04T15:10:00.346830+00:00"},
+        "seven_day":{"utilization":31.0,"resets_at":"2026-08-06T19:00:00.346853+00:00"},
+        "extra_usage":{"is_enabled":true,"monthly_limit":null,"used_credits":297.0,
+        "utilization":null,"currency":"USD","decimal_places":2,"spend_limit_reached":false,
+        "credits_ever_enabled":true},
+        "spend":{"used":{"amount_minor":297,"currency":"USD","exponent":2},"limit":null,
+        "percent":0,"severity":"normal","enabled":true,"cap":null,"balance":null,
+        "auto_reload":null,"can_purchase_credits":false,"can_toggle":false}}
+    """.trimIndent().replace("\n", "")
+
+    @Test
+    fun `credits survive the monthly limit being switched off`() {
+        val credits = UsageParser.parse(uncappedPayload)?.credits
+        assertNotNull("an uncapped account still has credits", credits)
+        assertEquals(297L, credits!!.usedMinor)
+        assertNull("no cap means no limit, not a zero limit", credits.limitMinor)
+        assertTrue("real spend is worth reporting", credits.isReportable)
+        assertEquals("$2.97", Fmt.money(credits.usedMinor, credits.exponent, credits.currency))
+    }
+
+    /**
+     * The heart of CCBG-9: with no denominator there must be no percentage. A synthesised
+     * 0% would draw an empty bar and read as "plenty of headroom" against a ceiling that
+     * does not exist.
+     */
+    @Test
+    fun `an uncapped account invents no percentage and no remainder`() {
+        val credits = UsageParser.parse(uncappedPayload)!!.credits!!
+        assertFalse(credits.hasLimit)
+        assertNull(credits.percent)
+        assertNull(credits.percentDisplay)
+        assertNull(credits.remainingMinor)
+    }
+
+    @Test
+    fun `the uncapped fallback shape parses the same way`() {
+        // Same account state via extra_usage only, in case spend ever drops out.
+        val credits = UsageParser.parse(
+            """{"extra_usage":{"monthly_limit":null,"used_credits":297.0,
+               "currency":"USD","decimal_places":2}}""".replace("\n", "")
+        )?.credits
+        assertNotNull(credits)
+        assertEquals(297L, credits!!.usedMinor)
+        assertNull(credits.limitMinor)
+        assertTrue(credits.isReportable)
     }
 
     @Test
