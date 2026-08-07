@@ -243,7 +243,29 @@ keys) would still make this a different product. Not filed, not an open question
 -->
 
 ### CCRM-21 · Pace Alerts — warn on the projection, not just the absolute percent
-- **Status:** Planned · medium · **highest-value item from the OpenQuota review**
+- **Status:** Done (2026-08-07) · wireframe approved same day
+- **Shipped:** ladder and transition rules as pure functions in `data/Projection.kt`
+  (`paceSeverity`, `paceSatisfied`, `paceStep`), evaluated per window per profile from
+  `Alerts.checkPace` on every poll; new `pace_alerts` channel; Settings → Alerts block
+  with a master switch (default on) and the three milestone toggles. All five guards
+  below implemented and pinned by 12 cases in `PaceTest` (97 tests, 0 failures) —
+  primed-never-fires, drift-vs-real-reset via `Projection.sameWindow`, hysteresis
+  re-arm, young-window suppression (1% of period min 60s, and under 5% used), and
+  delivery-failure rollback. One notification id per window, so an escalation replaces
+  in place; the most severe newly-fired milestone is the headline. Milestone maths:
+  Will Run Out = projection crosses 100% before the reset; Cutting It Close =
+  projected ≥85% at reset (`PACE_CLOSE_AT_RESET`); Almost Out = under 10% of quota
+  left (`PACE_ALMOST_OUT_USED`). A null projection (not enough signal) can never be
+  CLOSE or RUNNING_OUT — no projection, no verdict about the future.
+- **Deliberately not shipped:** `alwaysShowPacing` — a display preference, not an
+  alerting one; it belongs with CCRM-22 (Used or Left)'s display-token batch. Flagged
+  at wireframe review and approved out.
+- **Still to look at on hardware:** the Settings block (built to the approved wireframe
+  from the existing `ToggleRow` idiom, master-off dimming included) and a real
+  milestone notification — the phone dropped off wireless adb before the install.
+  CCRM-15 (Above-Pace Verification)'s synthetic above-pace series would be the way to
+  fire one on demand; until then the first Will Run Out in the wild is the check.
+- **Was:** Planned · medium · **highest-value item from the OpenQuota review**
 - **Why:** Our alerts only fire on absolute thresholds — `sessionAlertThresholds` 80/95,
   weekly 90, model caps 90 ([UsageCache.kt:134](app/src/main/java/com/robin/claudeusage/data/UsageCache.kt#L134)).
   That tells you where you *are*, never where you're *heading*. Burning a 5-hour window in

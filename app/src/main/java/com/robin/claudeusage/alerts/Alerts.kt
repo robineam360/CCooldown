@@ -35,6 +35,16 @@ object Alerts {
      */
     private const val CHANNEL_PING = "ping_alerts"
 
+    /**
+     * Pace alerts (CCRM-21) — "moving too fast", as opposed to CHANNEL_USAGE's
+     * "close to the wall". Its own channel so either signal can be muted alone.
+     */
+    private const val CHANNEL_PACE = "pace_alerts"
+
+    /** Pace notification id kinds — one per window, so an escalation replaces in place. */
+    private const val PACE_SESSION_KIND = 30
+    private const val PACE_WEEKLY_KIND = 31
+
     /** Notification-id kinds 1–7 are fixed; per-model caps use this base + index. */
     private const val MODEL_CAP_KIND_BASE = 10
 
@@ -68,6 +78,11 @@ object Alerts {
             NotificationChannel(
                 CHANNEL_PING, "Window pings", NotificationManager.IMPORTANCE_HIGH
             ).apply { description = "A scheduled window ping failed to start a window" }
+        )
+        nm.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_PACE, "Pace alerts", NotificationManager.IMPORTANCE_DEFAULT
+            ).apply { description = "Usage on pace to run out before the window resets" }
         )
     }
 
@@ -155,6 +170,31 @@ object Alerts {
                 windowLengthMs = Projection.WEEKLY_MS,
             )
         }
+        // Pace alerts (CCRM-21): where usage is *heading*, from the same projection
+        // the chart draws. Orthogonal to the absolute thresholds above — "moving too
+        // fast" vs "close to the wall" — so both deliberately coexist.
+        if (cache.paceAlertsEnabled()) {
+            val history = com.robin.claudeusage.data.HistoryStore(context).points(profile)
+            data.session?.let { w ->
+                w.resetsAt?.toEpochMilli()?.let { reset ->
+                    checkPace(
+                        context, cache, profile, "Session", "5-hour", w,
+                        Projection.SESSION_MS, notifId(profile, PACE_SESSION_KIND),
+                        Projection.sessionSamples(history, reset, Projection.SESSION_MS), use24h,
+                    )
+                }
+            }
+            data.weekly?.let { w ->
+                w.resetsAt?.toEpochMilli()?.let { reset ->
+                    checkPace(
+                        context, cache, profile, "Weekly", "7-day", w,
+                        Projection.WEEKLY_MS, notifId(profile, PACE_WEEKLY_KIND),
+                        Projection.weeklySamples(history, reset, Projection.WEEKLY_MS), use24h,
+                    )
+                }
+            }
+        }
+
         // Per-model 7-day caps (e.g. an Opus limit) — same machinery, keyed
         // by model name so caps appearing/disappearing dedupe independently.
         data.modelCaps.forEachIndexed { index, cap ->
@@ -309,6 +349,80 @@ object Alerts {
         cache.setAlertState(profile, keyName, windowKey, crossed)
     }
 
+    /**
+     * Pace milestone evaluation for one window. The decisions are all in
+     * [Projection.paceStep] (pure, tested); this does the I/O: reads the toggles and
+     * the stored state, formats the copy, posts at most one notification (the most
+     * severe newly-fired milestone — an escalation replaces in place, same id), and
+     * persists. Delivered bits are only recorded when the post succeeded, so a failed
+     * delivery retries next poll rather than being silently lost.
+     */
+    private fun checkPace(
+        context: Context,
+        cache: UsageCache,
+        profile: Profile,
+        windowName: String,
+        windowLabel: String,
+        window: UsageWindow,
+        windowLengthMs: Long,
+        notificationId: Int,
+        samples: List<Pair<Long, Double>>,
+        use24h: Boolean,
+    ) {
+        val resetMs = window.resetsAt?.toEpochMilli() ?: return
+        val usedPct = window.percent ?: return
+        val elapsedMs = System.currentTimeMillis() - (resetMs - windowLengthMs)
+        val estimate = Projection.estimate(samples, resetMs)
+        val severity = Projection.paceSeverity(usedPct, elapsedMs, windowLengthMs, estimate)
+
+        var satisfied = Projection.paceSatisfied(severity, usedPct)
+        for (m in Projection.PaceMilestone.entries) {
+            if (!cache.paceMilestoneEnabled(m.name)) satisfied = satisfied and m.bit.inv()
+        }
+
+        val step = Projection.paceStep(
+            cache.paceState(profile, windowName), resetMs, windowLengthMs, satisfied,
+        )
+        var state = step.carry
+        step.fire.firstOrNull()?.let { headline ->
+            val label = cache.profileLabel(profile)
+            val (title, text) = paceCopy(headline, label, windowLabel, window, usedPct, estimate, use24h)
+            if (notify(context, profile, notificationId, CHANNEL_PACE, title, text)) {
+                val delivered = step.fire.fold(0) { acc, m -> acc or m.bit }
+                state = state.copy(firedMask = state.firedMask or delivered)
+            }
+        }
+        cache.setPaceState(profile, windowName, state)
+    }
+
+    private fun paceCopy(
+        milestone: Projection.PaceMilestone,
+        label: String,
+        windowLabel: String,
+        window: UsageWindow,
+        usedPct: Double,
+        estimate: Projection.Estimate?,
+        use24h: Boolean,
+    ): Pair<String, String> = when (milestone) {
+        Projection.PaceMilestone.WILL_RUN_OUT -> {
+            val hits = estimate?.hitsLimitAtMs
+            "$label: $windowLabel window will run out early" to if (hits != null) {
+                "At this pace, 100% around ${Fmt.dayTime(Instant.ofEpochMilli(hits), use24h)} — " +
+                    "${Fmt.span(window.resetsAt!!.toEpochMilli() - hits)} before the reset."
+            } else {
+                // SPENT without a projection: it already happened.
+                "Nothing left at ${usedPct.toInt()}%. ${resetLine(window.resetsAt, use24h)}"
+            }
+        }
+        Projection.PaceMilestone.CUTTING_IT_CLOSE ->
+            "$label: cutting it close on the $windowLabel window" to
+                "Projected ~${Math.round(estimate?.pctAtReset ?: usedPct)}% by the reset. " +
+                resetLine(window.resetsAt, use24h)
+        Projection.PaceMilestone.ALMOST_OUT ->
+            "$label: $windowLabel window almost out" to
+                "Under 10% left. ${resetLine(window.resetsAt, use24h)}"
+    }
+
     private fun notifId(profile: Profile, kind: Int): Int =
         kind + if (profile == Profile.WORK) 100 else 0
 
@@ -319,6 +433,7 @@ object Alerts {
         return if (rel == "any moment") "Resets any moment ($abs)" else "Resets $rel — $abs"
     }
 
+    /** @return whether the notification was actually posted — pace alerts roll back on false. */
     private fun notify(
         context: Context,
         profile: Profile,
@@ -326,7 +441,7 @@ object Alerts {
         channel: String,
         title: String,
         text: String,
-    ) {
+    ): Boolean {
         // Request code = notification id (already unique per profile+kind), so
         // a Work alert's intent isn't recycled with the Personal extra.
         val openApp = PendingIntent.getActivity(
@@ -341,10 +456,12 @@ object Alerts {
             .setContentIntent(openApp)
             .setAutoCancel(true)
             .build()
-        try {
+        return try {
             NotificationManagerCompat.from(context).notify(id, notification)
+            true
         } catch (_: SecurityException) {
             // POST_NOTIFICATIONS not granted — silently skip.
+            false
         }
     }
 }

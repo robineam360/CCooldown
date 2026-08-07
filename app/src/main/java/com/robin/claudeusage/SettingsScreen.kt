@@ -180,6 +180,49 @@ fun SettingsScreen(
                 cacheSettings.setModelCapAlertThresholds(it)
             }
             RowDivider()
+            // Pace alerts (CCRM-21): the projection-based counterpart to the absolute
+            // thresholds above — heading vs position, two deliberate signals.
+            var paceEnabled by remember { mutableStateOf(cacheSettings.paceAlertsEnabled()) }
+            ToggleRow(
+                title = "Pace alerts",
+                subtitle = "Warn on where usage is heading, not just where it is. " +
+                    "First reading of a window never alerts.",
+                checked = paceEnabled,
+            ) {
+                paceEnabled = it
+                cacheSettings.setPaceAlertsEnabled(it)
+            }
+            Spacer(Modifier.height(4.dp))
+            val milestones = listOf(
+                Triple(
+                    Projection.PaceMilestone.WILL_RUN_OUT.name,
+                    "Will run out",
+                    "Projected past 100% before the reset",
+                ),
+                Triple(
+                    Projection.PaceMilestone.CUTTING_IT_CLOSE.name,
+                    "Cutting it close",
+                    "Projected to land at ${Projection.PACE_CLOSE_AT_RESET.toInt()}% or more",
+                ),
+                Triple(
+                    Projection.PaceMilestone.ALMOST_OUT.name,
+                    "Almost out",
+                    "Under ${100 - Projection.PACE_ALMOST_OUT_USED.toInt()}% of the window left",
+                ),
+            )
+            for ((key, title, subtitle) in milestones) {
+                var on by remember { mutableStateOf(cacheSettings.paceMilestoneEnabled(key)) }
+                ToggleRow(title = title, subtitle = subtitle, checked = on, enabled = paceEnabled) {
+                    on = it
+                    cacheSettings.setPaceMilestoneEnabled(key, it)
+                }
+            }
+            Text(
+                "Applies to the 5-hour and 7-day windows, on profiles with alerts enabled.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            RowDivider()
             Text("Reset pings", style = MaterialTheme.typography.bodyLarge)
             Text(
                 "\"If busy\" pings only when that window had reached 80% before it reset.",
@@ -2112,18 +2155,29 @@ private fun RowDivider() {
 }
 
 @Composable
-private fun ToggleRow(title: String, subtitle: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+private fun ToggleRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    enabled: Boolean = true,
+    onChange: (Boolean) -> Unit,
+) {
+    val dim = if (enabled) 1f else 0.38f
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = dim),
+            )
             Text(
                 subtitle,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = dim),
             )
         }
         Spacer(Modifier.width(12.dp))
-        Switch(checked = checked, onCheckedChange = onChange)
+        Switch(checked = checked, onCheckedChange = onChange, enabled = enabled)
     }
 }
 

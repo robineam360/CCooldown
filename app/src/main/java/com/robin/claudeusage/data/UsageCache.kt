@@ -179,6 +179,39 @@ class UsageCache(context: Context) {
         prefs.edit().putBoolean("healthAlertsEnabled", enabled).apply()
     }
 
+    // --- pace alerts (CCRM-21): projection-based milestones -------------------------
+
+    fun paceAlertsEnabled(): Boolean = prefs.getBoolean("paceAlertsEnabled", true)
+
+    fun setPaceAlertsEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean("paceAlertsEnabled", enabled).apply()
+    }
+
+    /** Per-milestone toggle; [milestone] is a [Projection.PaceMilestone] name. */
+    fun paceMilestoneEnabled(milestone: String): Boolean =
+        prefs.getBoolean("paceMilestone.$milestone", true)
+
+    fun setPaceMilestoneEnabled(milestone: String, enabled: Boolean) {
+        prefs.edit().putBoolean("paceMilestone.$milestone", enabled).apply()
+    }
+
+    /**
+     * Pace state per profile+window: the window identity plus which milestones have
+     * fired in it. Null when nothing was recorded yet — the primed guard's signal.
+     */
+    fun paceState(profile: Profile, window: String): Projection.PaceState? {
+        val key = prefs.getLong(k(profile, "pace${window}Key"), 0L)
+        if (key == 0L) return null
+        return Projection.PaceState(key, prefs.getInt(k(profile, "pace${window}Mask"), 0))
+    }
+
+    fun setPaceState(profile: Profile, window: String, state: Projection.PaceState) {
+        prefs.edit()
+            .putLong(k(profile, "pace${window}Key"), state.windowKey)
+            .putInt(k(profile, "pace${window}Mask"), state.firedMask)
+            .apply()
+    }
+
     // --- highest percent seen in the current window instance (drives smart reset pings) ---
 
     fun windowPeak(profile: Profile, window: String): Double =

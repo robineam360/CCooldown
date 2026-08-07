@@ -101,6 +101,115 @@ object Projection {
         )
     }
 
+    // --- Pace alerts (CCRM-21) -----------------------------------------------------
+    //
+    // Warn on where usage is *heading*, not just where it is. The severity ladder and
+    // the transition rules live here as pure functions so they're unit-testable the
+    // way PingSchedule is; Alerts.checkPace only does I/O around them.
+
+    /** "Cutting it close": projected to land at or above this percent at the reset. */
+    const val PACE_CLOSE_AT_RESET = 85.0
+
+    /** "Almost out": less than 10% of the window's quota left. */
+    const val PACE_ALMOST_OUT_USED = 90.0
+
+    /**
+     * Young-window suppression: no verdict until this much of the period has elapsed
+     * (min 60s) — a 5-hour window at 2% after four minutes projects to 150% and means
+     * nothing.
+     */
+    fun paceMinElapsedMs(windowLengthMs: Long): Long = maxOf(windowLengthMs / 100, 60_000L)
+
+    /** ...and none at all under this much usage. */
+    const val PACE_MIN_USED = 5.0
+
+    /** Ordered — hysteresis and escalation compare by ordinal. */
+    enum class PaceSeverity { UNTRACKED, HEALTHY, CLOSE, RUNNING_OUT, SPENT }
+
+    /** Descending severity, so the first satisfied milestone is the headline. */
+    enum class PaceMilestone(val bit: Int) {
+        WILL_RUN_OUT(4), CUTTING_IT_CLOSE(2), ALMOST_OUT(1);
+
+        companion object {
+            fun fromMask(mask: Int): List<PaceMilestone> = entries.filter { mask and it.bit != 0 }
+        }
+    }
+
+    /**
+     * The ladder, from the same inputs the chart draws: the even-pace diagonal's
+     * elapsed fraction and [estimate]'s projection — which is why the chart and the
+     * alerts agree for free. A null estimate (not enough signal to be honest) can
+     * still be SPENT, but never CLOSE or RUNNING_OUT: no projection, no verdict
+     * about the future.
+     */
+    fun paceSeverity(
+        usedPct: Double,
+        elapsedMs: Long,
+        windowLengthMs: Long,
+        estimate: Estimate?,
+    ): PaceSeverity = when {
+        elapsedMs < paceMinElapsedMs(windowLengthMs) || usedPct < PACE_MIN_USED ->
+            PaceSeverity.UNTRACKED
+        usedPct >= 99.5 -> PaceSeverity.SPENT
+        estimate?.hitsLimitAtMs != null -> PaceSeverity.RUNNING_OUT
+        (estimate?.pctAtReset ?: 0.0) >= PACE_CLOSE_AT_RESET -> PaceSeverity.CLOSE
+        else -> PaceSeverity.HEALTHY
+    }
+
+    /** Which milestones the current reading satisfies, as a [PaceMilestone.bit] mask. */
+    fun paceSatisfied(severity: PaceSeverity, usedPct: Double): Int {
+        if (severity == PaceSeverity.UNTRACKED) return 0
+        var mask = 0
+        if (severity >= PaceSeverity.RUNNING_OUT) mask = mask or PaceMilestone.WILL_RUN_OUT.bit
+        if (severity >= PaceSeverity.CLOSE) mask = mask or PaceMilestone.CUTTING_IT_CLOSE.bit
+        if (usedPct >= PACE_ALMOST_OUT_USED) mask = mask or PaceMilestone.ALMOST_OUT.bit
+        return mask
+    }
+
+    /** Persisted per profile+window: the window identity and which milestones fired. */
+    data class PaceState(val windowKey: Long, val firedMask: Int)
+
+    /**
+     * @property carry state to persist if nothing fires (or before delivery): the
+     *   re-anchored key and the hysteresis-cleared fired mask. On delivery the caller
+     *   ORs the delivered bits in; a failed delivery simply isn't ORed, so the
+     *   milestone retries next poll (guard 5: rollback on delivery failure).
+     * @property fire milestones to notify now, most severe first.
+     */
+    data class PaceStep(val carry: PaceState, val fire: List<PaceMilestone>)
+
+    /**
+     * One evaluation step. Encodes the guards that keep this feature from being
+     * annoying:
+     *  1. **Primed** — the first observation of a window never fires; whatever is
+     *     already true is marked as known, so enabling the feature (or any state
+     *     loss) can't dump a backlog for a window the user already knows about.
+     *  2. **Dedupe by window identity** through [sameWindow], never `==` (CCBG-4),
+     *     with the stored key re-anchored to the newest reading each step so drift
+     *     can't accumulate past tolerance over a 7-day window.
+     *  3. **Hysteresis** — a fired bit survives only while its milestone stays
+     *     satisfied, so a window hovering on a boundary re-fires only after severity
+     *     genuinely dropped below it and rose again.
+     *
+     * [satisfiedMask] should already be filtered to the user's enabled milestones.
+     */
+    fun paceStep(
+        stored: PaceState?,
+        windowKey: Long,
+        windowLengthMs: Long,
+        satisfiedMask: Int,
+    ): PaceStep {
+        if (stored == null || !sameWindow(stored.windowKey, windowKey, windowLengthMs)) {
+            return PaceStep(PaceState(windowKey, satisfiedMask), emptyList())
+        }
+        val carried = stored.firedMask and satisfiedMask
+        val toFire = satisfiedMask and carried.inv()
+        return PaceStep(
+            PaceState(windowKey, carried),
+            PaceMilestone.fromMask(toFire),
+        )
+    }
+
     /** Session samples belonging to the window that resets around [resetAtMs]. */
     fun sessionSamples(
         history: List<HistoryPoint>,
