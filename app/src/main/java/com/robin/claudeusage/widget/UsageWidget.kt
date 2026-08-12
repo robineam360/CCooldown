@@ -57,6 +57,14 @@ import com.robin.claudeusage.work.Polling
 
 class UsageWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = UsageWidget()
+
+    override fun onDeleted(context: Context, appWidgetIds: IntArray) {
+        super.onDeleted(context, appWidgetIds)
+        // Launchers recycle widget ids, so a stale override would pre-fill the
+        // reconfigure screen for a widget that no longer exists.
+        val prefs = WidgetPrefs(context)
+        for (id in appWidgetIds) prefs.remove(id)
+    }
 }
 
 val PROFILE_PARAM = ActionParameters.Key<String>("profile")

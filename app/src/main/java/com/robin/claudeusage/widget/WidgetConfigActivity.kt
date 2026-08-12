@@ -1,6 +1,7 @@
 package com.robin.claudeusage.widget
 
 import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -22,6 +23,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -29,7 +31,6 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -43,7 +44,8 @@ import com.robin.claudeusage.ui.Palette
 import kotlinx.coroutines.launch
 
 /**
- * Shown by the launcher when a widget is placed (android:configure). Picks the
+ * Shown by the launcher when a widget is placed (android:configure), and again
+ * when a placed one is reconfigured (widgetFeatures="reconfigurable"). Picks the
  * profile for any widget, plus the bar kind for the single-bar widget.
  */
 class WidgetConfigActivity : ComponentActivity() {
@@ -54,14 +56,36 @@ class WidgetConfigActivity : ComponentActivity() {
         val appWidgetId = intent?.extras?.getInt(
             AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID
         ) ?: AppWidgetManager.INVALID_APPWIDGET_ID
+        // Cancel/back only deletes the widget on the add flow; a reconfigure
+        // abandoned this way leaves the instance exactly as it was.
         setResult(RESULT_CANCELED, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId))
         if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
             finish()
             return
         }
 
-        val isBarWidget = AppWidgetManager.getInstance(this)
-            .getAppWidgetInfo(appWidgetId)?.provider?.className?.endsWith("BarWidgetReceiver") == true
+        val isBarWidget = AppWidgetManager.getInstance(this).getAppWidgetInfo(appWidgetId)?.provider ==
+            ComponentName(this, BarWidgetReceiver::class.java)
+        val widgetPrefs = WidgetPrefs(this)
+        // Prefs are only written on the first confirm, so their presence is the
+        // add-vs-reconfigure test.
+        val isReconfigure = widgetPrefs.has(appWidgetId)
+
+        // Render the widget with its new config, then confirm.
+        fun renderAndFinish() {
+            kotlinx.coroutines.MainScope().launch {
+                try {
+                    if (isBarWidget) BarWidget().updateAll(this@WidgetConfigActivity)
+                    else UsageWidget().updateAll(this@WidgetConfigActivity)
+                } catch (_: Exception) {
+                }
+                setResult(
+                    RESULT_OK,
+                    Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId),
+                )
+                finish()
+            }
+        }
 
         setContent {
             val dark = isSystemInDarkTheme()
@@ -74,23 +98,22 @@ class WidgetConfigActivity : ComponentActivity() {
             }
             MaterialTheme(colorScheme = scheme) {
                 Surface(Modifier.fillMaxSize()) {
-                    ConfigScreen(isBarWidget) { profile, bar ->
-                        WidgetPrefs(this@WidgetConfigActivity).save(appWidgetId, profile, bar)
-                        val scopeActivity = this@WidgetConfigActivity
-                        // Render the widget with its new config, then confirm.
-                        kotlinx.coroutines.MainScope().launch {
-                            try {
-                                if (isBarWidget) BarWidget().updateAll(scopeActivity)
-                                else UsageWidget().updateAll(scopeActivity)
-                            } catch (_: Exception) {
-                            }
-                            setResult(
-                                RESULT_OK,
-                                Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId),
-                            )
-                            finish()
-                        }
-                    }
+                    ConfigScreen(
+                        isBarWidget = isBarWidget,
+                        isReconfigure = isReconfigure,
+                        initialProfile = widgetPrefs.profileFor(appWidgetId),
+                        initialBar = widgetPrefs.barFor(appWidgetId),
+                        onDone = { profile, bar ->
+                            widgetPrefs.save(appWidgetId, profile, bar)
+                            renderAndFinish()
+                        },
+                        onUseDefaults = {
+                            // Drop the per-instance override entirely so the widget
+                            // follows the app-wide defaults from now on.
+                            widgetPrefs.remove(appWidgetId)
+                            renderAndFinish()
+                        },
+                    )
                 }
             }
         }
@@ -98,12 +121,18 @@ class WidgetConfigActivity : ComponentActivity() {
 }
 
 @androidx.compose.runtime.Composable
-private fun ConfigScreen(isBarWidget: Boolean, onDone: (Profile, String?) -> Unit) {
-    var profile by remember { mutableStateOf(Profile.PERSONAL) }
-    var bar by remember { mutableStateOf("session") }
+private fun ConfigScreen(
+    isBarWidget: Boolean,
+    isReconfigure: Boolean,
+    initialProfile: Profile,
+    initialBar: String,
+    onDone: (Profile, String?) -> Unit,
+    onUseDefaults: () -> Unit,
+) {
+    var profile by remember { mutableStateOf(initialProfile) }
+    var bar by remember { mutableStateOf(initialBar) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val cache = remember { com.robin.claudeusage.data.UsageCache(context) }
-    rememberCoroutineScope()
 
     Column(
         Modifier
@@ -112,7 +141,10 @@ private fun ConfigScreen(isBarWidget: Boolean, onDone: (Profile, String?) -> Uni
             .padding(24.dp)
             .verticalScroll(rememberScrollState()),
     ) {
-        Text("Widget setup", style = MaterialTheme.typography.headlineSmall)
+        Text(
+            if (isReconfigure) "Widget settings" else "Widget setup",
+            style = MaterialTheme.typography.headlineSmall,
+        )
         Spacer(Modifier.height(20.dp))
 
         Text("Profile", style = MaterialTheme.typography.titleSmall)
@@ -147,6 +179,14 @@ private fun ConfigScreen(isBarWidget: Boolean, onDone: (Profile, String?) -> Uni
         Button(
             onClick = { onDone(profile, if (isBarWidget) bar else null) },
             modifier = Modifier.fillMaxWidth(),
-        ) { Text("Add widget") }
+        ) { Text(if (isReconfigure) "Save changes" else "Add widget") }
+
+        if (isReconfigure) {
+            Spacer(Modifier.height(8.dp))
+            TextButton(
+                onClick = onUseDefaults,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Use my defaults") }
+        }
     }
 }

@@ -204,7 +204,34 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
   copy-the-desktop-sign-in path (README §"If the phone can't complete the sign-in").
 
 ### CCRM-4 · Widget Quick-Edit — reconfigure a placed widget by long-press
-- **Status:** Planned · small · **prerequisite for CCRM-3 phase 2**
+- **Status:** Built (2026-08-12) · wireframe approved same day · **on-device
+  verification outstanding** · was the prerequisite for CCRM-3 phase 2, now cleared
+- **Shipped:**
+  - `android:widgetFeatures="reconfigurable"` in both `usage_widget_info.xml` and
+    `bar_widget_info.xml` — minSdk 31, so no version gating.
+  - `WidgetPrefs.has(appWidgetId)` — the getters fall back to Personal/`session`, so
+    they can't tell "unset" from the defaults; presence of the stored profile key is
+    both the add-vs-reconfigure test and the "has an override" probe CCRM-3
+    (Unified Theming) will need for its per-instance overrides.
+  - `ConfigScreen` seeds its state from `WidgetPrefs` instead of hardcoding it; when
+    reconfiguring the title reads **Widget settings** and the button **Save changes**
+    (add flow unchanged: "Widget setup" / "Add widget").
+  - **Use my defaults** (reconfigure only, semantics decided at wireframe review):
+    calls `WidgetPrefs.remove()`, re-renders, closes — the instance truly drops its
+    override, so it will follow the CCRM-3 Settings-held defaults automatically once
+    those exist. Today it falls back to Personal + 5-hour.
+  - Cancel/back on a reconfigure leaves the widget untouched for free — the seeded
+    `RESULT_CANCELED` only deletes a widget on the add flow.
+  - **Leak fixed while in there:** `WidgetPrefs.remove()` had no callers and neither
+    receiver overrode `onDeleted`, so per-id prefs outlived their widget — and
+    launchers recycle ids, which would have pre-filled a *new* widget's config with a
+    dead one's settings. Both receivers now clean up.
+  - The brittle `className?.endsWith("BarWidgetReceiver")` provider check became a
+    `ComponentName` comparison.
+- **Not device-verified yet** (97 unit tests green, but nothing here is unit-testable —
+  it's all launcher interaction): the long-press reconfigure entry point appearing, the
+  pre-fill, save/re-render, cancel harmlessness, "Use my defaults", and the
+  delete-then-recycle id case. Run the checklist on the Fold 7 when next connected.
 - **Moved up from *Later* on 2026-07-30.** CCRM-3 phase 2 gives each widget a layout, a
   background and an accent. A cosmetic setting you can only change by deleting the widget
   and adding it again is worse than not shipping it, so this now leads that work rather

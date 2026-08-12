@@ -538,6 +538,13 @@ class WidgetPrefs(context: Context) {
     private val prefs: SharedPreferences =
         context.applicationContext.getSharedPreferences("widget_prefs", Context.MODE_PRIVATE)
 
+    /**
+     * Whether this instance has a stored override. Prefs are only written on the
+     * first confirm, so this is also the add-vs-reconfigure test for the config
+     * screen — the getters below can't tell "unset" from the defaults.
+     */
+    fun has(appWidgetId: Int): Boolean = prefs.contains("w$appWidgetId.profile")
+
     fun profileFor(appWidgetId: Int): Profile =
         Profile.fromKey(prefs.getString("w$appWidgetId.profile", null))
 

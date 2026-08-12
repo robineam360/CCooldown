@@ -12,4 +12,5 @@
     android:resizeMode="horizontal|vertical"
     android:updatePeriodMillis="0"
     android:configure="com.robin.claudeusage.widget.WidgetConfigActivity"
+    android:widgetFeatures="reconfigurable"
     android:widgetCategory="home_screen" />

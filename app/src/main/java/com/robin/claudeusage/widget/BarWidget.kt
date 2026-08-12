@@ -32,6 +32,14 @@ import com.robin.claudeusage.ui.Fmt
 
 class BarWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = BarWidget()
+
+    override fun onDeleted(context: Context, appWidgetIds: IntArray) {
+        super.onDeleted(context, appWidgetIds)
+        // Launchers recycle widget ids, so a stale override would pre-fill the
+        // reconfigure screen for a widget that no longer exists.
+        val prefs = WidgetPrefs(context)
+        for (id in appWidgetIds) prefs.remove(id)
+    }
 }
 
 /** Compact single-bar widget: one window of one profile, chosen at placement. */
