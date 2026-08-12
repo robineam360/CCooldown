@@ -172,7 +172,37 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
   (`play.google.com/store/apps/details?id=com.anthropic.claude`).
 
 ### CCRM-16 · Sign-in Expiry Accuracy — correct the token-family expiry when renewal dies early
-- **Status:** Planned · small
+- **Status:** Built (2026-08-12) · wireframe approved same day
+- **Shipped:**
+  - `data/SignInExpiry.kt` — the expiry-line decision as a pure function
+    (`Estimated` / `Exact` / `RenewalDead` / `None`), keyed on `REAUTH_NEEDED`,
+    which already covers both death signals: a direct 400–403 on refresh, and the
+    `firstRefreshFailAt` streak crossing `STUCK_REFRESH_MS` (both escalate to that
+    state in `UsageRepository`). 11 cases in `SignInExpiryTest` (108 total, 0
+    failures) pin the four states, the 48h materially-early split
+    (`MATERIALLY_EARLY_MS` — phrasing only, the date is dropped either way), the
+    nearest-day rounding, an unstamped sign-in, a death timestamp *before* the
+    sign-in (a stale streak must not render a huge interval), a missing estimate
+    date, and that a death **after** the estimate passed still renders the dead
+    line — the old `refreshExpiresAt > now` gate would have hidden it silently.
+  - Account card: `RenewalDead` replaces the date line, in the error colour —
+    "Renewal stopped working 9 days after sign-in — earlier than the ~30-day
+    estimate. Re-sign in below." / "…~30 days after sign-in — the sign-in likely
+    reached its age limit…". The death moment is the fail-streak start, falling
+    back to the failure's own timestamp.
+  - Debug section: `Sign-in age: Personal 12d (est. ~30d) · Work 5d (exact)` —
+    the instrument that finally reads the real family lifetime the first time one
+    dies of old age rather than revocation.
+- **Deliberately not shipped:** persisting the observed interval as the new
+  estimate for subsequent sign-ins — per the entry's own rule, only worth doing
+  once the early death has been seen more than once; one revocation isn't a
+  lifetime. Pasted-token (exact-date) accounts keep their behaviour unchanged;
+  this item is scoped to the estimate.
+- **Device verification:** the healthy lines and the debug age row are checkable
+  any time; the `RenewalDead` states can't be produced on demand — they'll be
+  seen the first time a real family dies (which is also when the debug row pays
+  out). Unit tests are the primary pin here, deliberately.
+- **Was:** Planned · small
 - **Why:** For a native sign-in we don't know when the refresh-token family actually
   expires — the token response omits it, so we display sign-in time + a flat 30-day
   guess (`OAuthSignIn.ESTIMATED_FAMILY_MS`,

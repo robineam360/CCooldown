@@ -77,9 +77,11 @@ import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import com.robin.claudeusage.data.ApiClient
 import com.robin.claudeusage.data.AuthState
+import com.robin.claudeusage.data.OAuthSignIn
 import com.robin.claudeusage.data.PingSchedule
 import com.robin.claudeusage.data.Profile
 import com.robin.claudeusage.data.Projection
+import com.robin.claudeusage.data.SignInExpiry
 import com.robin.claudeusage.data.UpdateCheck
 import com.robin.claudeusage.data.UpdateInfo
 import com.robin.claudeusage.data.UsageCache
@@ -650,6 +652,7 @@ private fun TokenCard(
     val refreshEstimated = remember(stateKey) { repo.refreshExpiryEstimated(profile) }
     val lastRenewedAt = remember(stateKey) { repo.lastRenewedAt(profile) }
     val backoffUntil = remember(stateKey) { repo.cacheSettings().backoffUntil(profile) }
+    val firstRefreshFailAt = remember(stateKey) { repo.cacheSettings().firstRefreshFailAt(profile) }
 
     // Open a sign-in URL, letting the user pick a browser when they have more than
     // one (so they can route Work vs Personal through different browsers). Always
@@ -853,15 +856,51 @@ private fun TokenCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                if (refreshExpiresAt > now) {
-                    Text(
-                        if (refreshEstimated)
-                            "Sign-in expires around ${Fmt.dateTime(refreshExpiresAt, use24h)} · ~${Fmt.dhm(refreshExpiresAt)} left"
-                        else
-                            "Sign-in valid until ${Fmt.dateTime(refreshExpiresAt, use24h)} · ${Fmt.dhm(refreshExpiresAt)} to go",
+                // CCRM-16: once renewal is dead the ~30-day estimate must stop
+                // rendering as a date — the fail-streak start is the best fix on
+                // when it died, falling back to the failure's own timestamp.
+                val deadAt = when {
+                    firstRefreshFailAt > 0 -> firstRefreshFailAt
+                    snapshot.lastAttemptAt > 0 -> snapshot.lastAttemptAt
+                    else -> now
+                }
+                when (
+                    val expiry = SignInExpiry.line(
+                        snapshot.authState, refreshEstimated, refreshExpiresAt, addedAt, deadAt, now,
+                    )
+                ) {
+                    is SignInExpiry.Line.RenewalDead -> {
+                        val estDays = OAuthSignIn.ESTIMATED_FAMILY_MS / SignInExpiry.DAY_MS
+                        val days = expiry.daysObserved
+                        Text(
+                            when {
+                                days == null ->
+                                    "Renewal has stopped working — re-sign in below."
+                                expiry.earlierThanEstimate && days == 0L ->
+                                    "Renewal stopped working within a day of sign-in — " +
+                                        "earlier than the ~$estDays-day estimate. Re-sign in below."
+                                expiry.earlierThanEstimate ->
+                                    "Renewal stopped working $days day${if (days == 1L) "" else "s"} after sign-in — " +
+                                        "earlier than the ~$estDays-day estimate. Re-sign in below."
+                                else ->
+                                    "Renewal stopped working ~$days days after sign-in — " +
+                                        "the sign-in likely reached its age limit. Re-sign in below."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                    is SignInExpiry.Line.Estimated -> Text(
+                        "Sign-in expires around ${Fmt.dateTime(expiry.expiresAt, use24h)} · ~${Fmt.dhm(expiry.expiresAt)} left",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    is SignInExpiry.Line.Exact -> Text(
+                        "Sign-in valid until ${Fmt.dateTime(expiry.expiresAt, use24h)} · ${Fmt.dhm(expiry.expiresAt)} to go",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    SignInExpiry.Line.None -> {}
                 }
                 Text(
                     "Added: ${if (addedAt > 0) Fmt.date(addedAt) else "before v0.7"}",
@@ -1396,6 +1435,31 @@ private fun DebugSection(repo: UsageRepository) {
     var showDebug by remember { mutableStateOf(false) }
     var debugProfile by remember { mutableStateOf(Profile.PERSONAL) }
     SectionCard {
+        // CCRM-16: the ~30-day family estimate has never been verified against a
+        // real expiry — this age readout is how we learn the true number the first
+        // time a family dies of old age rather than revocation.
+        val signInAges = remember {
+            val now = System.currentTimeMillis()
+            Profile.entries.joinToString(" · ") { p ->
+                val label = repo.cacheSettings().profileLabel(p)
+                val added = repo.tokenAddedAt(p)
+                when {
+                    !repo.hasCredentials(p) || added <= 0 -> "$label —"
+                    repo.refreshExpiryEstimated(p) ->
+                        "$label ${(now - added) / SignInExpiry.DAY_MS}d " +
+                            "(est. ~${OAuthSignIn.ESTIMATED_FAMILY_MS / SignInExpiry.DAY_MS}d)"
+                    else -> "$label ${(now - added) / SignInExpiry.DAY_MS}d (exact)"
+                }
+            }
+        }
+        Text(
+            "Sign-in age: $signInAges",
+            style = MaterialTheme.typography.bodySmall,
+            fontFamily = FontFamily.Monospace,
+            fontSize = 11.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(8.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             OutlinedButton(onClick = { showDebug = !showDebug }) {
                 Text(if (showDebug) "Hide raw response" else "Show last raw response")
