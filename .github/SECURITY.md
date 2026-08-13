@@ -42,6 +42,6 @@ not here.
 
 ## Supported versions
 
-Only the [latest release](../../../releases/latest) is supported — the app's
+Only the [latest release](https://github.com/robineam360/CCooldown/releases/latest) is supported — the app's
 *Check for updates* button and the README both point there, and there is no mechanism
 for patching older builds.

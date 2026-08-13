@@ -86,7 +86,7 @@ import com.robin.claudeusage.ui.chartHeight
 import com.robin.claudeusage.ui.hasTwoColumns
 import com.robin.claudeusage.ui.PACE_DEAD_ZONE
 import com.robin.claudeusage.ui.elapsedPercent
-import com.robin.claudeusage.ui.reduceMotion
+import com.robin.claudeusage.ui.Motion
 import com.robin.claudeusage.ui.twoPane
 import com.robin.claudeusage.widget.BarWidget
 import com.robin.claudeusage.widget.UsageWidget
@@ -289,9 +289,10 @@ private fun ProfileTabs(
         pageCount = { profiles.size },
     )
     val scope = rememberCoroutineScope()
-    // Live, not remembered: the user can flip the system animation setting while
-    // the app is open, and the next tab press should honour the new answer.
-    val reduceMotion = reduceMotion()
+    // Read inside the click, never captured at composition: the user can flip the
+    // system animation setting while the app is open, and the very next tab press
+    // must honour the new answer.
+    val motionContext = LocalContext.current
 
     Column(modifier = modifier.fillMaxSize()) {
         TabRow(selectedTabIndex = pagerState.currentPage) {
@@ -302,8 +303,11 @@ private fun ProfileTabs(
                         scope.launch {
                             // The zero-duration limit of the same page turn — identical
                             // landing, no travel — per CCRM-32 (Reduce Motion).
-                            if (reduceMotion) pagerState.scrollToPage(index)
-                            else pagerState.animateScrollToPage(index)
+                            if (Motion.reduced(Motion.scale(motionContext))) {
+                                pagerState.scrollToPage(index)
+                            } else {
+                                pagerState.animateScrollToPage(index)
+                            }
                         }
                     },
                     text = { Text(repo.cacheSettings().profileLabel(profile)) },

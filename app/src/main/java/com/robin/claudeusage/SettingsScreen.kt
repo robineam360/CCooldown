@@ -616,7 +616,9 @@ internal fun allowedLinkUrl(url: String): Boolean {
 /**
  * Opens a URL in a specific browser (full external app, not an in-app tab).
  * The single launch path for sign-in and the CCRM-26 (Quick Links) buttons —
- * shared with MainActivity so the [allowedLinkUrl] check guards every launch.
+ * shared with MainActivity so the [allowedLinkUrl] check guards every launch
+ * through this path. (The release-notes dialog and the mailto feedback intent
+ * build their own intents and are guarded at their own call sites.)
  */
 internal fun openInBrowser(context: android.content.Context, url: String, pkg: String?) {
     if (!allowedLinkUrl(url)) return
@@ -995,7 +997,7 @@ private fun TokenCard(
         val browsers = remember { installedBrowsers(context) }
         AlertDialog(
             onDismissRequest = { showBrowserPicker = false },
-            title = { Text("Open sign-in with") },
+            title = { Text("Open with") },
             text = {
                 Column {
                     Text(
@@ -1377,7 +1379,10 @@ private fun UpdatesCard(cache: UsageCache) {
                     if (info.updateAvailable && info.releaseUrl.isNotBlank()) {
                         TextButton(onClick = {
                             context.startActivity(
-                                Intent(Intent.ACTION_VIEW, Uri.parse(info.releaseUrl))
+                                Intent(
+                                    Intent.ACTION_VIEW,
+                                    Uri.parse(UpdateGate.safeReleaseUrl(info.releaseUrl)),
+                                )
                             )
                             updateResult = null
                         }) { Text("Open GitHub") }
