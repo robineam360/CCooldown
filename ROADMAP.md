@@ -488,7 +488,7 @@ keys) would still make this a different product. Not filed, not an open question
   notification are too tight — they get nothing.
 
 ### CCRM-32 · Reduce Motion — honour the system animation setting
-- **Status:** Planned · small
+- **Status:** Done (2026-08-13)
 - **Why:** An accessibility floor we don't currently meet. Users who set animations off at
   the OS level mean it.
 - **Approach:** read `Settings.Global.ANIMATOR_DURATION_SCALE` (0 means off) and collapse
@@ -496,6 +496,17 @@ keys) would still make this a different product. Not filed, not an open question
   `springMotion(reducedMotion)` does exactly this, and keeping the same curve means only one
   visual behaviour to reason about. Affects the pager, the chart's entry animation, and the
   bar fills.
+- **Shipped:** `Motion` in `ui/Adaptive.kt` — pure `reduced`/`collapse` verdicts plus the
+  one `ANIMATOR_DURATION_SCALE` read — and a `reduceMotion()` composable that re-reads it
+  every composition, never cached, so flipping the setting mid-session takes effect on the
+  next press. Wired to the one Compose-driven animation the audit actually found: the tab
+  press's `animateScrollToPage`, which becomes `scrollToPage` (the same page turn at zero
+  duration). The chart has no entry animation and the bar fills don't animate — a full
+  `animateFloatAsState`/`tween`/`spring` sweep confirmed there was nothing else to collapse,
+  and adding animations just to reduce them would be backwards. The pager's finger-driven
+  swipe settle stays: direct manipulation isn't the motion this setting removes, and the
+  framework governs its own animators by the same scale already. Verdicts pinned by
+  `MotionTest` (garbage scales fail towards stillness; the unset 1f default keeps motion).
 
 ### CCRM-33 · App Shortcuts — launcher long-press entries
 - **Status:** Planned · small
