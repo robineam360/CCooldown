@@ -313,6 +313,55 @@ class UsageCache(context: Context) {
         prefs.edit().putString("themeColor", name).apply()
     }
 
+    // --- automatic update checks (CCRM-28): app-global, deliberately not per-profile ---
+
+    fun autoCheckUpdates(): Boolean = prefs.getBoolean("autoCheckUpdates", true)
+
+    fun setAutoCheckUpdates(enabled: Boolean) {
+        prefs.edit().putBoolean("autoCheckUpdates", enabled).apply()
+    }
+
+    /** Last **successful** check, epoch ms; 0 = never. A failure never advances it. */
+    fun lastUpdateCheckAt(): Long = prefs.getLong("lastUpdateCheckAt", 0L)
+
+    /** The settings line's outcome half, e.g. "up to date (v0.14)" / "v0.15 available". */
+    fun lastUpdateCheckOutcome(): String? = prefs.getString("lastUpdateCheckOutcome", null)
+
+    fun recordUpdateCheckSuccess(at: Long, outcome: String) {
+        prefs.edit()
+            .putLong("lastUpdateCheckAt", at)
+            .putString("lastUpdateCheckOutcome", outcome)
+            .remove("lastUpdateFailAt")
+            .remove("lastUpdateFailReason")
+            .apply()
+    }
+
+    fun lastUpdateFailAt(): Long = prefs.getLong("lastUpdateFailAt", 0L)
+
+    fun lastUpdateFailReason(): String? = prefs.getString("lastUpdateFailReason", null)
+
+    /** Deliberately leaves lastUpdateCheckAt alone, so the next poll retries. */
+    fun recordUpdateCheckFailure(at: Long, reason: String) {
+        prefs.edit()
+            .putLong("lastUpdateFailAt", at)
+            .putString("lastUpdateFailReason", reason)
+            .apply()
+    }
+
+    /** Written only when the notification actually posted — once per version, ever. */
+    fun lastNotifiedVersion(): String? = prefs.getString("lastNotifiedVersion", null)
+
+    fun setLastNotifiedVersion(version: String) {
+        prefs.edit().putString("lastNotifiedVersion", version).apply()
+    }
+
+    /** "Skip this version": silences exactly this version; a newer one still notifies. */
+    fun dismissedUpdateVersion(): String? = prefs.getString("dismissedUpdateVersion", null)
+
+    fun setDismissedUpdateVersion(version: String) {
+        prefs.edit().putString("dismissedUpdateVersion", version).apply()
+    }
+
     // --- alert dedupe state: one alert per threshold per window instance ---
 
     fun alertKey(profile: Profile, name: String): Long = prefs.getLong(k(profile, "${name}Key"), 0L)

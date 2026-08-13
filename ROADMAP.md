@@ -452,7 +452,22 @@ keys) would still make this a different product. Not filed, not an open question
   being wrong.
 
 ### CCRM-28 · Auto Update Check — check in the background, and let a version be dismissed
-- **Status:** Planned · small
+- **Status:** Done (2026-08-13) · wireframe approved same day
+- **Shipped:** the check rides `UsagePollWorker` — no scheduler of its own — behind a
+  pure gate in `data/UpdateGate.kt` (`autoCheckUpdates` on and 6h past the last
+  *successful* check; a failure never advances the anchor, so the next poll retries).
+  A found release posts notification id 40 on the new `update_alerts` channel
+  (IMPORTANCE_LOW, silent) at most **once per version ever** — a swipe counts as seen —
+  with a "Skip this version" action (`notify/UpdateSkipReceiver`) that silences exactly
+  that version; a newer one still notifies. `lastNotifiedVersion` records only when the
+  post succeeded (the pace-alert rollback pattern). Tap opens the release page only if
+  its URL is https on github.com, else the hardcoded releases page — nothing ever
+  downloads or installs. New **Updates** settings section above About with the
+  auto-check toggle, the manual "Check for updates" button (moved out of the About
+  card), and the last-checked/failed outcome lines; the manual dialog names a skipped
+  version. Decision table, notes trimming, gate, and URL fallback pinned by 20 cases
+  in `UpdateGateTest` (117 tests, 0 failures).
+- **Was:** Planned · small
 - **Why:** Our update check is a button someone has to think to press
   ([SettingsScreen.kt:1206](app/src/main/java/com/robin/claudeusage/SettingsScreen.kt#L1206)).
   CCRM-8 established that this checker is **the only channel we have for reaching installed
