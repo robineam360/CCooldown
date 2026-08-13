@@ -389,7 +389,18 @@ keys) would still make this a different product. Not filed, not an open question
   minutes has no business rendering "resets in 43s".
 
 ### CCRM-26 · Quick Links — the Anthropic status page and the usage dashboard
-- **Status:** Planned · small
+- **Status:** Done (2026-08-13) · wireframe approved same day
+- **Shipped:** two text buttons on each *signed-in* account card (none when signed out —
+  nothing to verify), below a new divider after the Re-sign in/Clear row: "Anthropic
+  status" opens `status.anthropic.com` in the default browser, "Usage dashboard" opens
+  `claude.ai/settings/usage` through the same per-profile browser picker sign-in uses,
+  so it lands in the browser holding *that* account's Claude session. Main screen gets
+  "Check Anthropic status" directly under the red `Status:` line, same
+  `lastStatus != "OK"` gate — including the no-data-yet state, where it matters most.
+  Both URLs are compile-time https constants; `openInBrowser` moved out of `private`
+  so MainActivity shares the one launch path, now guarded by `allowedLinkUrl`
+  (https/http only, silent no-op otherwise) and pinned by 5 cases in `QuickLinksTest`.
+  Text-only buttons — no `material-icons-extended`.
 - **Why:** When the app shows a network error the first question is "is it me or is it
   them", and we make the user leave the app to find out. OpenQuota puts two links on every
   provider card: `status.anthropic.com` and `claude.ai/settings/usage`.

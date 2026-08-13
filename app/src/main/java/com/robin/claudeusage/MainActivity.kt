@@ -44,6 +44,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -577,6 +578,13 @@ private fun ProfileScreen(repo: UsageRepository, profile: Profile, use24h: Boole
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.error,
         )
+        // CCRM-26 (Quick Links): the "is it me or is it them" escape, shown under
+        // the same gate as the red line — including the no-data-yet state, where
+        // it matters most.
+        val context = LocalContext.current
+        TextButton(onClick = { openInBrowser(context, ANTHROPIC_STATUS_URL, null) }) {
+            Text("Check Anthropic status")
+        }
     }
 }
 
