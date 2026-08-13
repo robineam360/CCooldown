@@ -25,10 +25,12 @@ import androidx.glance.layout.padding
 import com.robin.claudeusage.MainActivity
 import com.robin.claudeusage.data.AuthState
 import com.robin.claudeusage.data.Profile
+import com.robin.claudeusage.data.Projection
 import com.robin.claudeusage.data.UsageCache
 import com.robin.claudeusage.data.UsageWindow
 import com.robin.claudeusage.data.WidgetPrefs
 import com.robin.claudeusage.ui.Fmt
+import com.robin.claudeusage.ui.elapsedPercent
 
 class BarWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = BarWidget()
@@ -66,9 +68,16 @@ class BarWidget : GlanceAppWidget() {
         val use24h = cache.use24hTime()
         val themeName = cache.themeColorName()
         val profileLabel = cache.profileLabel(profile)
+        val showOverPace = cache.paceOverOnWidgets()
+        // SizeMode.Single makes LocalSize the *minimum* size, not the real one, and the
+        // bar is a bitmap now — so take the width from the launcher's own options.
+        val widthDp = widgetWidthDp(context, appWidgetId)
         provideContent {
             GlanceTheme {
-                BarContent(profile, profileLabel, bar, snapshot, use24h, themeName)
+                BarContent(
+                    profile, profileLabel, bar, snapshot, use24h, themeName, showOverPace,
+                    widthDp,
+                )
             }
         }
     }
@@ -82,6 +91,8 @@ private fun BarContent(
     snapshot: com.robin.claudeusage.data.Snapshot,
     use24h: Boolean,
     themeName: String,
+    showOverPace: Boolean = true,
+    widgetWidthDp: Float? = null,
 ) {
     val rootModifier = GlanceModifier
         .fillMaxSize()
@@ -94,16 +105,26 @@ private fun BarContent(
     val dark = widgetIsDark()
     val data = snapshot.data
 
-    val (window: UsageWindow?, label: String, suffix: String) = when (bar) {
+    // The window length travels with the window: the pace mark is meaningless without
+    // it, and a model cap measured against the 5-hour window would park its tick at
+    // the left edge and look plausible (CCRM-43 (Bar Pace Marks)).
+    data class Choice(
+        val window: UsageWindow?,
+        val label: String,
+        val suffix: String,
+        val windowLengthMs: Long,
+    )
+    val (window: UsageWindow?, label: String, suffix: String, windowLengthMs: Long) = when (bar) {
         // "days" was the Days elapsed option, retired once the chart's even-pace
         // diagonal made it redundant. Widgets already placed with it land on the
         // 7-day window, which is what the figure was derived from.
-        "weekly", "days" -> Triple(data?.weekly, "7-day", "% used")
+        "weekly", "days" -> Choice(data?.weekly, "7-day", "% used", Projection.WEEKLY_MS)
         "model" -> {
             val cap = data?.modelCaps?.firstOrNull()
-            Triple(cap?.window, "${cap?.modelName ?: "Model"} · 7d", "% used")
+            // Model caps are "· 7-day" surfaces, so they measure against 7 days too.
+            Choice(cap?.window, "${cap?.modelName ?: "Model"} · 7d", "% used", Projection.WEEKLY_MS)
         }
-        else -> Triple(data?.session, "5-hour", "% used")
+        else -> Choice(data?.session, "5-hour", "% used", Projection.SESSION_MS)
     }
 
     // Credits were picked explicitly at placement, so they aren't gated on the
@@ -139,8 +160,9 @@ private fun BarContent(
                 // A bar needs a denominator. Without one it would render empty and read
                 // as "plenty left", so it is omitted entirely.
                 if (pct != null) {
-                    WidgetBar(pct, theme, dark, 12.dp)
-                    Spacer(GlanceModifier.height(4.dp))
+                    // No elapsed: money has no clock, so credits never carry a mark.
+                    WidgetBar(pct, theme, dark, 12.dp, widgetWidthDp = widgetWidthDp)
+                    Spacer(GlanceModifier.height(1.dp))
                 }
                 SubTextRow(
                     if (credits.limitMinor != null) {
@@ -159,9 +181,19 @@ private fun BarContent(
             }
             else -> {
                 HeaderRow(profile, "$label · $profileLabel", window?.percent, suffix, showRefresh = true)
-                Spacer(GlanceModifier.height(5.dp))
-                WidgetBar(window?.percent, theme, dark, 12.dp)
-                Spacer(GlanceModifier.height(4.dp))
+                // Trimmed from 5.dp/4.dp: the bar image carries 0.3 h of transparent
+                // overhang for the tick on each side, so the visible gaps are unchanged.
+                Spacer(GlanceModifier.height(1.dp))
+                WidgetBar(
+                    percent = window?.percent,
+                    theme = theme,
+                    dark = dark,
+                    height = 12.dp,
+                    elapsedPercent = elapsedPercent(window, windowLengthMs),
+                    showOverPace = showOverPace,
+                    widgetWidthDp = widgetWidthDp,
+                )
+                Spacer(GlanceModifier.height(1.dp))
                 ResetSubText(window, use24h)
             }
         }

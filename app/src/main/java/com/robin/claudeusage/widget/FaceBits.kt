@@ -82,6 +82,8 @@ internal fun ringBitmap(
     elapsedPercent: Double?,
     accent: Color,
     dark: Boolean,
+    /** The widgets' "Show red past the pace mark" toggle; the tick ignores it. */
+    showOverPace: Boolean = true,
 ): Bitmap {
     val density = context.resources.displayMetrics.density
     return RingRenderer.draw(
@@ -91,6 +93,7 @@ internal fun ringBitmap(
         elapsedPercent = elapsedPercent,
         accent = accent,
         dark = dark,
+        showOverPace = showOverPace,
     )
 }
 

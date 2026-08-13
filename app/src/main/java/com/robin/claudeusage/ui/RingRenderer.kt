@@ -32,6 +32,8 @@ object RingRenderer {
         elapsedPercent: Double?,
         accent: Color,
         dark: Boolean,
+        /** The widgets' "Show red past the pace mark" setting; the tick ignores it. */
+        showOverPace: Boolean = true,
     ): Bitmap {
         val bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bmp)
@@ -64,9 +66,20 @@ object RingRenderer {
 
             // 3 · red segment — the full red role, only when meaningfully over pace.
             // At 100% it is invisible against the fill, which is fine.
-            RingGeometry.redSegment(percent, elapsedPercent)?.let { (start, len) ->
+            RingGeometry.redSegment(percent, elapsedPercent, showOverPace)?.let { (start, len) ->
                 stroke.color = Palette.barColor(100.0, accent, dark).toArgb()
                 canvas.drawArc(oval, RingGeometry.START_ANGLE + start, len, false, stroke)
+                // The round cap is what lets the segment cover the fill's own tip
+                // completely — but it also bulges backwards behind the tick. Trim that
+                // by redrawing the fill colour from 12 o'clock to the tick, butt-capped,
+                // so the red begins *exactly* on the pace line (CCRM-43 (Bar Pace Marks)
+                // wireframe rev B). The fill's round start cap at 12 o'clock is already
+                // painted and this doesn't erase it.
+                if (start > 0f) {
+                    stroke.color = Palette.barColor(percent, accent, dark).toArgb()
+                    stroke.strokeCap = Paint.Cap.BUTT
+                    canvas.drawArc(oval, RingGeometry.START_ANGLE, start, false, stroke)
+                }
             }
         }
 

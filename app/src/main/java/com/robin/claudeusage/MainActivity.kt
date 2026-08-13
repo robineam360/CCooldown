@@ -9,6 +9,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
@@ -62,6 +63,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -72,6 +76,7 @@ import com.robin.claudeusage.data.Profile
 import com.robin.claudeusage.data.Projection
 import com.robin.claudeusage.data.UsageRepository
 import com.robin.claudeusage.data.UsageWindow
+import com.robin.claudeusage.ui.BarGeometry
 import com.robin.claudeusage.ui.ChartColumnMaxWidth
 import com.robin.claudeusage.ui.ContentColumn
 import com.robin.claudeusage.ui.ContentMaxWidth
@@ -129,6 +134,10 @@ private fun App(startProfile: Profile) {
     var debugUnlocked by remember { mutableStateOf(false) }
     var themeName by remember { mutableStateOf(cache.themeColorName()) }
     var use24h by remember { mutableStateOf(cache.use24hTime()) }
+    // Hoisted like use24h so flipping the toggle in Settings recomposes the bars
+    // behind it — CCRM-43 (Bar Pace Marks) gates the in-app red separately from the
+    // widgets' and the notification's.
+    var paceOverInApp by remember { mutableStateOf(cache.paceOverInApp()) }
     var tick by remember { mutableIntStateOf(0) }
 
     // Ticks every few seconds so "updated Xm ago" and background results stay fresh.
@@ -229,7 +238,10 @@ private fun App(startProfile: Profile) {
                 }
                 when (screen) {
                     Screen.MAIN ->
-                        ProfileTabs(repo, use24h, tick, startProfile, Modifier.padding(innerPadding))
+                        ProfileTabs(
+                            repo, use24h, paceOverInApp, tick, startProfile,
+                            Modifier.padding(innerPadding),
+                        )
                     else -> ContentColumn(
                         modifier = Modifier.padding(innerPadding),
                         maxWidth = contentWidth,
@@ -242,6 +254,8 @@ private fun App(startProfile: Profile) {
                                 repo = repo,
                                 use24h = use24h,
                                 onUse24h = { use24h = it },
+                                paceOverInApp = paceOverInApp,
+                                onPaceOverInApp = { paceOverInApp = it },
                                 themeName = themeName,
                                 onTheme = { themeName = it },
                                 debugUnlocked = debugUnlocked,
@@ -275,6 +289,7 @@ private fun App(startProfile: Profile) {
 private fun ProfileTabs(
     repo: UsageRepository,
     use24h: Boolean,
+    showOverPace: Boolean,
     tick: Int,
     startProfile: Profile,
     modifier: Modifier,
@@ -324,31 +339,92 @@ private fun ProfileTabs(
         ) { page ->
             ContentColumn(maxWidth = ChartColumnMaxWidth) {
                 Spacer(Modifier.height(16.dp))
-                ProfileScreen(repo, profiles[page], use24h, tick)
+                ProfileScreen(repo, profiles[page], use24h, showOverPace, tick)
                 Spacer(Modifier.height(24.dp))
             }
         }
     }
 }
 
-/** Claude-style bar: light tint track, solid fill, fully rounded. */
+/**
+ * Claude-style bar: light tint track, solid fill, fully rounded — plus the pace
+ * marks (CCRM-43 (Bar Pace Marks)): the neutral even-pace tick and, past the dead
+ * zone, the red over-pace segment.
+ *
+ * [elapsedPercent] null → no marks at all: either there is no reset clock to derive
+ * even pace from, or this is a credits row, which has no clock by definition.
+ * [showOverPace] is the Settings toggle and gates only the red; the tick always
+ * draws.
+ *
+ * The outer Box is deliberately *not* clipped and is taller than the bar: the tick
+ * overhangs the bar by 0.3h top and bottom, so a clip here would shear it off. The
+ * track and fill carry their own rounded clips instead.
+ */
 @Composable
-private fun UsageBarLine(percent: Double?, fillColor: Color, height: androidx.compose.ui.unit.Dp = 12.dp) {
+private fun UsageBarLine(
+    percent: Double?,
+    fillColor: Color,
+    height: androidx.compose.ui.unit.Dp = 12.dp,
+    elapsedPercent: Double? = null,
+    showOverPace: Boolean = true,
+) {
     val fraction = ((percent ?: 0.0) / 100.0).toFloat().coerceIn(0f, 1f)
+    val overhang = height * 0.3f
+    val segment = BarGeometry.redSegment(percent, elapsedPercent, showOverPace)
+    val tick = BarGeometry.showTick(percent, elapsedPercent)
+    val tickColor = MaterialTheme.colorScheme.onSurface.copy(
+        alpha = if (isSystemInDarkTheme()) 0.60f else 0.48f,
+    )
+    val redColor = Palette.barColor(100.0, fillColor, isSystemInDarkTheme())
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(height)
-            .clip(RoundedCornerShape(height / 2))
-            .background(fillColor.copy(alpha = 0.25f)),
+            .height(height + overhang * 2),
+        contentAlignment = Alignment.CenterStart,
     ) {
         Box(
             modifier = Modifier
-                .fillMaxWidth(fraction)
-                .fillMaxHeight()
+                .fillMaxWidth()
+                .height(height)
                 .clip(RoundedCornerShape(height / 2))
-                .background(fillColor),
-        )
+                .background(fillColor.copy(alpha = 0.25f)),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(fraction)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(height / 2))
+                    .background(fillColor),
+            ) {
+                // The red rides *inside* the fill's clip, which is what makes the
+                // boundary between the two colours a straight vertical edge and lets
+                // the red cover the fill's rounded tip (wireframe rev B). Offsetting
+                // by the segment's start keeps it beginning exactly on the pace line.
+                if (segment != null) {
+                    val (start, end) = segment
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(if (end > 0f) 1f - start / end else 0f)
+                            .fillMaxHeight()
+                            .align(Alignment.CenterEnd)
+                            .background(redColor),
+                    )
+                }
+            }
+        }
+        if (tick) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val w = BarGeometry.tickWidth(height.toPx())
+                val cx = size.width * BarGeometry.tickFraction(elapsedPercent!!)
+                drawRoundRect(
+                    color = tickColor,
+                    topLeft = Offset(cx - w / 2f, 0f),
+                    size = Size(w, size.height),
+                    cornerRadius = CornerRadius(w / 2f),
+                )
+            }
+        }
     }
 }
 
@@ -383,7 +459,13 @@ private fun barFill(percent: Double?): Color =
     Palette.barColor(percent, MaterialTheme.colorScheme.primary, isSystemInDarkTheme())
 
 @Composable
-private fun ProfileScreen(repo: UsageRepository, profile: Profile, use24h: Boolean, tick: Int) {
+private fun ProfileScreen(
+    repo: UsageRepository,
+    profile: Profile,
+    use24h: Boolean,
+    showOverPace: Boolean,
+    tick: Int,
+) {
     val scope = rememberCoroutineScope()
     var refreshing by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
@@ -427,7 +509,12 @@ private fun ProfileScreen(repo: UsageRepository, profile: Profile, use24h: Boole
                     )
                 }
                 Spacer(Modifier.height(8.dp))
-                UsageBarLine(data.session?.percent, barFill(data.session?.percent))
+                UsageBarLine(
+                    percent = data.session?.percent,
+                    fillColor = barFill(data.session?.percent),
+                    elapsedPercent = elapsedPercent(data.session, SESSION_MS),
+                    showOverPace = showOverPace,
+                )
                 data.session?.let { w ->
                     TrendBlock(
                         window = w,
@@ -448,9 +535,9 @@ private fun ProfileScreen(repo: UsageRepository, profile: Profile, use24h: Boole
             Column(Modifier.padding(16.dp)) {
                 Text("7-day window", style = MaterialTheme.typography.titleSmall)
                 Spacer(Modifier.height(10.dp))
-                SubBar("All models", data.weekly?.percent, "% used")
+                SubBar("All models", data.weekly, "% used", showOverPace)
                 for (cap in data.modelCaps) {
-                    SubBar(cap.modelName, cap.window.percent, "% used")
+                    SubBar(cap.modelName, cap.window, "% used", showOverPace)
                 }
                 data.weekly?.let { w ->
                     TrendBlock(
@@ -512,6 +599,9 @@ private fun ProfileScreen(repo: UsageRepository, profile: Profile, use24h: Boole
                     }
                     if (pct != null) {
                         Spacer(Modifier.height(8.dp))
+                        // No elapsed, so no pace mark: credits are money, and money
+                        // has no clock. Spending them faster than the month isn't a
+                        // thing to be behind or ahead of.
                         UsageBarLine(pct, barFill(pct))
                     }
                     Spacer(Modifier.height(8.dp))
@@ -685,8 +775,20 @@ private fun TrendBlock(
     }
 }
 
+/**
+ * One 7-day row: All models, or a per-model cap. Takes the whole [window] rather
+ * than a bare percent because the pace mark needs its reset time — and every row
+ * under the 7-day card measures against 7 days, model caps included (they are
+ * "· 7-day" surfaces).
+ */
 @Composable
-private fun SubBar(label: String, percent: Double?, suffix: String) {
+private fun SubBar(
+    label: String,
+    window: UsageWindow?,
+    suffix: String,
+    showOverPace: Boolean = true,
+) {
+    val percent = window?.percent
     Row(verticalAlignment = Alignment.Bottom) {
         Text(
             label,
@@ -702,6 +804,11 @@ private fun SubBar(label: String, percent: Double?, suffix: String) {
         )
     }
     Spacer(Modifier.height(4.dp))
-    UsageBarLine(percent, barFill(percent))
+    UsageBarLine(
+        percent = percent,
+        fillColor = barFill(percent),
+        elapsedPercent = elapsedPercent(window, WEEKLY_MS),
+        showOverPace = showOverPace,
+    )
     Spacer(Modifier.height(10.dp))
 }

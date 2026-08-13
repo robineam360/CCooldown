@@ -301,6 +301,34 @@ class UsageCache(context: Context) {
         prefs.edit().putBoolean("creditsOnWidgets", enabled).apply()
     }
 
+    // --- CCRM-43 (Bar Pace Marks): the red over-pace segment, per surface ---
+    //
+    // Three keys rather than one, by decision of 2026-08-13: the surfaces are read at
+    // very different distances (a glance at a widget, a long look at the usage screen,
+    // a notification you can't dismiss), so the appetite for red differs per surface.
+    // All default ON — the behaviour approved in CCRM-39 (Ring Widget) and shipped —
+    // and each gates *only* the segment. The neutral even-pace tick always draws, and
+    // the 80/90/100 severity ladder is untouched: this is about pace, not severity.
+
+    /** Bars *and* rings on the home screen: one home screen, one answer. */
+    fun paceOverOnWidgets(): Boolean = prefs.getBoolean("paceOverOnWidgets", true)
+
+    fun setPaceOverOnWidgets(enabled: Boolean) {
+        prefs.edit().putBoolean("paceOverOnWidgets", enabled).apply()
+    }
+
+    fun paceOverInApp(): Boolean = prefs.getBoolean("paceOverInApp", true)
+
+    fun setPaceOverInApp(enabled: Boolean) {
+        prefs.edit().putBoolean("paceOverInApp", enabled).apply()
+    }
+
+    fun paceOverOnNotification(): Boolean = prefs.getBoolean("paceOverOnNotification", true)
+
+    fun setPaceOverOnNotification(enabled: Boolean) {
+        prefs.edit().putBoolean("paceOverOnNotification", enabled).apply()
+    }
+
     fun use24hTime(): Boolean = prefs.getBoolean("use24hTime", false)
 
     fun setUse24hTime(enabled: Boolean) {

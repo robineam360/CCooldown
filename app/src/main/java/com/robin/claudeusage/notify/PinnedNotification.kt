@@ -9,6 +9,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color as AndroidColor
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.util.TypedValue
@@ -21,12 +22,16 @@ import androidx.compose.ui.graphics.toArgb
 import com.robin.claudeusage.MainActivity
 import com.robin.claudeusage.R
 import com.robin.claudeusage.data.Profile
+import com.robin.claudeusage.data.Projection
 import com.robin.claudeusage.data.UsageCache
 import com.robin.claudeusage.data.UsageData
 import com.robin.claudeusage.data.UsageWindow
+import com.robin.claudeusage.ui.BarGeometry
+import com.robin.claudeusage.ui.BarRenderer
 import com.robin.claudeusage.ui.Fmt
 import com.robin.claudeusage.ui.Palette
 import com.robin.claudeusage.ui.UsageIcon
+import com.robin.claudeusage.ui.elapsedPercent
 
 /**
  * The optional always-on notification: one profile's 5-hour usage as a filled
@@ -42,6 +47,14 @@ object PinnedNotification {
     // v2: LOW (not MIN) so the status-bar icon actually shows. Channel importance
     // is locked after creation, so the level change needs a fresh channel id.
     private const val CHANNEL = "pinned_usage_v2"
+
+    /**
+     * The nominal width every bitmap in this notification is drawn at. RemoteViews
+     * never learns the real content width, so both the panel and the collapsed bar
+     * assume the same figure and let `fitXY` take up the small remaining difference.
+     */
+    private const val PANEL_WIDTH_DP = 340f
+
     private const val NOTIF_ID = 9100
     const val ACTION_REFRESH = "com.robin.claudeusage.PINNED_REFRESH"
 
@@ -86,6 +99,10 @@ object PinnedNotification {
 
         val style = cache.pinnedStyle()
         val fill = Palette.barColor(pct, theme, dark)
+        // CCRM-43 (Bar Pace Marks): this surface's own red toggle. The even-pace tick
+        // draws regardless; only the colour past it is optional.
+        val showOverPace = cache.paceOverOnNotification()
+        val sessionElapsed = elapsedPercent(session, Projection.SESSION_MS)
         val smallIcon = drawStatusIcon(context, pct, cache.pinnedIconStyle())
         val pctText = if (pct == null) "—" else "${pct.toInt()}%"
 
@@ -131,7 +148,7 @@ object PinnedNotification {
             .setColor(fill.toArgb())
             .addAction(0, "Refresh", refresh)
 
-        val panel = data?.let { drawPanel(context, label, it, theme, dark, use24h) }
+        val panel = data?.let { drawPanel(context, label, it, theme, dark, use24h, showOverPace) }
 
         when (style) {
             // A — the number owns the large-icon slot instead of a ring around it.
@@ -147,12 +164,16 @@ object PinnedNotification {
             // C — custom views: the largest number the collapsed row can hold.
             "big" -> {
                 builder.setCustomContentView(
-                    bigNumberView(context, R.layout.notif_big_number, pctText, title, collapsedText, pct, fill, null)
+                    bigNumberView(
+                        context, R.layout.notif_big_number, pctText, title, collapsedText,
+                        pct, sessionElapsed, fill, theme, dark, showOverPace, null,
+                    )
                 )
                 builder.setCustomBigContentView(
                     bigNumberView(
                         context, R.layout.notif_big_number_expanded,
-                        pctText, title, collapsedText, pct, fill, panel,
+                        pctText, title, collapsedText,
+                        pct, sessionElapsed, fill, theme, dark, showOverPace, panel,
                     )
                 )
                 builder.setStyle(NotificationCompat.DecoratedCustomViewStyle())
@@ -217,40 +238,52 @@ object PinnedNotification {
         title: String,
         sub: String,
         pct: Double?,
+        elapsed: Double?,
         fill: Color,
+        theme: Color,
+        dark: Boolean,
+        showOverPace: Boolean,
         panel: Bitmap?,
     ): RemoteViews = RemoteViews(context.packageName, layout).apply {
         setTextViewText(R.id.pct, pctText)
         setTextColor(R.id.pct, fill.toArgb())
         setTextViewText(R.id.title, title)
         setTextViewText(R.id.sub, sub)
-        setImageViewBitmap(R.id.bar, drawBarBitmap(context, pct, fill))
+        setImageViewBitmap(
+            R.id.bar, drawBarBitmap(context, pct, elapsed, theme, dark, showOverPace),
+        )
         if (panel != null) setImageViewBitmap(R.id.panel, panel)
     }
 
     // --- drawing ---
 
     /**
-     * A wide, short rounded bar. Drawn at a fixed pixel width and stretched by the
-     * ImageView (fitXY), so the rounded caps are built from the height only and
-     * survive the scaling.
+     * The collapsed row's 5-hour bar, with its pace mark.
+     *
+     * Rendered at the same nominal width the expanded panel assumes (340 dp) rather
+     * than the old `h × 80`. The ImageView is still `fitXY` — RemoteViews can't tell
+     * us the real content width — but at roughly 1:1 the residual stretch is a few
+     * percent instead of the 2.4× horizontal squeeze the old aspect produced, which
+     * flattened the tick to about 0.19 h and skewed the fill→red boundary off the
+     * vertical (CCRM-43 (Bar Pace Marks) wireframe rev B, D4). The tick's *position*
+     * was always exact; this is about its shape.
      */
-    private fun drawBarBitmap(context: Context, pct: Double?, fill: Color): Bitmap {
-        val h = dp(context, 8f).toInt().coerceAtLeast(8)
-        val w = h * 80
-        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-        val c = Canvas(bmp)
-        val r = h / 2f
-        val track = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = fill.copy(alpha = 0.25f).toArgb() }
-        c.drawRoundRect(RectF(0f, 0f, w.toFloat(), h.toFloat()), r, r, track)
-
-        val fraction = ((pct ?: 0.0) / 100.0).coerceIn(0.0, 1.0).toFloat()
-        if (fraction > 0f) {
-            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = fill.toArgb() }
-            c.drawRoundRect(RectF(0f, 0f, (w * fraction).coerceAtLeast(h.toFloat()), h.toFloat()), r, r, paint)
-        }
-        return bmp
-    }
+    private fun drawBarBitmap(
+        context: Context,
+        pct: Double?,
+        elapsed: Double?,
+        theme: Color,
+        dark: Boolean,
+        showOverPace: Boolean,
+    ): Bitmap = BarRenderer.draw(
+        widthPx = dp(context, PANEL_WIDTH_DP),
+        heightPx = dp(context, 8f),
+        percent = pct,
+        elapsedPercent = elapsed,
+        accent = theme,
+        dark = dark,
+        showOverPace = showOverPace,
+    )
 
     /**
      * Layout A: the large-icon slot as a solid tile with the number filling it.
@@ -376,6 +409,7 @@ object PinnedNotification {
         theme: Color,
         dark: Boolean,
         use24h: Boolean,
+        showOverPace: Boolean,
     ): Bitmap? {
         data class Bar(val label: String, val window: UsageWindow?, val sub: String)
         val bars = buildList {
@@ -389,17 +423,22 @@ object PinnedNotification {
         }.take(4)
         if (bars.isEmpty()) return null
 
-        val width = dp(context, 340f).toInt()
+        val width = dp(context, PANEL_WIDTH_DP).toInt()
         val left = dp(context, 2f)
         val right = width - dp(context, 2f)
         val barThick = dp(context, 10f)
         val labelH = dp(context, 19f)
         val subH = dp(context, 15f)
         val rowGap = dp(context, 14f)
+        // Every row grows by the tick's overhang above and below, so a mark at the
+        // top or bottom edge of the bar can't collide with the label or be cut off.
+        // The 2 dp side inset is already wider than half a tick (1.55 dp at this
+        // thickness), so a tick at 0% or 100% stays inside the bitmap horizontally.
+        val over = BarGeometry.tickOverhang(barThick)
 
         var height = 0f
         for (b in bars) {
-            height += labelH + dp(context, 7f) + barThick
+            height += labelH + dp(context, 7f) + 2f * over + barThick
             if (b.sub.isNotEmpty()) height += subH
             height += rowGap
         }
@@ -427,20 +466,64 @@ object PinnedNotification {
             val baseline = y + labelH - dp(context, 4f)
             c.drawText(bar.label, left, baseline, labelPaint)
             c.drawText(bar.window?.percent?.let { "${it.toInt()}%" } ?: "—", right, baseline, valuePaint)
-            y += labelH + dp(context, 7f)
+            y += labelH + dp(context, 7f) + over
 
-            val fill = Palette.barColor(bar.window?.percent, theme, dark)
+            val pct = bar.window?.percent
+            // Every row in this panel is a 7-day surface — the weekly window and the
+            // per-model caps alike — so they all measure their pace against 7 days.
+            val elapsed = elapsedPercent(bar.window, Projection.WEEKLY_MS)
+            val fill = Palette.barColor(pct, theme, dark)
             val radius = barThick / 2f
             val track = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = fill.copy(alpha = 0.25f).toArgb() }
             c.drawRoundRect(RectF(left, y, right, y + barThick), radius, radius, track)
 
-            val fraction = ((bar.window?.percent ?: 0.0) / 100.0).coerceIn(0.0, 1.0).toFloat()
-            if (fraction > 0f) {
-                val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = fill.toArgb() }
-                val end = (left + (right - left) * fraction).coerceAtLeast(left + barThick)
-                c.drawRoundRect(RectF(left, y, end, y + barThick), radius, radius, paint)
+            var fillEnd: Float? = null
+            if (pct != null) {
+                val end = left + (right - left) * BarGeometry.fillFraction(pct)
+                if (end > left) {
+                    fillEnd = end.coerceAtLeast(left + barThick).coerceAtMost(right)
+                    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = fill.toArgb() }
+                    c.drawRoundRect(RectF(left, y, fillEnd, y + barThick), radius, radius, paint)
+                }
             }
-            y += barThick
+
+            // The red rides inside a clip of the fill's own rounded rect: straight
+            // vertical boundary where the colours meet, and the red covers the fill's
+            // rounded tip rather than stopping short of it.
+            val segment = BarGeometry.redSegment(pct, elapsed, showOverPace)
+            if (segment != null && fillEnd != null) {
+                val segLeft = left + (right - left) * segment.first
+                if (fillEnd > segLeft) {
+                    val clip = Path().apply {
+                        addRoundRect(
+                            RectF(left, y, fillEnd, y + barThick), radius, radius, Path.Direction.CW,
+                        )
+                    }
+                    c.save()
+                    c.clipPath(clip)
+                    c.drawRect(
+                        RectF(segLeft, y, fillEnd, y + barThick),
+                        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                            color = Palette.barColor(100.0, theme, dark).toArgb()
+                        },
+                    )
+                    c.restore()
+                }
+            }
+
+            if (BarGeometry.showTick(pct, elapsed)) {
+                val tickW = BarGeometry.tickWidth(barThick)
+                val cx = left + (right - left) * BarGeometry.tickFraction(elapsed!!)
+                val tickPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = (if (dark) Color(0xFFF2F2F4) else Color(0xFF1D1D1F))
+                        .copy(alpha = if (dark) 0.60f else 0.48f).toArgb()
+                }
+                c.drawRoundRect(
+                    RectF(cx - tickW / 2f, y - over, cx + tickW / 2f, y + barThick + over),
+                    tickW / 2f, tickW / 2f, tickPaint,
+                )
+            }
+            y += barThick + over
 
             if (bar.sub.isNotEmpty()) {
                 c.drawText(bar.sub, left, y + subH - dp(context, 3f), subPaint)

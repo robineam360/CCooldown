@@ -84,6 +84,8 @@ class RingWidget : GlanceAppWidget() {
         val windowLengthMs =
             if (windowKey == "weekly") Projection.WEEKLY_MS else Projection.SESSION_MS
         window?.resetsAt?.let { Polling.armResetRedraw(context, it.toEpochMilli()) }
+        // Widgets read UsageCache directly; there is no composition to hoist into here.
+        val showOverPace = cache.paceOverOnWidgets()
         provideContent {
             GlanceTheme {
                 RingFace(
@@ -94,6 +96,7 @@ class RingWidget : GlanceAppWidget() {
                     windowLengthMs = windowLengthMs,
                     use24h = use24h,
                     themeName = themeName,
+                    showOverPace = showOverPace,
                 )
             }
         }
@@ -109,6 +112,7 @@ private fun RingFace(
     windowLengthMs: Long,
     use24h: Boolean,
     themeName: String,
+    showOverPace: Boolean = true,
 ) {
     val context = LocalContext.current
     val size = LocalSize.current
@@ -135,7 +139,7 @@ private fun RingFace(
             Box(contentAlignment = Alignment.Center) {
                 Image(
                     provider = ImageProvider(
-                        ringBitmap(context, ringDp, strokeDp, percent, elapsed, accent, dark)
+                        ringBitmap(context, ringDp, strokeDp, percent, elapsed, accent, dark, showOverPace)
                     ),
                     contentDescription = null,
                     modifier = GlanceModifier.size(ringDp.dp),

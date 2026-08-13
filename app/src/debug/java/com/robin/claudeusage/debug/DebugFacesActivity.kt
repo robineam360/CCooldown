@@ -23,13 +23,14 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.robin.claudeusage.ui.BarRenderer
 import com.robin.claudeusage.ui.Palette
 import com.robin.claudeusage.ui.RingRenderer
 import com.robin.claudeusage.widget.ChartBitmap
 
 /**
- * Debug-only contact sheet: the real RingRenderer/ChartBitmap pipeline over the
- * handover §6 fixtures, light and dark — the widget preview harness. Launch:
+ * Debug-only contact sheet: the real RingRenderer/BarRenderer/ChartBitmap pipeline
+ * over the handover fixtures, light and dark — the widget preview harness. Launch:
  * `adb shell am start -n com.robin.claudeusage/.debug.DebugFacesActivity`.
  * Compare against design/widget-wireframes.html and the Mac renders.
  */
@@ -68,6 +69,27 @@ private val RING_FIXTURES = listOf(
     "noData" to (null to null),
 )
 
+/**
+ * The bar states from the CCRM-43 (Bar Pace Marks) wireframe §2, in the order the
+ * wireframe shows them. This is also the CCRM-15 (Above-Pace Verification) residual
+ * for bars: the over-pace and dead-zone states are the ones that shipped unobserved
+ * on the rings, and every one of them is now a thing you can look at on a device.
+ */
+private val BAR_FIXTURES = listOf<Triple<String, Double?, Double?>>(
+    Triple("under pace 42/70", 42.0, 70.0),
+    Triple("over pace 78/70", 78.0, 70.0),
+    Triple("dead zone 72/70", 72.0, 70.0),
+    Triple("boundary not over 73/70", 73.0, 70.0),
+    Triple("boundary over 73.5/70", 73.5, 70.0),
+    Triple("fill covers tick 96/40", 96.0, 40.0),
+    Triple("at 100% 100/62", 100.0, 62.0),
+    Triple("tick at start 4/2", 4.0, 2.0),
+    Triple("tick at end 99/100", 99.0, 100.0),
+    Triple("no percent", null, 70.0),
+    Triple("no reset clock 55/-", 55.0, null),
+    Triple("credits 61/-", 61.0, null),
+)
+
 @Composable
 private fun Sheet(dark: Boolean) {
     val context = LocalContext.current
@@ -76,33 +98,106 @@ private fun Sheet(dark: Boolean) {
     val face = if (dark) Color(0xFF242428) else Color.White
 
     Column(Modifier.background(face).padding(12.dp)) {
-        // Hero rings + mini-rings, drawn by the exact widget code path.
-        for (ringDp in listOf(128f, 56f)) {
-            Row {
-                for ((label, fx) in RING_FIXTURES) {
-                    val (pct, elapsed) = fx
-                    Column(Modifier.padding(4.dp)) {
-                        Image(
-                            bitmap = RingRenderer.draw(
-                                sizePx = (ringDp * density).toInt(),
-                                strokePx = (if (ringDp > 100f) 8f else 5.5f) * density,
-                                percent = pct,
-                                elapsedPercent = elapsed,
-                                accent = accent,
-                                dark = dark,
-                            ).asImageBitmap(),
-                            contentDescription = label,
-                            modifier = Modifier.size(ringDp.dp),
-                        )
-                        if (ringDp > 100f) Text(
-                            label,
-                            fontSize = 8.sp,
-                            color = if (dark) Color.White else Color.Black,
-                        )
+        // Hero rings + mini-rings, drawn by the exact widget code path. The second
+        // pass has the red toggled off, which is what the widgets setting does — the
+        // tick must survive it, and the fill must keep its severity colour.
+        for (showOverPace in listOf(true, false)) {
+            for (ringDp in listOf(128f, 56f)) {
+                Row {
+                    for ((label, fx) in RING_FIXTURES) {
+                        val (pct, elapsed) = fx
+                        Column(Modifier.padding(4.dp)) {
+                            Image(
+                                bitmap = RingRenderer.draw(
+                                    sizePx = (ringDp * density).toInt(),
+                                    strokePx = (if (ringDp > 100f) 8f else 5.5f) * density,
+                                    percent = pct,
+                                    elapsedPercent = elapsed,
+                                    accent = accent,
+                                    dark = dark,
+                                    showOverPace = showOverPace,
+                                ).asImageBitmap(),
+                                contentDescription = label,
+                                modifier = Modifier.size(ringDp.dp),
+                            )
+                            if (ringDp > 100f) Text(
+                                if (showOverPace) label else "$label · red off",
+                                fontSize = 8.sp,
+                                color = if (dark) Color.White else Color.Black,
+                            )
+                        }
                     }
                 }
+                Spacer(Modifier.height(8.dp))
             }
-            Spacer(Modifier.height(8.dp))
+        }
+
+        // The bars, through the real BarRenderer: every wireframe §2 state at both
+        // widget heights, then the same over-pace states with the red switched off.
+        for (barDp in listOf(12f, 14f)) {
+            for ((label, pct, elapsed) in BAR_FIXTURES) {
+                Text(
+                    "${barDp.toInt()}dp · $label",
+                    fontSize = 8.sp,
+                    color = if (dark) Color.White else Color.Black,
+                )
+                Image(
+                    bitmap = BarRenderer.draw(
+                        widthPx = 300 * density,
+                        heightPx = barDp * density,
+                        percent = pct,
+                        elapsedPercent = elapsed,
+                        accent = accent,
+                        dark = dark,
+                    ).asImageBitmap(),
+                    contentDescription = label,
+                    modifier = Modifier.width(300.dp).height((barDp * 1.6f).dp),
+                )
+                Spacer(Modifier.height(4.dp))
+            }
+        }
+        for ((label, pct, elapsed) in BAR_FIXTURES.filter { it.second != null && it.third != null }) {
+            Text(
+                "12dp · $label · red off",
+                fontSize = 8.sp,
+                color = if (dark) Color.White else Color.Black,
+            )
+            Image(
+                bitmap = BarRenderer.draw(
+                    widthPx = 300 * density,
+                    heightPx = 12f * density,
+                    percent = pct,
+                    elapsedPercent = elapsed,
+                    accent = accent,
+                    dark = dark,
+                    showOverPace = false,
+                ).asImageBitmap(),
+                contentDescription = label,
+                modifier = Modifier.width(300.dp).height((12f * 1.6f).dp),
+            )
+            Spacer(Modifier.height(4.dp))
+        }
+        // The narrow case: at 150 dp the smallest segment the dead zone allows is a
+        // few dp wide, and it is drawn true to scale rather than padded out.
+        for ((label, pct, elapsed) in BAR_FIXTURES.filter { it.second != null && it.third != null }) {
+            Text(
+                "150dp wide · $label",
+                fontSize = 8.sp,
+                color = if (dark) Color.White else Color.Black,
+            )
+            Image(
+                bitmap = BarRenderer.draw(
+                    widthPx = 150 * density,
+                    heightPx = 12f * density,
+                    percent = pct,
+                    elapsedPercent = elapsed,
+                    accent = accent,
+                    dark = dark,
+                ).asImageBitmap(),
+                contentDescription = label,
+                modifier = Modifier.width(150.dp).height((12f * 1.6f).dp),
+            )
+            Spacer(Modifier.height(4.dp))
         }
         // The chart, over- and under-pace plus refused and empty.
         val now = System.currentTimeMillis()

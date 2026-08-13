@@ -113,6 +113,9 @@ fun SettingsScreen(
     repo: UsageRepository,
     use24h: Boolean,
     onUse24h: (Boolean) -> Unit,
+    /** Hoisted so flipping it recomposes the usage screen's bars behind this one. */
+    paceOverInApp: Boolean,
+    onPaceOverInApp: (Boolean) -> Unit,
     themeName: String,
     onTheme: (String) -> Unit,
     debugUnlocked: Boolean,
@@ -516,6 +519,51 @@ fun SettingsScreen(
                 onUse24h(it)
                 repo.cacheSettings().setUse24hTime(it)
                 refreshWidgets()
+            }
+            RowDivider()
+            // CCRM-43 (Bar Pace Marks). One group, three switches: the surfaces are
+            // read at very different distances, so the appetite for red differs. Each
+            // gates *only* the red past the pace mark — the neutral even-pace tick
+            // always draws, and the 80/90/100 severity ladder is untouched.
+            Text(
+                "Show red past the pace mark",
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                "Off keeps the even-pace tick without the colour.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(6.dp))
+            var paceOverWidgets by remember { mutableStateOf(cacheSettings.paceOverOnWidgets()) }
+            ToggleRow(
+                title = "On widgets",
+                subtitle = "Bars and rings on the home screen",
+                checked = paceOverWidgets,
+            ) {
+                paceOverWidgets = it
+                cacheSettings.setPaceOverOnWidgets(it)
+                refreshWidgets()
+            }
+            ToggleRow(
+                title = "In-app bars",
+                subtitle = "The usage screen's bars",
+                checked = paceOverInApp,
+            ) {
+                onPaceOverInApp(it)
+                cacheSettings.setPaceOverInApp(it)
+            }
+            var paceOverNotif by remember { mutableStateOf(cacheSettings.paceOverOnNotification()) }
+            ToggleRow(
+                title = "Pinned notification",
+                subtitle = "The always-on notification's bars",
+                checked = paceOverNotif,
+            ) {
+                paceOverNotif = it
+                cacheSettings.setPaceOverOnNotification(it)
+                // Re-post so the change lands without waiting for the next refresh.
+                com.robin.claudeusage.notify.PinnedNotification.update(context, cacheSettings)
             }
             RowDivider()
             Text("Theme color", style = MaterialTheme.typography.bodyLarge)

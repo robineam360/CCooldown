@@ -13,6 +13,7 @@ import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
 import androidx.glance.Image
 import androidx.glance.ImageProvider
+import androidx.glance.layout.ContentScale
 import androidx.glance.LocalContext
 import androidx.glance.LocalSize
 import androidx.glance.action.ActionParameters
@@ -22,7 +23,6 @@ import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
-import androidx.glance.appwidget.LinearProgressIndicator
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.ActionCallback
 import androidx.glance.appwidget.action.actionRunCallback
@@ -42,17 +42,19 @@ import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
-import androidx.glance.unit.ColorProvider
 import com.robin.claudeusage.MainActivity
 import com.robin.claudeusage.R
 import com.robin.claudeusage.data.AuthState
 import com.robin.claudeusage.data.Profile
+import com.robin.claudeusage.data.Projection
 import com.robin.claudeusage.data.Snapshot
 import com.robin.claudeusage.data.UsageCache
 import com.robin.claudeusage.data.UsageWindow
 import com.robin.claudeusage.data.WidgetPrefs
+import com.robin.claudeusage.ui.BarRenderer
 import com.robin.claudeusage.ui.Fmt
 import com.robin.claudeusage.ui.Palette
+import com.robin.claudeusage.ui.elapsedPercent
 import com.robin.claudeusage.work.Polling
 
 class UsageWidgetReceiver : GlanceAppWidgetReceiver() {
@@ -102,12 +104,36 @@ class UsageWidget : GlanceAppWidget() {
         // Both gates: the per-profile switch decides whether credits exist for this
         // account at all, the widget switch whether they're worth the height here.
         val showCredits = cache.creditsOnWidgets() && cache.creditsVisible(profile)
+        // Widgets read UsageCache directly, the same way creditsOnWidgets does — there
+        // is no composition to hoist state into out here (CCRM-43 (Bar Pace Marks)).
+        val showOverPace = cache.paceOverOnWidgets()
+        // Measured out here: LocalSize reports the breakpoint under SizeMode.Responsive,
+        // and the bars are bitmaps now, so they need the width they will really occupy.
+        val widthDp = widgetWidthDp(context, appWidgetId)
         provideContent {
             GlanceTheme {
-                WidgetContent(profile, cache.profileLabel(profile), snapshot, use24h, themeName, showCredits)
+                WidgetContent(
+                    profile, cache.profileLabel(profile), snapshot, use24h, themeName,
+                    showCredits, showOverPace, widthDp,
+                )
             }
         }
     }
+}
+
+/**
+ * The widget's real width in dp, from the launcher's own options — the only figure
+ * that is neither a breakpoint nor a minimum. `OPTION_APPWIDGET_MIN_WIDTH` is the
+ * width in the current orientation, which is what the bar has to fill.
+ *
+ * Null when the launcher hasn't reported one yet (a freshly placed widget on some
+ * launchers), so callers fall back to `LocalSize`.
+ */
+internal fun widgetWidthDp(context: Context, appWidgetId: Int): Float? {
+    val options = android.appwidget.AppWidgetManager.getInstance(context)
+        ?.getAppWidgetOptions(appWidgetId) ?: return null
+    val w = options.getInt(android.appwidget.AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0)
+    return if (w > 0) w.toFloat() else null
 }
 
 internal val staleColor = androidx.glance.color.ColorProvider(
@@ -145,10 +171,15 @@ private fun WidgetContent(
     use24h: Boolean,
     themeName: String,
     showCredits: Boolean,
+    showOverPace: Boolean = true,
+    widgetWidthDp: Float? = null,
 ) {
     val size = LocalSize.current
     val large = size.height >= 190.dp
     val medium = size.height >= 110.dp
+    // The bars are drawn as bitmaps, so they need the width they will occupy: the
+    // widget's own width less this face's padding.
+    val pad = if (large) 16.dp else 12.dp
 
     val needsSetup = snapshot.authState == AuthState.NO_CREDENTIALS
     val needsReauth = snapshot.authState == AuthState.REAUTH_NEEDED
@@ -175,7 +206,12 @@ private fun WidgetContent(
                 val data = snapshot.data!!
                 // Only the large bucket has the height for a fourth bar.
                 val credits = data.credits?.takeIf { showCredits && it.isReportable }
-                SessionBlock(profile, data.session, use24h, theme, dark, label = "5-hour · $profileLabel", barHeight = 14.dp)
+                SessionBlock(
+                    profile, data.session, use24h, theme, dark,
+                    label = "5-hour · $profileLabel", barHeight = 14.dp,
+                    showOverPace = showOverPace, contentPadding = pad,
+                    widgetWidthDp = widgetWidthDp,
+                )
                 Spacer(GlanceModifier.height(12.dp))
                 Column(modifier = GlanceModifier.fillMaxWidth()) {
                     Text(
@@ -187,9 +223,21 @@ private fun WidgetContent(
                         ),
                     )
                     Spacer(GlanceModifier.height(4.dp))
-                    LabeledBar("All models", data.weekly?.percent, "%", theme, dark)
+                    // Every row here is a 7-day surface — the weekly window and each
+                    // model cap alike — so all of them measure pace against 7 days.
+                    LabeledBar(
+                        "All models", data.weekly?.percent, "%", theme, dark,
+                        elapsedPercent = elapsedPercent(data.weekly, Projection.WEEKLY_MS),
+                        showOverPace = showOverPace, contentPadding = pad,
+                        widgetWidthDp = widgetWidthDp,
+                    )
                     for (cap in data.modelCaps) {
-                        LabeledBar(cap.modelName, cap.window.percent, "%", theme, dark)
+                        LabeledBar(
+                            cap.modelName, cap.window.percent, "%", theme, dark,
+                            elapsedPercent = elapsedPercent(cap.window, Projection.WEEKLY_MS),
+                            showOverPace = showOverPace, contentPadding = pad,
+                            widgetWidthDp = widgetWidthDp,
+                        )
                     }
                     credits?.let {
                         val pct = it.percent
@@ -212,11 +260,14 @@ private fun WidgetContent(
                                     },
                             )
                         } else {
+                            // No elapsed: credits are money, and money has no clock.
                             LabeledBar(
                                 "Credits · ${Fmt.money(it.usedMinor, it.exponent, it.currency)} / " +
                                     Fmt.money(limit, it.exponent, it.currency),
                                 pct, "%", theme, dark,
                                 valueText = "${it.percentDisplay}%",
+                                contentPadding = pad,
+                                widgetWidthDp = widgetWidthDp,
                             )
                         }
                     }
@@ -226,19 +277,37 @@ private fun WidgetContent(
             }
             medium -> {
                 val data = snapshot.data!!
-                SessionBlock(profile, data.session, use24h, theme, dark, label = "5-hour · $profileLabel", barHeight = 12.dp)
+                SessionBlock(
+                    profile, data.session, use24h, theme, dark,
+                    label = "5-hour · $profileLabel", barHeight = 12.dp,
+                    showOverPace = showOverPace, contentPadding = pad,
+                    widgetWidthDp = widgetWidthDp,
+                )
                 Spacer(GlanceModifier.height(8.dp))
                 Column(modifier = GlanceModifier.fillMaxWidth()) {
                     HeaderRow(profile, "7-day", data.weekly?.percent, "% used", showRefresh = false)
-                    Spacer(GlanceModifier.height(4.dp))
-                    WidgetBar(data.weekly?.percent, theme, dark, 12.dp)
-                    Spacer(GlanceModifier.height(6.dp))
+                    WidgetBar(
+                        percent = data.weekly?.percent,
+                        theme = theme,
+                        dark = dark,
+                        height = 12.dp,
+                        elapsedPercent = elapsedPercent(data.weekly, Projection.WEEKLY_MS),
+                        showOverPace = showOverPace,
+                        contentPadding = pad,
+                        widgetWidthDp = widgetWidthDp,
+                    )
+                    Spacer(GlanceModifier.height(2.dp))
                     FooterRow(snapshot, data.weekly, use24h)
                 }
             }
             else -> {
                 val data = snapshot.data!!
-                SessionBlock(profile, data.session, use24h, theme, dark, label = "5h · $profileLabel", barHeight = 12.dp)
+                SessionBlock(
+                    profile, data.session, use24h, theme, dark,
+                    label = "5h · $profileLabel", barHeight = 12.dp,
+                    showOverPace = showOverPace, contentPadding = pad,
+                    widgetWidthDp = widgetWidthDp,
+                )
             }
         }
     }
@@ -253,12 +322,27 @@ internal fun SessionBlock(
     dark: Boolean,
     label: String,
     barHeight: androidx.compose.ui.unit.Dp,
+    showOverPace: Boolean = true,
+    contentPadding: androidx.compose.ui.unit.Dp = 12.dp,
+    widgetWidthDp: Float? = null,
 ) {
     Column(modifier = GlanceModifier.fillMaxWidth()) {
         HeaderRow(profile, label, session?.percent, "% used", showRefresh = true)
-        Spacer(GlanceModifier.height(5.dp))
-        WidgetBar(session?.percent, theme, dark, barHeight)
-        Spacer(GlanceModifier.height(4.dp))
+        // Trimmed from 5.dp: the bar image now carries 0.3 h of transparent overhang
+        // above the bar for the tick, so the visible gap is unchanged.
+        Spacer(GlanceModifier.height(1.dp))
+        WidgetBar(
+            percent = session?.percent,
+            theme = theme,
+            dark = dark,
+            height = barHeight,
+            elapsedPercent = elapsedPercent(session, Projection.SESSION_MS),
+            showOverPace = showOverPace,
+            contentPadding = contentPadding,
+            widgetWidthDp = widgetWidthDp,
+        )
+        // Trimmed from 4.dp for the same reason, on the underside.
+        Spacer(GlanceModifier.height(1.dp))
         ResetSubText(session, use24h)
     }
 }
@@ -314,14 +398,60 @@ internal fun HeaderRow(
     }
 }
 
+/**
+ * One widget bar, with its pace marks (CCRM-43 (Bar Pace Marks)).
+ *
+ * A [BarRenderer] bitmap rather than Glance's `LinearProgressIndicator`: that
+ * composable draws a track and a fill and nothing else, so there is no way to put a
+ * tick or a second-colour segment inside it. Same move [ringBitmap] already makes
+ * for the ring faces.
+ *
+ * The bitmap is drawn at the width the bar will actually occupy — [widgetWidthDp] less
+ * the face's padding — so the capsules keep their proportions instead of being
+ * stretched into place.
+ *
+ * [widgetWidthDp] has to be measured outside the composition: `LocalSize` reports the
+ * *breakpoint* under `SizeMode.Responsive`, and the minimum under `SizeMode.Single`,
+ * so neither is the real width. `provideGlance` reads it from the widget's options
+ * (see [widgetWidthDp]) and passes it down. Null falls back to `LocalSize`, which is
+ * exact under `SizeMode.Exact`.
+ *
+ * `FillBounds` rather than `Fit` deliberately: the bar must span the full width the
+ * way `LinearProgressIndicator` did, so a wrong width estimate should cost the tick a
+ * little of its thickness rather than leaving the bar visibly short of the edge.
+ *
+ * The image is `1.6 × height` tall, because the tick overhangs the bar by 0.3 h top
+ * and bottom; call sites trim the adjacent spacers to keep the row's total height.
+ */
 @Composable
-internal fun WidgetBar(percent: Double?, theme: Color, dark: Boolean, height: androidx.compose.ui.unit.Dp) {
-    val fill = Palette.barColor(percent, theme, dark)
-    LinearProgressIndicator(
-        progress = ((percent ?: 0.0) / 100.0).toFloat().coerceIn(0f, 1f),
-        modifier = GlanceModifier.fillMaxWidth().height(height).cornerRadius(height / 2),
-        color = ColorProvider(fill),
-        backgroundColor = ColorProvider(fill.copy(alpha = 0.25f)),
+internal fun WidgetBar(
+    percent: Double?,
+    theme: Color,
+    dark: Boolean,
+    height: androidx.compose.ui.unit.Dp,
+    elapsedPercent: Double? = null,
+    showOverPace: Boolean = true,
+    contentPadding: androidx.compose.ui.unit.Dp = 12.dp,
+    widgetWidthDp: Float? = null,
+) {
+    val context = LocalContext.current
+    val density = context.resources.displayMetrics.density
+    val fullWidth = widgetWidthDp?.dp ?: LocalSize.current.width
+    val widthDp = (fullWidth - contentPadding * 2).coerceAtLeast(24.dp)
+    val bitmap = BarRenderer.draw(
+        widthPx = widthDp.value * density,
+        heightPx = height.value * density,
+        percent = percent,
+        elapsedPercent = elapsedPercent,
+        accent = theme,
+        dark = dark,
+        showOverPace = showOverPace,
+    )
+    Image(
+        provider = ImageProvider(bitmap),
+        contentDescription = null,
+        modifier = GlanceModifier.fillMaxWidth().height(height * 1.6f),
+        contentScale = ContentScale.FillBounds,
     )
 }
 
@@ -337,6 +467,11 @@ internal fun LabeledBar(
     theme: Color,
     dark: Boolean,
     valueText: String? = null,
+    /** Null for a credits row: money has no clock, so it never carries a mark. */
+    elapsedPercent: Double? = null,
+    showOverPace: Boolean = true,
+    contentPadding: androidx.compose.ui.unit.Dp = 12.dp,
+    widgetWidthDp: Float? = null,
 ) {
     Column(modifier = GlanceModifier.fillMaxWidth()) {
         Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -355,9 +490,19 @@ internal fun LabeledBar(
                 ),
             )
         }
+        // Both spacers trimmed by the bar image's 0.3 h transparent overhang (4 dp at
+        // this height), so the row keeps the height it had before the marks arrived.
+        WidgetBar(
+            percent = percent,
+            theme = theme,
+            dark = dark,
+            height = 14.dp,
+            elapsedPercent = elapsedPercent,
+            showOverPace = showOverPace,
+            contentPadding = contentPadding,
+            widgetWidthDp = widgetWidthDp,
+        )
         Spacer(GlanceModifier.height(3.dp))
-        WidgetBar(percent, theme, dark, 14.dp)
-        Spacer(GlanceModifier.height(7.dp))
     }
 }
 

@@ -79,9 +79,14 @@ class MiniRingsWidget : GlanceAppWidget() {
         val rows = snapshot.data?.let { windowRows(it) } ?: emptyList()
         rows.mapNotNull { it.window.resetsAt?.toEpochMilli() }.minOrNull()
             ?.let { Polling.armResetRedraw(context, it) }
+        // Widgets read UsageCache directly; there is no composition to hoist into here.
+        val showOverPace = cache.paceOverOnWidgets()
         provideContent {
             GlanceTheme {
-                MiniRingsFace(profile, cache.profileLabel(profile), snapshot, rows, use24h, themeName)
+                MiniRingsFace(
+                    profile, cache.profileLabel(profile), snapshot, rows, use24h, themeName,
+                    showOverPace,
+                )
             }
         }
     }
@@ -95,6 +100,7 @@ private fun MiniRingsFace(
     rows: List<WindowRow>,
     @Suppress("UNUSED_PARAMETER") use24h: Boolean, // no prose reset line on this face
     themeName: String,
+    showOverPace: Boolean = true,
 ) {
     val context = LocalContext.current
     val state = faceState(snapshot, hasData = rows.isNotEmpty())
@@ -171,7 +177,7 @@ private fun MiniRingsFace(
                         Box(contentAlignment = Alignment.Center) {
                             Image(
                                 provider = ImageProvider(
-                                    ringBitmap(context, 56f, 5.5f, percent, elapsed, accent, dark)
+                                    ringBitmap(context, 56f, 5.5f, percent, elapsed, accent, dark, showOverPace)
                                 ),
                                 contentDescription = null,
                                 modifier = GlanceModifier.size(56.dp),

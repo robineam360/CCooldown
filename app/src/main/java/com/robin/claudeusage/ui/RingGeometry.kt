@@ -45,8 +45,17 @@ object RingGeometry {
      * `percent > elapsed + PACE_DEAD_ZONE`, strict — the *identical* comparison
      * the chart wash and the pace sentence make, so ring, sentence and chart
      * can never disagree. A hairline overshoot draws the tick alone.
+     *
+     * [enabled] is the widgets' "Show red past the pace mark" toggle (CCRM-43 (Bar
+     * Pace Marks)); it gates the segment only, never the tick. Defaulted, so every
+     * existing call site keeps today's behaviour.
      */
-    fun redSegment(percent: Double?, elapsedPercent: Double?): Pair<Float, Float>? {
+    fun redSegment(
+        percent: Double?,
+        elapsedPercent: Double?,
+        enabled: Boolean = true,
+    ): Pair<Float, Float>? {
+        if (!enabled) return null
         percent ?: return null
         elapsedPercent ?: return null
         if (percent <= elapsedPercent + PACE_DEAD_ZONE) return null
