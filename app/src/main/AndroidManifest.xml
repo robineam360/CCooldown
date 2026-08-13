@@ -105,6 +105,42 @@
         </receiver>
 
         <receiver
+            android:name=".widget.RingWidgetReceiver"
+            android:label="@string/ring_widget_label"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/ring_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.MiniRingsWidgetReceiver"
+            android:label="@string/mini_rings_widget_label"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/mini_rings_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.PaceWidgetReceiver"
+            android:label="@string/pace_widget_label"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/pace_widget_info" />
+        </receiver>
+
+        <receiver
             android:name=".notify.PinnedRefreshReceiver"
             android:exported="false" />
 

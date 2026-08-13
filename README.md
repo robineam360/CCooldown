@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="Release/screenshots/hero.png" alt="CCooldown — your Claude usage limits, right on your Android home screen" width="100%">
+  <img src="release/screenshots/hero.png" alt="CCooldown — your Claude usage limits, right on your Android home screen" width="100%">
 </p>
 
 # CCooldown
@@ -12,8 +12,8 @@ to see how close you are.
 
 **📱 Android only (for now)** — an iOS version is on the roadmap. iPhone folks, watch this space.
 
-📄 **Docs:** [User Guide (PDF)](Release/docs/CCooldown-User-Guide-v1.1.pdf) — the full
-install → sign-in → widgets walkthrough · [Brochure (PDF)](Release/docs/CCooldown-Brochure.pdf) —
+📄 **Docs:** [User Guide (PDF)](release/docs/CCooldown-User-Guide-v1.1.pdf) — the full
+install → sign-in → widgets walkthrough · [Brochure (PDF)](release/docs/CCooldown-Brochure.pdf) —
 a 2-page overview.
 
 > ⚠️ **Unofficial.** This is a personal community tool. It is not affiliated with, endorsed
@@ -63,34 +63,34 @@ a 2-page overview.
 
 <table>
   <tr>
-    <td align="center"><img src="Release/screenshots/history-5h-dark.png" width="240" alt="Usage history, per-session bars"><br><sub><b>Usage history</b> 🆕 — a bar per 5-hour session (red = hit 100%)</sub></td>
-    <td align="center"><img src="Release/screenshots/pinned-collapsed.png" width="240" alt="Pinned notification, collapsed"><br><sub><b>Pinned notification</b> 🆕 — always-on gauge in your shade</sub></td>
-    <td align="center"><img src="Release/screenshots/settings-alerts.png" width="240" alt="Granular alert settings"><br><sub><b>Granular alerts</b> 🆕 — pick your thresholds per window</sub></td>
+    <td align="center"><img src="release/screenshots/history-5h-dark.png" width="240" alt="Usage history, per-session bars"><br><sub><b>Usage history</b> 🆕 — a bar per 5-hour session (red = hit 100%)</sub></td>
+    <td align="center"><img src="release/screenshots/pinned-collapsed.png" width="240" alt="Pinned notification, collapsed"><br><sub><b>Pinned notification</b> 🆕 — always-on gauge in your shade</sub></td>
+    <td align="center"><img src="release/screenshots/settings-alerts.png" width="240" alt="Granular alert settings"><br><sub><b>Granular alerts</b> 🆕 — pick your thresholds per window</sub></td>
   </tr>
   <tr>
-    <td align="center"><img src="Release/screenshots/pinned-expanded.png" width="240" alt="Pinned notification, expanded"><br><sub><b>Expanded</b> — 7-day &amp; per-model bars, one-tap Refresh</sub></td>
-    <td align="center"><img src="Release/screenshots/profile-names.png" width="240" alt="Editable profile names"><br><sub><b>Rename your profiles</b> 🆕 — not just Personal/Work</sub></td>
-    <td align="center"><img src="Release/screenshots/history-7d-dark.png" width="240" alt="Per-week history"><br><sub><b>Per-week view</b> 🆕 — one bar per 7-day window</sub></td>
+    <td align="center"><img src="release/screenshots/pinned-expanded.png" width="240" alt="Pinned notification, expanded"><br><sub><b>Expanded</b> — 7-day &amp; per-model bars, one-tap Refresh</sub></td>
+    <td align="center"><img src="release/screenshots/profile-names.png" width="240" alt="Editable profile names"><br><sub><b>Rename your profiles</b> 🆕 — not just Personal/Work</sub></td>
+    <td align="center"><img src="release/screenshots/history-7d-dark.png" width="240" alt="Per-week history"><br><sub><b>Per-week view</b> 🆕 — one bar per 7-day window</sub></td>
   </tr>
   <tr>
-    <td align="center"><img src="Release/screenshots/widget-large-dark.png" width="240" alt="Home-screen widget, dark theme"><br><sub><b>Home-screen widget</b> — 5-hour &amp; 7-day windows at a glance</sub></td>
-    <td align="center"><img src="Release/screenshots/widget-theme-blue.png" width="240" alt="Home-screen widgets in a blue theme"><br><sub><b>Themeable</b> — 13 accent colors (here in blue)</sub></td>
-    <td align="center"><img src="Release/screenshots/app-tabs-personal.png" width="240" alt="App main screen, Personal profile"><br><sub><b>The app</b> — full breakdown with exact reset times</sub></td>
+    <td align="center"><img src="release/screenshots/widget-large-dark.png" width="240" alt="Home-screen widget, dark theme"><br><sub><b>Home-screen widget</b> — 5-hour &amp; 7-day windows at a glance</sub></td>
+    <td align="center"><img src="release/screenshots/widget-theme-blue.png" width="240" alt="Home-screen widgets in a blue theme"><br><sub><b>Themeable</b> — 13 accent colors (here in blue)</sub></td>
+    <td align="center"><img src="release/screenshots/app-tabs-personal.png" width="240" alt="App main screen, Personal profile"><br><sub><b>The app</b> — full breakdown with exact reset times</sub></td>
   </tr>
   <tr>
-    <td align="center"><img src="Release/screenshots/quick-settings-tiles.png" width="240" alt="Quick Settings tiles"><br><sub><b>Quick Settings tiles</b> — swipe down, see your %</sub></td>
-    <td align="center"><img src="Release/screenshots/notifications.png" width="240" alt="Usage alerts"><br><sub><b>Alerts</b> — near-limit warnings and "window has reset"</sub></td>
-    <td align="center"><img src="Release/screenshots/app-tabs-work.png" width="240" alt="Work profile tab"><br><sub><b>Two profiles</b> — Personal and Work, side by side</sub></td>
+    <td align="center"><img src="release/screenshots/quick-settings-tiles.png" width="240" alt="Quick Settings tiles"><br><sub><b>Quick Settings tiles</b> — swipe down, see your %</sub></td>
+    <td align="center"><img src="release/screenshots/notifications.png" width="240" alt="Usage alerts"><br><sub><b>Alerts</b> — near-limit warnings and "window has reset"</sub></td>
+    <td align="center"><img src="release/screenshots/app-tabs-work.png" width="240" alt="Work profile tab"><br><sub><b>Two profiles</b> — Personal and Work, side by side</sub></td>
   </tr>
   <tr>
-    <td align="center"><img src="Release/screenshots/signin-settings.png" width="240" alt="Sign in on this phone"><br><sub><b>Sign in on this phone</b> 🆕 — no computer needed</sub></td>
-    <td align="center"><img src="Release/screenshots/signin-consent.png" width="240" alt="Authorize in the browser"><br><sub><b>Authorize in your browser</b> — Pro, Max &amp; Team accounts</sub></td>
-    <td align="center"><img src="Release/screenshots/signin-finish.png" width="240" alt="Paste the code to finish"><br><sub><b>Paste the code, done</b> — self-renews for ~a month</sub></td>
+    <td align="center"><img src="release/screenshots/signin-settings.png" width="240" alt="Sign in on this phone"><br><sub><b>Sign in on this phone</b> 🆕 — no computer needed</sub></td>
+    <td align="center"><img src="release/screenshots/signin-consent.png" width="240" alt="Authorize in the browser"><br><sub><b>Authorize in your browser</b> — Pro, Max &amp; Team accounts</sub></td>
+    <td align="center"><img src="release/screenshots/signin-finish.png" width="240" alt="Paste the code to finish"><br><sub><b>Paste the code, done</b> — self-renews for ~a month</sub></td>
   </tr>
 </table>
 
 More screenshots (settings, themes, widget setup, token guide) in
-[`Release/screenshots/`](Release/screenshots/). All screenshots are from a real device in dark
+[`release/screenshots/`](release/screenshots/). All screenshots are from a real device in dark
 mode; **Usage history** fills in over time as your windows close.
 
 ## Get started — about 2 minutes, no computer needed
@@ -240,7 +240,7 @@ About section (it emails <robin@eam360.com>).
 ## Version history
 
 A quick, plain-English tour of what each update added (newest first). The full technical
-changelog lives in the [User Guide](Release/docs/CCooldown-User-Guide-v1.1.pdf).
+changelog lives in the [User Guide](release/docs/CCooldown-User-Guide-v1.1.pdf).
 
 - **1.0** — First official release — everything below, polished into one build and shared with the team.
 - **0.14** — Feedback now opens an email (was WhatsApp); added a **Check for updates** button; the app downloads from GitHub Releases.

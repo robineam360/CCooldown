@@ -1,15 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Cooldown sweep: faint full dial + solid pie that refills as the window resets. -->
+<!-- CCRM-42 (App Icon): reset ring foreground. Track + arc live together in this
+     layer (not split across background/foreground) so launcher parallax keeps them
+     concentric. Geometry maps the Mac master's 560/824 optical weight onto the
+     66dp safe circle: r=19, stroke=6.7, centre (54,54); arc = 12 o'clock, 260°
+     clockwise, round caps, endpoint ≈ (35.29, 57.30). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
     <path
-        android:fillColor="#F0EEE6"
-        android:fillAlpha="0.35"
-        android:pathData="M26,54 a28,28 0 1 0 56,0 a28,28 0 1 0 -56,0 z" />
+        android:pathData="M35,54 a19,19 0 1 0 38,0 a19,19 0 1 0 -38,0"
+        android:strokeColor="#343F50"
+        android:strokeWidth="6.7" />
     <path
-        android:fillColor="#F0EEE6"
-        android:pathData="M54,54 L54,26 A28,28 0 1 1 27.4,62.6 Z" />
+        android:pathData="M54,35 A19,19 0 1 1 35.29,57.3"
+        android:strokeWidth="6.7"
+        android:strokeLineCap="round">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:type="linear"
+                android:startX="35"
+                android:startY="35"
+                android:endX="73"
+                android:endY="73"
+                android:startColor="#F2B25C"
+                android:endColor="#E8734D" />
+        </aapt:attr>
+    </path>
 </vector>

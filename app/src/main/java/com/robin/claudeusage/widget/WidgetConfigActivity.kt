@@ -64,8 +64,14 @@ class WidgetConfigActivity : ComponentActivity() {
             return
         }
 
-        val isBarWidget = AppWidgetManager.getInstance(this).getAppWidgetInfo(appWidgetId)?.provider ==
-            ComponentName(this, BarWidgetReceiver::class.java)
+        val provider = AppWidgetManager.getInstance(this).getAppWidgetInfo(appWidgetId)?.provider
+        val kind = when (provider) {
+            ComponentName(this, BarWidgetReceiver::class.java) -> WidgetKind.BAR
+            ComponentName(this, RingWidgetReceiver::class.java) -> WidgetKind.RING
+            ComponentName(this, MiniRingsWidgetReceiver::class.java) -> WidgetKind.MINI_RINGS
+            ComponentName(this, PaceWidgetReceiver::class.java) -> WidgetKind.PACE
+            else -> WidgetKind.USAGE
+        }
         val widgetPrefs = WidgetPrefs(this)
         // Prefs are only written on the first confirm, so their presence is the
         // add-vs-reconfigure test.
@@ -75,8 +81,13 @@ class WidgetConfigActivity : ComponentActivity() {
         fun renderAndFinish() {
             kotlinx.coroutines.MainScope().launch {
                 try {
-                    if (isBarWidget) BarWidget().updateAll(this@WidgetConfigActivity)
-                    else UsageWidget().updateAll(this@WidgetConfigActivity)
+                    when (kind) {
+                        WidgetKind.BAR -> BarWidget().updateAll(this@WidgetConfigActivity)
+                        WidgetKind.RING -> RingWidget().updateAll(this@WidgetConfigActivity)
+                        WidgetKind.MINI_RINGS -> MiniRingsWidget().updateAll(this@WidgetConfigActivity)
+                        WidgetKind.PACE -> PaceWidget().updateAll(this@WidgetConfigActivity)
+                        WidgetKind.USAGE -> UsageWidget().updateAll(this@WidgetConfigActivity)
+                    }
                 } catch (_: Exception) {
                 }
                 setResult(
@@ -99,12 +110,13 @@ class WidgetConfigActivity : ComponentActivity() {
             MaterialTheme(colorScheme = scheme) {
                 Surface(Modifier.fillMaxSize()) {
                     ConfigScreen(
-                        isBarWidget = isBarWidget,
+                        kind = kind,
                         isReconfigure = isReconfigure,
                         initialProfile = widgetPrefs.profileFor(appWidgetId),
                         initialBar = widgetPrefs.barFor(appWidgetId),
-                        onDone = { profile, bar ->
-                            widgetPrefs.save(appWidgetId, profile, bar)
+                        initialWindow = widgetPrefs.windowFor(appWidgetId),
+                        onDone = { profile, bar, window ->
+                            widgetPrefs.save(appWidgetId, profile, bar, window)
                             renderAndFinish()
                         },
                         onUseDefaults = {
@@ -120,17 +132,22 @@ class WidgetConfigActivity : ComponentActivity() {
     }
 }
 
+/** Which provider the config screen is configuring — decides which pickers show. */
+enum class WidgetKind { USAGE, BAR, RING, MINI_RINGS, PACE }
+
 @androidx.compose.runtime.Composable
 private fun ConfigScreen(
-    isBarWidget: Boolean,
+    kind: WidgetKind,
     isReconfigure: Boolean,
     initialProfile: Profile,
     initialBar: String,
-    onDone: (Profile, String?) -> Unit,
+    initialWindow: String,
+    onDone: (Profile, String?, String?) -> Unit,
     onUseDefaults: () -> Unit,
 ) {
     var profile by remember { mutableStateOf(initialProfile) }
     var bar by remember { mutableStateOf(initialBar) }
+    var window by remember { mutableStateOf(initialWindow) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val cache = remember { com.robin.claudeusage.data.UsageCache(context) }
 
@@ -159,7 +176,7 @@ private fun ConfigScreen(
             }
         }
 
-        if (isBarWidget) {
+        if (kind == WidgetKind.BAR) {
             Spacer(Modifier.height(20.dp))
             Text("Show", style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(8.dp))
@@ -175,9 +192,32 @@ private fun ConfigScreen(
             }
         }
 
+        // The ring and pace faces bind one window; the mini-rings face shows
+        // them all, so it only ever picks a profile.
+        if (kind == WidgetKind.RING || kind == WidgetKind.PACE) {
+            Spacer(Modifier.height(20.dp))
+            Text("Window", style = MaterialTheme.typography.titleSmall)
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                for ((key, label) in listOf("session" to "5-hour", "weekly" to "7-day")) {
+                    FilterChip(
+                        selected = window == key,
+                        onClick = { window = key },
+                        label = { Text(label) },
+                    )
+                }
+            }
+        }
+
         Spacer(Modifier.height(28.dp))
         Button(
-            onClick = { onDone(profile, if (isBarWidget) bar else null) },
+            onClick = {
+                onDone(
+                    profile,
+                    if (kind == WidgetKind.BAR) bar else null,
+                    if (kind == WidgetKind.RING || kind == WidgetKind.PACE) window else null,
+                )
+            },
             modifier = Modifier.fillMaxWidth(),
         ) { Text(if (isReconfigure) "Save changes" else "Add widget") }
 

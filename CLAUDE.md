@@ -52,7 +52,7 @@ parsing, scheduling, tests, docs, or a bug fix that restores an already-approved
   proposing something that was already ruled out.
 - [BUGS.md](BUGS.md) — defects, `CCBG-N`, with a status and a severity.
 - [RELEASING.md](RELEASING.md) — the release process.
-- `Release/docs/` — the user-facing guide and brochure (HTML → headless Chrome; sources in
+- `release/docs/` — the user-facing guide and brochure (HTML → headless Chrome; sources in
   `docs/src/`).
 
 This is an **Android-only** repo. The Mac client is a separate repo by deliberate decision —

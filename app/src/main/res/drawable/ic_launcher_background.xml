@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- CCRM-42 (App Icon): the reset-ring identity, from the Mac's CCM-42 [Desktop]
+     AppIcon.svg master. Background layer: the dark vertical gradient. The macOS
+     drop shadow is dropped — the launcher supplies elevation. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:pathData="M0,0 H108 V108 H0 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="54"
+                android:startY="0"
+                android:endX="54"
+                android:endY="108"
+                android:startColor="#242B38"
+                android:endColor="#12161E" />
+        </aapt:attr>
+    </path>
+</vector>

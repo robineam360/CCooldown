@@ -25,7 +25,7 @@ export JAVA_HOME=/opt/homebrew/opt/openjdk@17
 export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
 ./gradlew assembleRelease
 # Signed APK lands at app/build/outputs/apk/release/app-release.apk — upload it in step 5.
-# (No longer copied into Release/ or committed.)
+# (No longer copied into release/ or committed.)
 ```
 
 **Signing (since v0.13).** The app is signed with a permanent release keystore, not the
@@ -43,15 +43,15 @@ root). `app/build.gradle.kts` reads them automatically.
 
 ## 3. Update the docs
 
-The PDFs are generated — never edit them. The sources are `Release/docs/src/guide.html`
+The PDFs are generated — never edit them. The sources are `release/docs/src/guide.html`
 and `brochure.html`; edit those, then rebuild with one command:
 
 ```bash
-./Release/docs/build.sh
+./release/docs/build.sh
 ```
 
 It reads `versionName` from `app/build.gradle.kts` and writes three files into
-`Release/docs/`:
+`release/docs/`:
 
 | Output | What it's for |
 |---|---|
@@ -70,10 +70,10 @@ row to a table, or a card to a grid, is enough to do it.
 
 Also update by hand when the UI or features change:
 
-- `Release/USER-GUIDE.md` — the markdown guide (its own version header + changelog)
+- `release/USER-GUIDE.md` — the markdown guide (its own version header + changelog)
 - `README.md` — feature bullets, and **both PDF links** if the version in the guide's
   filename changed
-- `Release/docs/src/shots/` — screenshots. Retire any that show a removed feature; a
+- `release/docs/src/shots/` — screenshots. Retire any that show a removed feature; a
   figure that contradicts the text is worse than no figure. v1.1's blue-accent
   "themeable" figure is currently absent for this reason — reshoot it with a blue theme
   if you want it back.

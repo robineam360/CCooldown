@@ -250,6 +250,9 @@ private fun App(startProfile: Profile) {
                                         try {
                                             UsageWidget().updateAll(context)
                                             BarWidget().updateAll(context)
+                                            com.robin.claudeusage.widget.RingWidget().updateAll(context)
+                                            com.robin.claudeusage.widget.MiniRingsWidget().updateAll(context)
+                                            com.robin.claudeusage.widget.PaceWidget().updateAll(context)
                                         } catch (_: Exception) {
                                         }
                                     }

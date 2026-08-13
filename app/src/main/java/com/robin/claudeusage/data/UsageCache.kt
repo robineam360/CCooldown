@@ -551,16 +551,32 @@ class WidgetPrefs(context: Context) {
     fun barFor(appWidgetId: Int): String =
         prefs.getString("w$appWidgetId.bar", "session") ?: "session"
 
-    fun save(appWidgetId: Int, profile: Profile, bar: String?) {
+    /**
+     * Which window a ring/pace face shows: "session" or "weekly". Doubles as the
+     * large face's on-widget 5h/7d toggle state ([saveWindow]) — one key, last
+     * writer wins, so the toggle "beats the configured window" trivially and the
+     * reconfigure screen pre-fills with whatever the face actually shows.
+     */
+    fun windowFor(appWidgetId: Int): String =
+        prefs.getString("w$appWidgetId.window", "session") ?: "session"
+
+    fun save(appWidgetId: Int, profile: Profile, bar: String?, window: String? = null) {
         val e = prefs.edit().putString("w$appWidgetId.profile", profile.key)
         if (bar != null) e.putString("w$appWidgetId.bar", bar)
+        if (window != null) e.putString("w$appWidgetId.window", window)
         e.apply()
+    }
+
+    /** The large face's toggle: flips the window without touching the profile. */
+    fun saveWindow(appWidgetId: Int, window: String) {
+        prefs.edit().putString("w$appWidgetId.window", window).apply()
     }
 
     fun remove(appWidgetId: Int) {
         prefs.edit()
             .remove("w$appWidgetId.profile")
             .remove("w$appWidgetId.bar")
+            .remove("w$appWidgetId.window")
             .apply()
     }
 }

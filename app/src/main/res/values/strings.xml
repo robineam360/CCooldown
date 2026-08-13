@@ -3,4 +3,10 @@
     <string name="app_name">CCooldown</string>
     <string name="widget_description">Claude Cooldown — 5-hour and 7-day windows (pick a profile)</string>
     <string name="bar_widget_description">Claude Cooldown — one bar (pick profile and window)</string>
+    <string name="ring_widget_label">Ring</string>
+    <string name="ring_widget_description">One window as a ring with a pace tick (pick profile and window)</string>
+    <string name="mini_rings_widget_label">Mini-rings</string>
+    <string name="mini_rings_widget_description">Every window as mini-rings, each with its own pace tick</string>
+    <string name="pace_widget_label">Pace chart</string>
+    <string name="pace_widget_description">The pace story: usage chart, projection and verdict (5h/7d toggle on the widget)</string>
 </resources>

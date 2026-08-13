@@ -12,6 +12,71 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
 
 ## Next — small, high value, ready to build
 
+### CCRM-39 · Ring Widget — small face, one window as a pace-marked ring
+- **Status:** Done (2026-08-13) · needs on-device verification
+- **Provenance:** the Mac's CCRM-18 [Desktop] small face + CCM-49 [Desktop] pace marks,
+  via `ANDROID-WIDGET-HANDOVER.md`; wireframe approved 2026-08-13 (rev 2 — the stale
+  pill overlays the ring's bottom edge) in `design/widget-wireframes.html`.
+- **What:** 2×2 provider ("Ring" in the picker), one profile + one window from the
+  config flow. Ring hero with everything inside it: profile caps-label (only when both
+  profiles are signed in), truncated percent, compact countdown ("soon" under 5 min),
+  exact reset clock. Pace marks per CCM-49: neutral tick at `elapsedPercent`, full-red
+  segment from tick to fill tip gated by `percent > elapsed + PACE_DEAD_ZONE` — the
+  identical comparison the chart wash makes, so the surfaces can't disagree.
+- **Where:** `ui/RingGeometry.kt` (pure math, `RingGeometryTest`) + `ui/RingRenderer.kt`
+  (bitmap painter) + `widget/RingWidget.kt` + `widget/WidgetFace.kt` (state table +
+  copy, `WidgetFaceTest`). `RingRenderer` is the shared ring surface —
+  `PinnedNotification.drawGauge` and `UsageIcon`'s ring should migrate onto it when next
+  touched, which is the CCRM-3 (Unified Theming) phase-3 extraction done for rings.
+- **Cadence:** redraw on every poll + a 15-minute redraw-only WorkManager tick
+  (`WidgetRedrawWorker`, self-cancelling) + a one-shot redraw at the reset moment when
+  it's <20 min out. No minute alarms — "soon" is what makes that honest.
+- The Mac's `needsAppUpdate` state is deliberately omitted: Glance renders in the app
+  process from the same APK, so snapshot-vs-binary skew can't happen here.
+
+### CCRM-40 · Mini-Rings Widget — medium face, every window as battery-style rings
+- **Status:** Done (2026-08-13) · needs on-device verification
+- **Provenance/wireframe:** same record as CCRM-39 (Ring Widget).
+- **What:** 4×2 provider ("Mini-rings"), one profile, ignores the configured window.
+  Header (profile · "Updated Xm ago" · ↻), then payload-ordered columns — session,
+  weekly, model caps — **capped at four** so the fixed windows always survive. Each
+  ring carries its own tick: session against the 5-hour clock, weekly **and every
+  model cap** against the 7-day clock — 41% reading calm next to 84% reading hot in
+  one glance is the whole feature. No prose reset line; density is the point.
+- **Where:** `widget/MiniRingsWidget.kt`, sharing `RingRenderer`/`WidgetFace`.
+
+### CCRM-41 · Pace Widget — large face, the pace story with an on-face 5h/7d toggle
+- **Status:** Done (2026-08-13) · needs on-device verification
+- **Provenance/wireframe:** same record as CCRM-39 (Ring Widget). Supersedes
+  CCRM-13 (Chart Widget), which stays as the historical sketch.
+- **What:** 4×3 provider ("Pace chart"). Header window title + a segmented 5h/7d
+  toggle **on the face itself** (`ToggleWindowAction` writes the same `w<id>.window`
+  key the config screen writes — persists, beats the configured window by *being* it,
+  and works with the app swiped away). Huge truncated percent; countdown + exact reset
+  stacked right; the CCRM-12 (Trend Chart)/CCRM-20 (Wide Chart) chart as a bitmap;
+  verdict sentence (amber when above pace; a refused projection prints why); footer
+  freshness + ↻.
+- **Extraction decision (CCRM-13's "solve it once"):** `widget/ChartBitmap.kt` shares
+  the semantic layer by construction — `SparkGeometry` coordinates, `evenPacePercent` +
+  `PACE_DEAD_ZONE` wash gate, `Palette.barColor` ladder, `Fmt` stamps — and declines
+  pixel-level unification with `UsageSparkline`, whose text/gesture stack is
+  Compose-bound (TextMeasurer, scrub, callout). What can drift is cosmetics; what
+  can't drift is shared. Recorded here so it isn't re-litigated.
+
+### CCRM-42 · App Icon — the reset-ring identity
+- **Status:** Done (2026-08-13) · needs on-device verification
+- **Provenance:** the Mac's CCM-42 [Desktop] icon; `AppIcon.svg` is the master.
+  Preview approved 2026-08-13 (`design/icon-preview.html`, deleted after sign-off per
+  the design-folder rule).
+- **What:** adaptive icon — background = the dark `#242B38→#12161E` gradient
+  (`ic_launcher_background.xml`), foreground = track + orange-gradient arc (260° from
+  12 o'clock, round caps) at the Mac's ~68% optical weight in the 66dp safe zone,
+  plus a dedicated monochrome layer (track 35% alpha, arc solid — "more solid = the
+  live part" survives launcher tinting). About-screen `drawable/ic_launcher.xml`
+  redrawn to match; the old terracotta `#D97757` icon background colour is retired
+  (`values/colors.xml` deleted with it). Status-bar/QS glyphs unchanged — they're
+  usage gauges, not the logo.
+
 ### CCRM-20 · Wide Chart — one profile at full width, and a chart you can touch
 - **Status:** Done (2026-08-04) · successor to CCRM-12
 - **Verified on the Fold 7's inner screen** (1968×2184 @ 420dpi = **750×832dp**, which
@@ -802,8 +867,14 @@ keys) would still make this a different product. Not filed, not an open question
      square default size. Glance has no Canvas, so this one *does* need a bitmap: extract the
      drawing so CCRM-13 shares that extraction rather than repeating it. Cap dimensions and
      cache per size bucket — a RemoteViews transaction has a size limit.
+     **Overridden 2026-08-13 by explicit user decision:** the Mac-parity faces ship as
+     dedicated providers — CCRM-39 (Ring Widget), CCRM-40 (Mini-Rings Widget), CCRM-41
+     (Pace Widget). The ring drawing extraction this phase wanted now exists as
+     `ui/RingRenderer.kt`; what remains of phase 3 is only migrating
+     `PinnedNotification.drawGauge` / `UsageIcon` onto it, and the layout-*option* idea
+     stays open for the existing bar providers only.
 - **Verification:** every layout wants looking at on real hardware before it is called done
-  (CCRM-15 exists because a state shipped unobserved), then a figure in `Release/docs`.
+  (CCRM-15 exists because a state shipped unobserved), then a figure in `release/docs`.
 - **Open questions:** does the mascot asset need licensing sign-off before it ships inside a
   widget ring — phase 3 only, nothing earlier needs it. *(Resolved: "how many themes is
   enough" — the four-control cap above.)*
@@ -941,7 +1012,7 @@ keys) would still make this a different product. Not filed, not an open question
   pace at 24%, and every warning element rendered — the wash over the above-pace region,
   the amber overshoot fill from the point the curve crossed the diagonal, and CCRM-20's tap
   callout picking up the warning colour for `32% · +8 vs pace`. Captured as
-  `Release/screenshots/chart-above-pace-work-fold-inner.png`.
+  `release/screenshots/chart-above-pace-work-fold-inner.png`.
 - **No defect found in it.** A label collision was filed off this screenshot and
   retracted the same day — the two labels are separated by construction, see
   [CCBG-7](BUGS.md). Worth recording that the state came up *clean*, since the entry was
@@ -958,7 +1029,10 @@ keys) would still make this a different product. Not filed, not an open question
   usable for the swap as-is.
 
 ### CCRM-13 · Chart Widget — standalone chart widget
-- **Status:** Planned · gated on the in-app chart proving itself
+- **Status:** Done (2026-08-13) — **delivered as CCRM-41 (Pace Widget)**, which is a
+  superset (on-face 5h/7d toggle, pace sentence, state table). The text below stays as
+  the historical sketch; the extraction question it raises is answered in CCRM-41's
+  entry (semantic layer shared via `SparkGeometry`; pixel-level unification declined).
 - **Why:** The trend chart answers "will I run out before the reset" better than any
   bar, and that's worth having on the home screen without opening the app.
 - **Approach:** A new widget rendering `UsageSparkline`'s content, with the window

@@ -50,7 +50,12 @@ object Alerts {
 
     /** Warn this many days before the known sign-in (refresh token) expiry. */
     private val EXPIRY_WARN_DAYS = listOf(1, 3, 7)
-    private const val STALE_DATA_MS = 6 * 60 * 60_000L
+    /**
+     * Public because the widget faces use the same threshold for their stale
+     * treatment (CCRM-39/40/41) — one constant, so the amber pill and the
+     * stale-data alert can never disagree about what "stale" means.
+     */
+    const val STALE_DATA_MS = 6 * 60 * 60_000L
 
     fun ensureChannels(context: Context) {
         val nm = context.getSystemService(NotificationManager::class.java)

@@ -498,6 +498,9 @@ class UsageRepository(private val context: Context) {
         try {
             UsageWidget().updateAll(context)
             BarWidget().updateAll(context)
+            com.robin.claudeusage.widget.RingWidget().updateAll(context)
+            com.robin.claudeusage.widget.MiniRingsWidget().updateAll(context)
+            com.robin.claudeusage.widget.PaceWidget().updateAll(context)
         } catch (_: Exception) {
             // No widgets placed yet — fine.
         }

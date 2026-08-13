@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- Widget-face contact sheet, debug builds only:
+             adb shell am start -n com.robin.claudeusage/.debug.DebugFacesActivity -->
+        <activity
+            android:name=".debug.DebugFacesActivity"
+            android:exported="true" />
+    </application>
+</manifest>
