@@ -78,7 +78,14 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
   usage gauges, not the logo.
 
 ### CCRM-43 · Bar Pace Marks — pace marks on the bars, and three red toggles
-- **Status:** Done (2026-08-13) · needs on-device verification
+- **Status:** Done (2026-08-13) · **partly verified on the Fold 7 outer screen the same
+  day**, dark theme, both accounts: in-app bars (tick at 97% not clipped, credits
+  unmarked, a window with no reset clock unmarked), both bar widgets (including a tick
+  hard against the right end, and a real dead-zone state at 61% against 59% elapsed),
+  the notification collapsed bar and expanded panel, the Settings group, and the ring
+  faces' ticks. **The red over-pace segment is still unobserved on device** — every
+  window sat inside or below the dead zone during the pass. Light theme and the inner
+  screen are also still owed.
 - **Provenance/wireframe:** the Mac's CCM-50 [Panel] bars + CCM-51 [Pace] toggle, via
   `ANDROID-PACE-BARS-HANDOVER.md` (which lives outside this repo — copy it in if this
   line should cite something durable). Wireframe rev B approved 2026-08-13 in
@@ -1129,13 +1136,16 @@ keys) would still make this a different product. Not filed, not an open question
   whose window isn't obliging.
 - **Then:** the guide still illustrates only the below-pace case, and the capture above is
   usable for the swap as-is.
-- **The bar half of this is now discharged** (2026-08-13, CCRM-43 (Bar Pace Marks)):
-  `DebugFacesActivity` renders every above-pace bar and ring state — including the dead
-  zone, both sides of the strict boundary, and each red-off variant — through the real
-  renderers, on demand, with no obliging window required. That is the same "inspect the
-  state whenever you like" the synthetic series was wanted for, for the surfaces it
-  covers. What remains genuinely uncovered is the *chart*, whose warning half needs a
-  synthetic series rather than a fixture.
+- **The bar half now has a harness** (2026-08-13, CCRM-43 (Bar Pace Marks)):
+  `DebugFacesActivity` renders every above-pace bar and ring state — the dead zone, both
+  sides of the strict boundary, each red-off variant — through the real renderers, with
+  no obliging window required. **But it is a debug-build activity, and the debug build
+  can't be installed beside a release-signed one** (same `applicationId`, different
+  signature), so on the phone that actually has the app it stays out of reach. Uninstall,
+  a second device, or an emulator is the price today; an `applicationIdSuffix` on the
+  debug build type would remove it, and was declined on 2026-08-13 in favour of waiting
+  for a natural crossing. The *chart* half is still uncovered either way: its warning
+  half needs the synthetic series, not a fixture.
 
 ### CCRM-13 · Chart Widget — standalone chart widget
 - **Status:** Done (2026-08-13) — **delivered as CCRM-41 (Pace Widget)**, which is a

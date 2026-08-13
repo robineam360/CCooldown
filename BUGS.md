@@ -11,6 +11,44 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
 
 ## Open
 
+### CCBG-11 · Ring Face Clutter — four stacked lines crowd the small ring's bore
+- **Status:** Open
+- **Severity:** Low (legibility, no wrong numbers)
+- **Symptom:** Observed on the Fold 7 outer screen, 2026-08-13, by the user: the
+  CCRM-39 (Ring Widget) face reads as cluttered. Four lines stack inside the ring's
+  bore — profile name, percentage, countdown, exact reset — and the fourth
+  ("today at 9:10 pm") runs nearly wall to wall inside the bore, so the ring's inner
+  edge crowds the text on both sides. Evidence:
+  `release/screenshots/widget-ring-clutter-fold-outer.png`.
+- **Detail:** the four lines are fixed regardless of the widget's size, so the bore
+  has to hold all of them however small it gets; nothing drops out as the face
+  shrinks. The exact reset stamp is the weakest of the four — the countdown above it
+  already answers "when", and the in-app card and the notification both carry the
+  exact time — which makes it the obvious candidate to drop, move under the ring, or
+  gate on available height.
+- **Not a regression from CCRM-43 (Bar Pace Marks):** the pace tick is drawn on the
+  ring's stroke, outside the bore, and doesn't touch the text stack.
+- **Fix:** needs a wireframe first (CLAUDE.md rule 2), showing what the bore holds at
+  each width class.
+
+### CCBG-10 · Mini-Rings Emptiness — two rings marooned in a mostly empty face
+- **Status:** Open
+- **Severity:** Low (wasted space, no wrong numbers)
+- **Symptom:** Observed on the Fold 7 outer screen, 2026-08-13, by the user: on an
+  account with only two windows, the CCRM-40 (Mini-Rings Widget) face is mostly empty
+  — two small rings sit in wide gutters with a dead band of roughly a third of the
+  height beneath them. Evidence:
+  `release/screenshots/widget-mini-rings-empty-fold-outer.png`.
+- **Detail:** two independent causes, both in `widget/MiniRingsWidget.kt`. The ring is
+  drawn at a **fixed 56 dp** (`ringBitmap(context, 56f, 5.5f, …)`) no matter how much
+  room the face has; and the columns divide the **full width** between however few
+  rows `windowRows` returns, so two rings on a 4×2 face spread to the quarter points
+  and leave the middle empty. An account with four windows fills the same face
+  reasonably, which is why this didn't show up in the wireframe.
+- **Fix:** needs a wireframe first (CLAUDE.md rule 2). The shape of it is that the ring
+  diameter should follow the space actually available — `LocalSize` height and width
+  divided by the row count — rather than being a constant.
+
 ### CCBG-3 · Credits Visibility — credits card ignores extra-usage being switched off
 - **Status:** Open
 - **Severity:** Low (misleading display, no data loss) — and possibly unreachable
