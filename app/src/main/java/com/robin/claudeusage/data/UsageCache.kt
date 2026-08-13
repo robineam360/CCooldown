@@ -341,11 +341,27 @@ class UsageCache(context: Context) {
 
     fun plan(profile: Profile): String? = prefs.getString(k(profile, "plan"), null)
 
-    fun setTokenMeta(profile: Profile, refreshExpiresAt: Long, plan: String?) {
+    /** Raw rate-limit tier, e.g. "default_5x" — parsed at render time (CCRM-38). */
+    fun tier(profile: Profile): String? = prefs.getString(k(profile, "tier"), null)
+
+    fun setTokenMeta(profile: Profile, refreshExpiresAt: Long, plan: String?, tier: String?) {
         prefs.edit()
             .putLong(k(profile, "refreshExpiresAt"), refreshExpiresAt)
             .putString(k(profile, "plan"), plan)
+            .putString(k(profile, "tier"), tier)
             .apply()
+    }
+
+    /**
+     * Key names (never values) of the last sign-in's token response — a
+     * debug-only instrument so whether `rate_limit_tier` actually appears in
+     * *our* token response gets settled by the next real sign-in (CCRM-38).
+     */
+    fun signInTokenKeys(profile: Profile): String? =
+        prefs.getString(k(profile, "signInTokenKeys"), null)
+
+    fun setSignInTokenKeys(profile: Profile, keys: String?) {
+        prefs.edit().putString(k(profile, "signInTokenKeys"), keys).apply()
     }
 
     fun clearRefreshExpiry(profile: Profile) {

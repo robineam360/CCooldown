@@ -92,6 +92,10 @@ class UsageRepository(private val context: Context) {
 
     fun plan(profile: Profile): String? = cache.plan(profile)
 
+    fun tier(profile: Profile): String? = cache.tier(profile)
+
+    fun signInTokenKeys(profile: Profile): String? = cache.signInTokenKeys(profile)
+
     fun lastRenewedAt(profile: Profile): Long = cache.lastRenewedAt(profile)
 
     fun configuredProfiles(): List<Profile> = Profile.entries.filter { hasCredentials(it) }
@@ -106,7 +110,7 @@ class UsageRepository(private val context: Context) {
     fun clearCredentials(profile: Profile) {
         credStore.clear(profile)
         cache.setAuthState(profile, AuthState.NO_CREDENTIALS)
-        cache.setTokenMeta(profile, 0L, null)
+        cache.setTokenMeta(profile, 0L, null, null)
         cache.setRefreshExpiryEstimated(profile, false)
         cache.setNativeSignIn(profile, false)
         cache.setLastRenewedAt(profile, 0L)
@@ -156,7 +160,7 @@ class UsageRepository(private val context: Context) {
                     )
                 credStore.save(profile, pasted.creds, stampAdded = true)
                 cache.setAuthState(profile, AuthState.OK)
-                cache.setTokenMeta(profile, pasted.refreshExpiresAt, pasted.plan)
+                cache.setTokenMeta(profile, pasted.refreshExpiresAt, pasted.plan, pasted.tier)
                 // Desktop copy: exact expiry from the JSON, and rotation means the
                 // family may have moved — keep the legacy (non-native) semantics.
                 cache.setRefreshExpiryEstimated(profile, false)
@@ -225,7 +229,12 @@ class UsageRepository(private val context: Context) {
                 credStore.save(profile, Credentials(access, refresh, expiresAt), stampAdded = true)
                 cache.setAuthState(profile, AuthState.OK)
                 val estExpiry = System.currentTimeMillis() + OAuthSignIn.ESTIMATED_FAMILY_MS
-                cache.setTokenMeta(profile, estExpiry, o.optString("subscriptionType").ifEmpty { null })
+                // Tolerant tier read (CCRM-38) — the token endpoint's spelling is
+                // unconfirmed, so try both; the key-name record below settles it.
+                val tier = o.optString("rate_limit_tier").ifEmpty { o.optString("rateLimitTier") }
+                    .ifEmpty { null }
+                cache.setTokenMeta(profile, estExpiry, o.optString("subscriptionType").ifEmpty { null }, tier)
+                cache.setSignInTokenKeys(profile, o.keys().asSequence().sorted().joinToString(", "))
                 cache.setRefreshExpiryEstimated(profile, true)
                 cache.setNativeSignIn(profile, true)
                 cache.setLastRenewedAt(profile, 0L)

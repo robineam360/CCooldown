@@ -647,6 +647,7 @@ private fun TokenCard(
     val addedAt = remember(stateKey) { repo.tokenAddedAt(profile) }
     val tail = remember(stateKey) { repo.tokenTail(profile) }
     val plan = remember(stateKey) { repo.plan(profile) }
+    val tier = remember(stateKey) { repo.tier(profile) }
     val tokenExpiresAt = remember(stateKey) { repo.tokenExpiresAt(profile) }
     val refreshExpiresAt = remember(stateKey) { repo.refreshExpiresAt(profile) }
     val refreshEstimated = remember(stateKey) { repo.refreshExpiryEstimated(profile) }
@@ -743,7 +744,7 @@ private fun TokenCard(
                 if (hasToken) StatusChip(snapshot.authState)
                 if (hasToken && plan != null) {
                     Spacer(Modifier.width(6.dp))
-                    PlanChip(plan)
+                    PlanChip(plan, tier)
                 }
                 Spacer(Modifier.weight(1f))
                 if (hasToken && tail != null) {
@@ -1060,10 +1061,13 @@ private fun BackupOptions(
 }
 
 @Composable
-private fun PlanChip(plan: String) {
+private fun PlanChip(plan: String, tier: String?) {
     val color = MaterialTheme.colorScheme.primary
+    // "Max 20x" when the tier parses, bare "Max" otherwise (CCRM-38). A tier
+    // with no plan renders no chip at all — the caller's gate is on the plan.
+    val multiplier = Fmt.tierMultiplier(tier)
     Text(
-        plan.replaceFirstChar { it.uppercase() },
+        plan.replaceFirstChar { it.uppercase() } + (multiplier?.let { " $it" } ?: ""),
         style = MaterialTheme.typography.labelSmall,
         color = color,
         modifier = Modifier
@@ -1490,6 +1494,15 @@ private fun DebugSection(repo: UsageRepository) {
                         .padding(12.dp),
                 )
             }
+            // Key names (never values) of the last sign-in's token response —
+            // settles whether `rate_limit_tier` is in ours (CCRM-38 verify-first).
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Sign-in token keys: " +
+                    (repo.signInTokenKeys(debugProfile) ?: "(no native sign-in recorded yet)"),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
     EndpointProbe(repo)
