@@ -17,6 +17,7 @@ data class PastedToken(
     val creds: Credentials,
     val refreshExpiresAt: Long, // epoch millis; 0 = not in the pasted JSON
     val plan: String?, // subscriptionType: "pro" / "max" / "team" …
+    val tier: String?, // rate-limit tier, raw: "default_5x" … (CCRM-38)
 )
 
 /** Android Keystore-backed storage for the OAuth tokens, one slot per profile. */
@@ -92,6 +93,10 @@ class CredentialStore(context: Context) {
                 creds = Credentials(access, refresh, o.optLong("expiresAt", 0L)),
                 refreshExpiresAt = o.optLong("refreshTokenExpiresAt", 0L),
                 plan = o.optString("subscriptionType").ifEmpty { null },
+                // The claudeAiOauth object is all-camelCase, so that spelling
+                // first; snake_case tolerated in case the shape ever shifts.
+                tier = o.optString("rateLimitTier").ifEmpty { o.optString("rate_limit_tier") }
+                    .ifEmpty { null },
             )
         } catch (_: Exception) {
             null

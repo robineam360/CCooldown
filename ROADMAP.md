@@ -344,7 +344,16 @@ keys) would still make this a different product. Not filed, not an open question
   reading.
 
 ### CCRM-38 · Plan Tier — show the rate-limit multiplier, not just the plan
-- **Status:** Planned · small
+- **Status:** Done (2026-08-13)
+- **Shipped:** the account card's plan chip now composes in the multiplier — "Max 20x" —
+  via a pure render-time parse (`Fmt.tierMultiplier`, pinned by 9 cases in
+  `TierMultiplierTest`; "05x" → "5x", a 1x tier renders, anything unrecognised → null and
+  the chip falls back to the bare plan). The raw tier string is stored as-is
+  (`UsageCache.tier`), read tolerantly off the token JSON on both the sign-in and
+  pasted-token paths (`rate_limit_tier` / `rateLimitTier`); the renewal path deliberately
+  does not touch it. The verify-first question gets its instrument: sign-in now records
+  the token response's key names (never values), shown as a line in the Settings debug
+  section, so the next real sign-in settles whether the tier field is in our response.
 - **Why:** We store and display `subscriptionType` — "pro", "max"
   ([UsageRepository.kt:228](app/src/main/java/com/robin/claudeusage/data/UsageRepository.kt#L228),
   shown on the account card at [SettingsScreen.kt:604](app/src/main/java/com/robin/claudeusage/SettingsScreen.kt#L604)).
