@@ -313,6 +313,55 @@ class UsageCache(context: Context) {
         prefs.edit().putString("themeColor", name).apply()
     }
 
+    // --- automatic update checks (CCRM-28): app-global, deliberately not per-profile ---
+
+    fun autoCheckUpdates(): Boolean = prefs.getBoolean("autoCheckUpdates", true)
+
+    fun setAutoCheckUpdates(enabled: Boolean) {
+        prefs.edit().putBoolean("autoCheckUpdates", enabled).apply()
+    }
+
+    /** Last **successful** check, epoch ms; 0 = never. A failure never advances it. */
+    fun lastUpdateCheckAt(): Long = prefs.getLong("lastUpdateCheckAt", 0L)
+
+    /** The settings line's outcome half, e.g. "up to date (v0.14)" / "v0.15 available". */
+    fun lastUpdateCheckOutcome(): String? = prefs.getString("lastUpdateCheckOutcome", null)
+
+    fun recordUpdateCheckSuccess(at: Long, outcome: String) {
+        prefs.edit()
+            .putLong("lastUpdateCheckAt", at)
+            .putString("lastUpdateCheckOutcome", outcome)
+            .remove("lastUpdateFailAt")
+            .remove("lastUpdateFailReason")
+            .apply()
+    }
+
+    fun lastUpdateFailAt(): Long = prefs.getLong("lastUpdateFailAt", 0L)
+
+    fun lastUpdateFailReason(): String? = prefs.getString("lastUpdateFailReason", null)
+
+    /** Deliberately leaves lastUpdateCheckAt alone, so the next poll retries. */
+    fun recordUpdateCheckFailure(at: Long, reason: String) {
+        prefs.edit()
+            .putLong("lastUpdateFailAt", at)
+            .putString("lastUpdateFailReason", reason)
+            .apply()
+    }
+
+    /** Written only when the notification actually posted — once per version, ever. */
+    fun lastNotifiedVersion(): String? = prefs.getString("lastNotifiedVersion", null)
+
+    fun setLastNotifiedVersion(version: String) {
+        prefs.edit().putString("lastNotifiedVersion", version).apply()
+    }
+
+    /** "Skip this version": silences exactly this version; a newer one still notifies. */
+    fun dismissedUpdateVersion(): String? = prefs.getString("dismissedUpdateVersion", null)
+
+    fun setDismissedUpdateVersion(version: String) {
+        prefs.edit().putString("dismissedUpdateVersion", version).apply()
+    }
+
     // --- alert dedupe state: one alert per threshold per window instance ---
 
     fun alertKey(profile: Profile, name: String): Long = prefs.getLong(k(profile, "${name}Key"), 0L)
@@ -341,11 +390,27 @@ class UsageCache(context: Context) {
 
     fun plan(profile: Profile): String? = prefs.getString(k(profile, "plan"), null)
 
-    fun setTokenMeta(profile: Profile, refreshExpiresAt: Long, plan: String?) {
+    /** Raw rate-limit tier, e.g. "default_5x" — parsed at render time (CCRM-38). */
+    fun tier(profile: Profile): String? = prefs.getString(k(profile, "tier"), null)
+
+    fun setTokenMeta(profile: Profile, refreshExpiresAt: Long, plan: String?, tier: String?) {
         prefs.edit()
             .putLong(k(profile, "refreshExpiresAt"), refreshExpiresAt)
             .putString(k(profile, "plan"), plan)
+            .putString(k(profile, "tier"), tier)
             .apply()
+    }
+
+    /**
+     * Key names (never values) of the last sign-in's token response — a
+     * debug-only instrument so whether `rate_limit_tier` actually appears in
+     * *our* token response gets settled by the next real sign-in (CCRM-38).
+     */
+    fun signInTokenKeys(profile: Profile): String? =
+        prefs.getString(k(profile, "signInTokenKeys"), null)
+
+    fun setSignInTokenKeys(profile: Profile, keys: String?) {
+        prefs.edit().putString(k(profile, "signInTokenKeys"), keys).apply()
     }
 
     fun clearRefreshExpiry(profile: Profile) {

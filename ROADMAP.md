@@ -454,7 +454,18 @@ keys) would still make this a different product. Not filed, not an open question
   minutes has no business rendering "resets in 43s".
 
 ### CCRM-26 · Quick Links — the Anthropic status page and the usage dashboard
-- **Status:** Planned · small
+- **Status:** Done (2026-08-13) · wireframe approved same day
+- **Shipped:** two text buttons on each *signed-in* account card (none when signed out —
+  nothing to verify), below a new divider after the Re-sign in/Clear row: "Anthropic
+  status" opens `status.anthropic.com` in the default browser, "Usage dashboard" opens
+  `claude.ai/settings/usage` through the same per-profile browser picker sign-in uses,
+  so it lands in the browser holding *that* account's Claude session. Main screen gets
+  "Check Anthropic status" directly under the red `Status:` line, same
+  `lastStatus != "OK"` gate — including the no-data-yet state, where it matters most.
+  Both URLs are compile-time https constants; `openInBrowser` moved out of `private`
+  so MainActivity shares the one launch path, now guarded by `allowedLinkUrl`
+  (https/http only, silent no-op otherwise) and pinned by 5 cases in `QuickLinksTest`.
+  Text-only buttons — no `material-icons-extended`.
 - **Why:** When the app shows a network error the first question is "is it me or is it
   them", and we make the user leave the app to find out. OpenQuota puts two links on every
   provider card: `status.anthropic.com` and `claude.ai/settings/usage`.
@@ -466,7 +477,16 @@ keys) would still make this a different product. Not filed, not an open question
   reading.
 
 ### CCRM-38 · Plan Tier — show the rate-limit multiplier, not just the plan
-- **Status:** Planned · small
+- **Status:** Done (2026-08-13)
+- **Shipped:** the account card's plan chip now composes in the multiplier — "Max 20x" —
+  via a pure render-time parse (`Fmt.tierMultiplier`, pinned by 9 cases in
+  `TierMultiplierTest`; "05x" → "5x", a 1x tier renders, anything unrecognised → null and
+  the chip falls back to the bare plan). The raw tier string is stored as-is
+  (`UsageCache.tier`), read tolerantly off the token JSON on both the sign-in and
+  pasted-token paths (`rate_limit_tier` / `rateLimitTier`); the renewal path deliberately
+  does not touch it. The verify-first question gets its instrument: sign-in now records
+  the token response's key names (never values), shown as a line in the Settings debug
+  section, so the next real sign-in settles whether the tier field is in our response.
 - **Why:** We store and display `subscriptionType` — "pro", "max"
   ([UsageRepository.kt:228](app/src/main/java/com/robin/claudeusage/data/UsageRepository.kt#L228),
   shown on the account card at [SettingsScreen.kt:604](app/src/main/java/com/robin/claudeusage/SettingsScreen.kt#L604)).
@@ -497,7 +517,22 @@ keys) would still make this a different product. Not filed, not an open question
   being wrong.
 
 ### CCRM-28 · Auto Update Check — check in the background, and let a version be dismissed
-- **Status:** Planned · small
+- **Status:** Done (2026-08-13) · wireframe approved same day
+- **Shipped:** the check rides `UsagePollWorker` — no scheduler of its own — behind a
+  pure gate in `data/UpdateGate.kt` (`autoCheckUpdates` on and 6h past the last
+  *successful* check; a failure never advances the anchor, so the next poll retries).
+  A found release posts notification id 40 on the new `update_alerts` channel
+  (IMPORTANCE_LOW, silent) at most **once per version ever** — a swipe counts as seen —
+  with a "Skip this version" action (`notify/UpdateSkipReceiver`) that silences exactly
+  that version; a newer one still notifies. `lastNotifiedVersion` records only when the
+  post succeeded (the pace-alert rollback pattern). Tap opens the release page only if
+  its URL is https on github.com, else the hardcoded releases page — nothing ever
+  downloads or installs. New **Updates** settings section above About with the
+  auto-check toggle, the manual "Check for updates" button (moved out of the About
+  card), and the last-checked/failed outcome lines; the manual dialog names a skipped
+  version. Decision table, notes trimming, gate, and URL fallback pinned by 20 cases
+  in `UpdateGateTest` (117 tests, 0 failures).
+- **Was:** Planned · small
 - **Why:** Our update check is a button someone has to think to press
   ([SettingsScreen.kt:1206](app/src/main/java/com/robin/claudeusage/SettingsScreen.kt#L1206)).
   CCRM-8 established that this checker is **the only channel we have for reaching installed
@@ -553,7 +588,7 @@ keys) would still make this a different product. Not filed, not an open question
   notification are too tight — they get nothing.
 
 ### CCRM-32 · Reduce Motion — honour the system animation setting
-- **Status:** Planned · small
+- **Status:** Done (2026-08-13)
 - **Why:** An accessibility floor we don't currently meet. Users who set animations off at
   the OS level mean it.
 - **Approach:** read `Settings.Global.ANIMATOR_DURATION_SCALE` (0 means off) and collapse
@@ -561,6 +596,17 @@ keys) would still make this a different product. Not filed, not an open question
   `springMotion(reducedMotion)` does exactly this, and keeping the same curve means only one
   visual behaviour to reason about. Affects the pager, the chart's entry animation, and the
   bar fills.
+- **Shipped:** `Motion` in `ui/Adaptive.kt` — pure `reduced`/`collapse` verdicts plus the
+  one `ANIMATOR_DURATION_SCALE` read — and a `reduceMotion()` composable that re-reads it
+  every composition, never cached, so flipping the setting mid-session takes effect on the
+  next press. Wired to the one Compose-driven animation the audit actually found: the tab
+  press's `animateScrollToPage`, which becomes `scrollToPage` (the same page turn at zero
+  duration). The chart has no entry animation and the bar fills don't animate — a full
+  `animateFloatAsState`/`tween`/`spring` sweep confirmed there was nothing else to collapse,
+  and adding animations just to reduce them would be backwards. The pager's finger-driven
+  swipe settle stays: direct manipulation isn't the motion this setting removes, and the
+  framework governs its own animators by the same scale already. Verdicts pinned by
+  `MotionTest` (garbage scales fail towards stillness; the unset 1f default keeps motion).
 
 ### CCRM-33 · App Shortcuts — launcher long-press entries
 - **Status:** Planned · small
@@ -587,7 +633,19 @@ keys) would still make this a different product. Not filed, not an open question
   history scrub is the precedent — this is a public repo and logs get pasted into emails.
 
 ### CCRM-36 · Repo Hygiene — the `.github/` directory we don't have
-- **Status:** Planned · small
+- **Status:** Done (2026-08-13)
+- **Shipped:** the full `.github/` set, docs only. `SECURITY.md` routes reports through
+  GitHub private vulnerability reporting with the explicit "no real credentials, OAuth
+  tokens, or authorization headers in a report" rule (the v0.14 scrub named as the
+  precedent). `CONTRIBUTING.md` surfaces the rules that lived only in CLAUDE.md and the
+  CCRM-8 (Mac Menu-Bar) entry — do-not-fork-for-another-client, wireframe-before-UI,
+  tracker-ID naming, Android-only and Claude-only scope, and how to run the tests.
+  Issue forms in `ISSUE_TEMPLATE/`: `bug_report.yml` requires app version and phone
+  model/skin (the skin-dependent `big` notification style is why), `feature_request.yml`
+  points at this file's appendix of ruled-out ideas, and `config.yml` adds the private
+  security-advisory and email-feedback contact links. `PULL_REQUEST_TEMPLATE.md` asks
+  which CCRM/CCBG item the change serves and whether a wireframe was approved before
+  building. `dependabot.yml` watches gradle and github-actions, both weekly.
 - **Why:** The repo is public and has no `.github/` at all. OpenQuota's set is the standard
   one and costs an afternoon:
   - **`SECURITY.md`** pointing at GitHub private vulnerability reporting, with an explicit

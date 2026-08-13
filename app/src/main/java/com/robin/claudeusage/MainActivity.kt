@@ -44,6 +44,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -85,6 +86,7 @@ import com.robin.claudeusage.ui.chartHeight
 import com.robin.claudeusage.ui.hasTwoColumns
 import com.robin.claudeusage.ui.PACE_DEAD_ZONE
 import com.robin.claudeusage.ui.elapsedPercent
+import com.robin.claudeusage.ui.Motion
 import com.robin.claudeusage.ui.twoPane
 import com.robin.claudeusage.widget.BarWidget
 import com.robin.claudeusage.widget.UsageWidget
@@ -290,13 +292,27 @@ private fun ProfileTabs(
         pageCount = { profiles.size },
     )
     val scope = rememberCoroutineScope()
+    // Read inside the click, never captured at composition: the user can flip the
+    // system animation setting while the app is open, and the very next tab press
+    // must honour the new answer.
+    val motionContext = LocalContext.current
 
     Column(modifier = modifier.fillMaxSize()) {
         TabRow(selectedTabIndex = pagerState.currentPage) {
             profiles.forEachIndexed { index, profile ->
                 Tab(
                     selected = pagerState.currentPage == index,
-                    onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
+                    onClick = {
+                        scope.launch {
+                            // The zero-duration limit of the same page turn — identical
+                            // landing, no travel — per CCRM-32 (Reduce Motion).
+                            if (Motion.reduced(Motion.scale(motionContext))) {
+                                pagerState.scrollToPage(index)
+                            } else {
+                                pagerState.animateScrollToPage(index)
+                            }
+                        }
+                    },
                     text = { Text(repo.cacheSettings().profileLabel(profile)) },
                 )
             }
@@ -569,6 +585,13 @@ private fun ProfileScreen(repo: UsageRepository, profile: Profile, use24h: Boole
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.error,
         )
+        // CCRM-26 (Quick Links): the "is it me or is it them" escape, shown under
+        // the same gate as the red line — including the no-data-yet state, where
+        // it matters most.
+        val context = LocalContext.current
+        TextButton(onClick = { openInBrowser(context, ANTHROPIC_STATUS_URL, null) }) {
+            Text("Check Anthropic status")
+        }
     }
 }
 

@@ -56,11 +56,11 @@ object UpdateCheck {
     }
 
     /** Strips a leading "v" so "v0.14" and "0.14" compare equal. */
-    private fun normalize(raw: String): String =
+    fun normalize(raw: String): String =
         raw.trim().removePrefix("v").removePrefix("V").trim()
 
     /** Numeric compare of dot-separated versions. >0 when a is newer than b. */
-    private fun compare(a: String, b: String): Int {
+    fun compare(a: String, b: String): Int {
         val pa = a.split(".")
         val pb = b.split(".")
         for (i in 0 until maxOf(pa.size, pb.size)) {

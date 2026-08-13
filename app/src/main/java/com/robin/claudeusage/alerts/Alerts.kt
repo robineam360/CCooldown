@@ -41,6 +41,12 @@ object Alerts {
      */
     private const val CHANNEL_PACE = "pace_alerts"
 
+    /**
+     * App updates (CCRM-28). Non-private: the poster lives in
+     * `notify/UpdateNotification.kt`, app-global rather than per-profile.
+     */
+    const val CHANNEL_UPDATE = "update_alerts"
+
     /** Pace notification id kinds — one per window, so an escalation replaces in place. */
     private const val PACE_SESSION_KIND = 30
     private const val PACE_WEEKLY_KIND = 31
@@ -88,6 +94,13 @@ object Alerts {
             NotificationChannel(
                 CHANNEL_PACE, "Pace alerts", NotificationManager.IMPORTANCE_DEFAULT
             ).apply { description = "Usage on pace to run out before the window resets" }
+        )
+        // IMPORTANCE_LOW: visible in the shade and status bar but silent — a new
+        // release discovered at 3am has no claim to a sound.
+        nm.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_UPDATE, "App updates", NotificationManager.IMPORTANCE_LOW
+            ).apply { description = "A newer Claude Cooldown release is on GitHub" }
         )
     }
 

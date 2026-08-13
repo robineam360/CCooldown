@@ -145,6 +145,10 @@
             android:exported="false" />
 
         <receiver
+            android:name=".notify.UpdateSkipReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".ping.PingAlarmReceiver"
             android:exported="false" />
 

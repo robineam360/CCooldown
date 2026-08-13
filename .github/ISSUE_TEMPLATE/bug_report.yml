@@ -1,0 +1,76 @@
+name: Bug report
+description: Something in CCooldown is broken or behaving oddly.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Two things before you start:
+
+        - **Never paste a real OAuth token, refresh token, or `Authorization` header
+          here** — issues are public. Redact anything that looks like a credential.
+          Security problems go through
+          [SECURITY.md](https://github.com/robineam360/CCooldown/blob/main/.github/SECURITY.md)
+          (Security tab → Report a vulnerability), not an issue.
+        - Check [BUGS.md](https://github.com/robineam360/CCooldown/blob/main/BUGS.md)
+          in case it's already tracked.
+  - type: input
+    id: app-version
+    attributes:
+      label: App version
+      description: "Settings → About in the app (e.g. 1.1)."
+      placeholder: "1.1"
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Phone model and skin
+      description: >
+        Model, Android version, and the manufacturer skin (e.g. Galaxy Z Fold 7,
+        Android 16, One UI 8). The skin matters — some behaviour, like the expanded
+        notification style, differs between skins.
+      placeholder: "Galaxy Z Fold 7 · Android 16 · One UI 8"
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. …
+        2. …
+    validations:
+      required: false
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where does it show up?
+      multiple: true
+      options:
+        - App (main screen / history / settings)
+        - Home-screen widget
+        - Pinned notification
+        - Alerts / notifications
+        - Quick Settings tile
+        - Sign-in / token
+        - Other
+    validations:
+      required: false
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: >
+        Screenshots help. If you attach logs, check them for tokens or authorization
+        headers first and redact anything sensitive.
+    validations:
+      required: false

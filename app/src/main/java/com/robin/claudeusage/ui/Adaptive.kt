@@ -1,5 +1,7 @@
 package com.robin.claudeusage.ui
 
+import android.content.Context
+import android.provider.Settings
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -15,6 +17,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -101,6 +104,51 @@ fun chartHeight(width: Dp, windowHeight: Dp): Dp {
     // collapsing the chart to nothing.
     return if (windowHeight <= 0.dp) fromWidth else minOf(fromWidth, windowHeight * 0.45f)
 }
+
+/**
+ * The system animation setting, as one app-wide decision (CCRM-32).
+ *
+ * A user who turns animations off at the OS level (Settings → Accessibility →
+ * Remove animations, or the developer-options animator scale) means it, and the
+ * framework honours them everywhere except Compose, which never consults the
+ * scale. The policy here is the one OpenQuota's `springMotion` settled on:
+ * collapse durations to **zero** and keep the same curve, so there is only one
+ * visual behaviour to reason about — never a different animation for the
+ * reduced case, just the same one arriving instantly.
+ *
+ * The pure verdicts live in [Motion] so they're unit-testable; the one Android
+ * read is [Motion.scale], and [reduceMotion] glues the two together per
+ * composition. Nothing here is cached across compositions on purpose — the
+ * scale is a live setting the user can flip mid-session.
+ */
+object Motion {
+    /**
+     * True when [animatorScale] means "no animations". Off is exactly 0, but the
+     * comparison is written so that garbage (negative, NaN) also lands on the
+     * reduced side — a broken read should fail towards stillness, not motion.
+     */
+    fun reduced(animatorScale: Float): Boolean = !(animatorScale > 0f)
+
+    /** [durationMs], or zero once the scale says animations are off. Deliberately
+     * not multiplied through: a 0.5× or 5× developer scale is a debugging tool the
+     * framework applies to its own animators, and second-guessing it here would
+     * make Compose motion disagree with everything around it twice over. */
+    fun collapse(durationMs: Int, animatorScale: Float): Int =
+        if (reduced(animatorScale)) 0 else durationMs
+
+    /**
+     * The animator scale as it stands right now. Never cache the result — read it
+     * again at every decision point, because the setting changes while the app is
+     * running and a stale `true` would freeze the app's motion permanently.
+     */
+    fun scale(context: Context): Float = Settings.Global.getFloat(
+        context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f,
+    )
+}
+
+/** Whether this composition should skip its animations, read fresh per composition. */
+@Composable
+fun reduceMotion(): Boolean = Motion.reduced(Motion.scale(LocalContext.current))
 
 /** Measures the window once and publishes the result as [LocalWidthClass]. */
 @Composable

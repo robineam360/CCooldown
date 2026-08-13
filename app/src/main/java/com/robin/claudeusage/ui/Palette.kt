@@ -287,6 +287,23 @@ object Fmt {
         if (epochMs <= 0) return "never"
         return "${dayTime(Instant.ofEpochMilli(epochMs), use24h)} (${ago(epochMs)})"
     }
+
+    /**
+     * "default_5x" → "5x" — the rate-limit multiplier out of a tier string
+     * (CCRM-38). Split on non-alphanumerics, take the first part that ends in a
+     * lowercase "x" with an all-digits stem; leading zeros drop ("05x" → "5x").
+     * Anything else — "high_volume", "5X", a bare number — is null, and the
+     * caller falls back to the bare plan. The raw tier is stored as-is; this
+     * runs at render time only.
+     */
+    fun tierMultiplier(tier: String?): String? {
+        tier ?: return null
+        val part = tier.split(Regex("[^A-Za-z0-9]+")).firstOrNull {
+            it.length >= 2 && it.endsWith('x') && it.dropLast(1).all { c -> c.isDigit() }
+        } ?: return null
+        val stem = part.dropLast(1).trimStart('0').ifEmpty { "0" }
+        return "${stem}x"
+    }
 }
 
 /**

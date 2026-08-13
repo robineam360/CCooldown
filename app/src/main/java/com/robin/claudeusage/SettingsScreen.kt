@@ -83,9 +83,11 @@ import com.robin.claudeusage.data.Profile
 import com.robin.claudeusage.data.Projection
 import com.robin.claudeusage.data.SignInExpiry
 import com.robin.claudeusage.data.UpdateCheck
+import com.robin.claudeusage.data.UpdateGate
 import com.robin.claudeusage.data.UpdateInfo
 import com.robin.claudeusage.data.UsageCache
 import com.robin.claudeusage.data.UsageRepository
+import com.robin.claudeusage.notify.UpdateNotification
 import com.robin.claudeusage.ping.PingLog
 import com.robin.claudeusage.ping.PingScheduler
 import com.robin.claudeusage.ui.Fmt
@@ -100,6 +102,11 @@ import kotlinx.coroutines.withContext
 
 private const val FEEDBACK_EMAIL = "robin@eam360.com"
 private const val DEBUG_UNLOCK_TAPS = 7
+
+// CCRM-26 (Quick Links) destinations. The status page is shared with the main
+// screen's error state, so it isn't private to this file.
+internal const val ANTHROPIC_STATUS_URL = "https://status.anthropic.com"
+private const val USAGE_DASHBOARD_URL = "https://claude.ai/settings/usage"
 
 @Composable
 fun SettingsScreen(
@@ -540,6 +547,10 @@ fun SettingsScreen(
         }
         Spacer(Modifier.height(24.dp))
 
+        SectionLabel("Updates")
+        UpdatesCard(cacheSettings)
+        Spacer(Modifier.height(24.dp))
+
         SectionLabel("About")
         AboutCard(debugUnlocked, onDebugUnlock)
 
@@ -591,8 +602,26 @@ private fun installedBrowsers(context: android.content.Context): List<BrowserCho
         .sortedBy { it.label.lowercase() }
 }
 
-/** Opens the sign-in URL in a specific browser (full external app, not an in-app tab). */
-private fun openInBrowser(context: android.content.Context, url: String, pkg: String?) {
+/**
+ * Whether a URL is one the app will hand to a browser: plain web links only.
+ * Every launch site uses a compile-time https constant today; this is the guard
+ * that keeps a future refactor from sending an `intent://` or `javascript:`
+ * payload through the same path.
+ */
+internal fun allowedLinkUrl(url: String): Boolean {
+    val scheme = url.trim().substringBefore(':', missingDelimiterValue = "")
+    return scheme.equals("https", ignoreCase = true) || scheme.equals("http", ignoreCase = true)
+}
+
+/**
+ * Opens a URL in a specific browser (full external app, not an in-app tab).
+ * The single launch path for sign-in and the CCRM-26 (Quick Links) buttons —
+ * shared with MainActivity so the [allowedLinkUrl] check guards every launch
+ * through this path. (The release-notes dialog and the mailto feedback intent
+ * build their own intents and are guarded at their own call sites.)
+ */
+internal fun openInBrowser(context: android.content.Context, url: String, pkg: String?) {
+    if (!allowedLinkUrl(url)) return
     val uri = Uri.parse(url)
     if (pkg != null) {
         try {
@@ -647,6 +676,7 @@ private fun TokenCard(
     val addedAt = remember(stateKey) { repo.tokenAddedAt(profile) }
     val tail = remember(stateKey) { repo.tokenTail(profile) }
     val plan = remember(stateKey) { repo.plan(profile) }
+    val tier = remember(stateKey) { repo.tier(profile) }
     val tokenExpiresAt = remember(stateKey) { repo.tokenExpiresAt(profile) }
     val refreshExpiresAt = remember(stateKey) { repo.refreshExpiresAt(profile) }
     val refreshEstimated = remember(stateKey) { repo.refreshExpiryEstimated(profile) }
@@ -654,11 +684,11 @@ private fun TokenCard(
     val backoffUntil = remember(stateKey) { repo.cacheSettings().backoffUntil(profile) }
     val firstRefreshFailAt = remember(stateKey) { repo.cacheSettings().firstRefreshFailAt(profile) }
 
-    // Open a sign-in URL, letting the user pick a browser when they have more than
-    // one (so they can route Work vs Personal through different browsers). Always
-    // opens a real external browser, never an in-app tab.
+    // Open a URL, letting the user pick a browser when they have more than one
+    // (so they can route Work vs Personal through different browsers). Always
+    // opens a real external browser, never an in-app tab. Used for sign-in and
+    // for the usage-dashboard quick link — same routing question either way.
     fun openWithPicker(url: String) {
-        authUrl = url
         val browsers = installedBrowsers(context)
         if (browsers.size >= 2) {
             pendingPickUrl = url
@@ -672,7 +702,9 @@ private fun TokenCard(
         message = null
         codeInput = ""
         awaitingCode = true
-        openWithPicker(repo.startSignIn(profile))
+        val url = repo.startSignIn(profile)
+        authUrl = url
+        openWithPicker(url)
     }
 
     fun finishSignIn() {
@@ -743,7 +775,7 @@ private fun TokenCard(
                 if (hasToken) StatusChip(snapshot.authState)
                 if (hasToken && plan != null) {
                     Spacer(Modifier.width(6.dp))
-                    PlanChip(plan)
+                    PlanChip(plan, tier)
                 }
                 Spacer(Modifier.weight(1f))
                 if (hasToken && tail != null) {
@@ -928,6 +960,21 @@ private fun TokenCard(
                         },
                     ) { Text("Clear", color = MaterialTheme.colorScheme.error) }
                 }
+                RowDivider()
+                // Quick escapes, not account actions — hence below the divider.
+                // Status goes to the default browser (account-independent); the
+                // dashboard reuses the sign-in picker, because which browser holds
+                // this profile's Claude session is the same question either way.
+                // Flows rather than a Row so the second label drops to its own
+                // line at large font scales instead of wrapping mid-label.
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = {
+                        openInBrowser(context, ANTHROPIC_STATUS_URL, null)
+                    }) { Text("Anthropic status") }
+                    TextButton(onClick = {
+                        openWithPicker(USAGE_DASHBOARD_URL)
+                    }) { Text("Usage dashboard") }
+                }
                 BackupOptions(
                     expanded = showBackup,
                     onToggle = { showBackup = !showBackup },
@@ -950,7 +997,7 @@ private fun TokenCard(
         val browsers = remember { installedBrowsers(context) }
         AlertDialog(
             onDismissRequest = { showBrowserPicker = false },
-            title = { Text("Open sign-in with") },
+            title = { Text("Open with") },
             text = {
                 Column {
                     Text(
@@ -1060,10 +1107,13 @@ private fun BackupOptions(
 }
 
 @Composable
-private fun PlanChip(plan: String) {
+private fun PlanChip(plan: String, tier: String?) {
     val color = MaterialTheme.colorScheme.primary
+    // "Max 20x" when the tier parses, bare "Max" otherwise (CCRM-38). A tier
+    // with no plan renders no chip at all — the caller's gate is on the plan.
+    val multiplier = Fmt.tierMultiplier(tier)
     Text(
-        plan.replaceFirstChar { it.uppercase() },
+        plan.replaceFirstChar { it.uppercase() } + (multiplier?.let { " $it" } ?: ""),
         style = MaterialTheme.typography.labelSmall,
         color = color,
         modifier = Modifier
@@ -1182,13 +1232,181 @@ private fun ThemeColorPicker(themeName: String, onTheme: (String) -> Unit) {
     )
 }
 
+/**
+ * The UPDATES section (CCRM-28): the auto-check toggle, the manual check button
+ * (moved here from the About card), and the outcome line the background check
+ * shares with it. Failures only ever surface here — never as a notification.
+ */
+@Composable
+private fun UpdatesCard(cache: UsageCache) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var auto by remember { mutableStateOf(cache.autoCheckUpdates()) }
+    var checking by remember { mutableStateOf(false) }
+    var updateResult by remember { mutableStateOf<UpdateUi?>(null) }
+    // Bumped when a manual check finishes so the outcome line re-reads the cache.
+    var outcomeTick by remember { mutableIntStateOf(0) }
+    val versionName = remember { UpdateNotification.installedVersion(context) }
+
+    SectionCard {
+        ToggleRow(
+            title = "Check automatically",
+            subtitle = "Checks GitHub for a newer release every 6 hours, riding the " +
+                "usage poll. A new version notifies once; a failed check never notifies.",
+            checked = auto,
+        ) {
+            auto = it
+            cache.setAutoCheckUpdates(it)
+        }
+        RowDivider()
+        OutlinedButton(
+            enabled = !checking,
+            onClick = {
+                checking = true
+                scope.launch {
+                    // Manual checks ignore the toggle and the skip record; a success
+                    // still refreshes the shared last-checked line below.
+                    updateResult = try {
+                        val info = withContext(Dispatchers.IO) {
+                            UpdateCheck.fetchLatest(versionName)
+                        }
+                        cache.recordUpdateCheckSuccess(
+                            System.currentTimeMillis(),
+                            UpdateGate.successOutcome(info.latestVersion, info.updateAvailable),
+                        )
+                        UpdateUi.Ok(info)
+                    } catch (_: Exception) {
+                        cache.recordUpdateCheckFailure(System.currentTimeMillis(), "couldn't reach GitHub")
+                        UpdateUi.Message(
+                            "Couldn't check for updates. Check your connection and try again."
+                        )
+                    }
+                    outcomeTick++
+                    checking = false
+                }
+            },
+        ) {
+            if (checking) {
+                CircularProgressIndicator(
+                    Modifier.size(16.dp),
+                    strokeWidth = 2.dp,
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("Checking…")
+            } else {
+                Text("Check for updates")
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        val lastOkAt = remember(outcomeTick) { cache.lastUpdateCheckAt() }
+        val outcome = remember(outcomeTick) { cache.lastUpdateCheckOutcome() }
+        val failAt = remember(outcomeTick) { cache.lastUpdateFailAt() }
+        val failReason = remember(outcomeTick) { cache.lastUpdateFailReason() }
+        val dismissed = remember(outcomeTick) { cache.dismissedUpdateVersion() }
+        when {
+            failAt > lastOkAt -> {
+                Text(
+                    "Last check failed ${Fmt.ago(failAt)} — " +
+                        "${failReason ?: "couldn't reach GitHub"}. Retries with the next poll.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+                if (lastOkAt > 0 && outcome != null) {
+                    Text(
+                        "Last successful check ${Fmt.ago(lastOkAt)} — $outcome",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            lastOkAt > 0 && outcome != null -> Text(
+                "Last checked ${Fmt.ago(lastOkAt)} — ${UpdateGate.outcomeLine(outcome, dismissed)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            else -> Text(
+                "Not checked yet — the first check rides the next poll.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+
+    when (val r = updateResult) {
+        is UpdateUi.Message -> AlertDialog(
+            onDismissRequest = { updateResult = null },
+            confirmButton = {
+                TextButton(onClick = { updateResult = null }) { Text("OK") }
+            },
+            text = { Text(r.text) },
+        )
+        is UpdateUi.Ok -> {
+            val info = r.info
+            AlertDialog(
+                onDismissRequest = { updateResult = null },
+                title = {
+                    Text(
+                        if (info.updateAvailable) "Update available"
+                        else "You're up to date"
+                    )
+                },
+                text = {
+                    Column {
+                        if (info.updateAvailable) {
+                            Text("v${info.latestVersion} is available (you have v${info.currentVersion}).")
+                            if (info.notes.isNotBlank()) {
+                                Spacer(Modifier.height(10.dp))
+                                Text(
+                                    info.notes,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            if (UpdateGate.isSkipped(info.latestVersion, cache.dismissedUpdateVersion())) {
+                                Spacer(Modifier.height(10.dp))
+                                Text(
+                                    "You skipped this version, so it isn't notifying.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        } else {
+                            Text("You're running the latest version (v${info.currentVersion}).")
+                        }
+                    }
+                },
+                confirmButton = {
+                    if (info.updateAvailable && info.releaseUrl.isNotBlank()) {
+                        TextButton(onClick = {
+                            context.startActivity(
+                                Intent(
+                                    Intent.ACTION_VIEW,
+                                    Uri.parse(UpdateGate.safeReleaseUrl(info.releaseUrl)),
+                                )
+                            )
+                            updateResult = null
+                        }) { Text("Open GitHub") }
+                    } else {
+                        TextButton(onClick = { updateResult = null }) { Text("OK") }
+                    }
+                },
+                dismissButton = {
+                    if (info.updateAvailable) {
+                        TextButton(onClick = { updateResult = null }) { Text("Later") }
+                    }
+                },
+            )
+        }
+        null -> {}
+    }
+}
+
 @Composable
 private fun AboutCard(debugUnlocked: Boolean, onDebugUnlock: () -> Unit) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     var taps by remember { mutableIntStateOf(0) }
-    var checking by remember { mutableStateOf(false) }
-    var updateResult by remember { mutableStateOf<UpdateUi?>(null) }
+    // Fallback message when no email app is configured to take the feedback intent.
+    var emailFallback by remember { mutableStateOf<String?>(null) }
     val versionName = remember {
         try {
             context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?"
@@ -1234,61 +1452,22 @@ private fun AboutCard(debugUnlocked: Boolean, onDebugUnlock: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(12.dp))
-            // Flows rather than a Row: the two labels together need ~325dp, which
-            // a settings column on a foldable doesn't have. Given a Row the second
-            // button wraps its own label to two lines; here it drops to its own
-            // line instead, and on a phone the pair still sits side by side.
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                OutlinedButton(onClick = {
-                    val email = Intent(Intent.ACTION_SENDTO).apply {
-                        data = Uri.parse("mailto:$FEEDBACK_EMAIL")
-                        putExtra(Intent.EXTRA_SUBJECT, "CCooldown feedback (v$versionName)")
-                    }
-                    try {
-                        context.startActivity(
-                            Intent.createChooser(email, "Share feedback")
-                        )
-                    } catch (_: Exception) {
-                        // No email app configured — surface the address instead.
-                        updateResult = UpdateUi.Message(
-                            "Email me at $FEEDBACK_EMAIL"
-                        )
-                    }
-                }) { Text("Share feedback") }
-                OutlinedButton(
-                    enabled = !checking,
-                    onClick = {
-                        checking = true
-                        scope.launch {
-                            updateResult = try {
-                                val info = withContext(Dispatchers.IO) {
-                                    UpdateCheck.fetchLatest(versionName)
-                                }
-                                UpdateUi.Ok(info)
-                            } catch (e: Exception) {
-                                UpdateUi.Message(
-                                    "Couldn't check for updates. Check your connection and try again."
-                                )
-                            }
-                            checking = false
-                        }
-                    },
-                ) {
-                    if (checking) {
-                        CircularProgressIndicator(
-                            Modifier.size(16.dp),
-                            strokeWidth = 2.dp,
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text("Checking…")
-                    } else {
-                        Text("Check for updates")
-                    }
+            // Only button left here — "Check for updates" moved to the UPDATES
+            // section above (CCRM-28), so a single Row fits every width class.
+            OutlinedButton(onClick = {
+                val email = Intent(Intent.ACTION_SENDTO).apply {
+                    data = Uri.parse("mailto:$FEEDBACK_EMAIL")
+                    putExtra(Intent.EXTRA_SUBJECT, "CCooldown feedback (v$versionName)")
                 }
-            }
+                try {
+                    context.startActivity(
+                        Intent.createChooser(email, "Share feedback")
+                    )
+                } catch (_: Exception) {
+                    // No email app configured — surface the address instead.
+                    emailFallback = "Email me at $FEEDBACK_EMAIL"
+                }
+            }) { Text("Share feedback") }
             Spacer(Modifier.height(12.dp))
             Text(
                 "Not affiliated with or endorsed by Anthropic",
@@ -1299,61 +1478,14 @@ private fun AboutCard(debugUnlocked: Boolean, onDebugUnlock: () -> Unit) {
         }
     }
 
-    when (val r = updateResult) {
-        is UpdateUi.Message -> AlertDialog(
-            onDismissRequest = { updateResult = null },
+    emailFallback?.let { message ->
+        AlertDialog(
+            onDismissRequest = { emailFallback = null },
             confirmButton = {
-                TextButton(onClick = { updateResult = null }) { Text("OK") }
+                TextButton(onClick = { emailFallback = null }) { Text("OK") }
             },
-            text = { Text(r.text) },
+            text = { Text(message) },
         )
-        is UpdateUi.Ok -> {
-            val info = r.info
-            AlertDialog(
-                onDismissRequest = { updateResult = null },
-                title = {
-                    Text(
-                        if (info.updateAvailable) "Update available"
-                        else "You're up to date"
-                    )
-                },
-                text = {
-                    Column {
-                        if (info.updateAvailable) {
-                            Text("v${info.latestVersion} is available (you have v${info.currentVersion}).")
-                            if (info.notes.isNotBlank()) {
-                                Spacer(Modifier.height(10.dp))
-                                Text(
-                                    info.notes,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        } else {
-                            Text("You're running the latest version (v${info.currentVersion}).")
-                        }
-                    }
-                },
-                confirmButton = {
-                    if (info.updateAvailable && info.releaseUrl.isNotBlank()) {
-                        TextButton(onClick = {
-                            context.startActivity(
-                                Intent(Intent.ACTION_VIEW, Uri.parse(info.releaseUrl))
-                            )
-                            updateResult = null
-                        }) { Text("Open GitHub") }
-                    } else {
-                        TextButton(onClick = { updateResult = null }) { Text("OK") }
-                    }
-                },
-                dismissButton = {
-                    if (info.updateAvailable) {
-                        TextButton(onClick = { updateResult = null }) { Text("Later") }
-                    }
-                },
-            )
-        }
-        null -> {}
     }
 }
 
@@ -1490,6 +1622,15 @@ private fun DebugSection(repo: UsageRepository) {
                         .padding(12.dp),
                 )
             }
+            // Key names (never values) of the last sign-in's token response —
+            // settles whether `rate_limit_tier` is in ours (CCRM-38 verify-first).
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Sign-in token keys: " +
+                    (repo.signInTokenKeys(debugProfile) ?: "(no native sign-in recorded yet)"),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
     EndpointProbe(repo)
