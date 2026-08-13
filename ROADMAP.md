@@ -522,7 +522,19 @@ keys) would still make this a different product. Not filed, not an open question
   history scrub is the precedent — this is a public repo and logs get pasted into emails.
 
 ### CCRM-36 · Repo Hygiene — the `.github/` directory we don't have
-- **Status:** Planned · small
+- **Status:** Done (2026-08-13)
+- **Shipped:** the full `.github/` set, docs only. `SECURITY.md` routes reports through
+  GitHub private vulnerability reporting with the explicit "no real credentials, OAuth
+  tokens, or authorization headers in a report" rule (the v0.14 scrub named as the
+  precedent). `CONTRIBUTING.md` surfaces the rules that lived only in CLAUDE.md and the
+  CCRM-8 (Mac Menu-Bar) entry — do-not-fork-for-another-client, wireframe-before-UI,
+  tracker-ID naming, Android-only and Claude-only scope, and how to run the tests.
+  Issue forms in `ISSUE_TEMPLATE/`: `bug_report.yml` requires app version and phone
+  model/skin (the skin-dependent `big` notification style is why), `feature_request.yml`
+  points at this file's appendix of ruled-out ideas, and `config.yml` adds the private
+  security-advisory and email-feedback contact links. `PULL_REQUEST_TEMPLATE.md` asks
+  which CCRM/CCBG item the change serves and whether a wireframe was approved before
+  building. `dependabot.yml` watches gradle and github-actions, both weekly.
 - **Why:** The repo is public and has no `.github/` at all. OpenQuota's set is the standard
   one and costs an afternoon:
   - **`SECURITY.md`** pointing at GitHub private vulnerability reporting, with an explicit

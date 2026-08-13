@@ -1,0 +1,46 @@
+name: Feature request
+description: Suggest something for CCooldown.
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before you write it up, a quick pass over
+        [ROADMAP.md](https://github.com/robineam360/CCooldown/blob/main/ROADMAP.md)
+        saves everyone time:
+
+        - The roadmap lists what's already planned, in order.
+        - Its **appendix records ideas that were deliberately ruled out** (mostly
+          things that only make sense on a desktop reading local Claude Code logs) —
+          if your idea is there, the answer and the reasoning are too.
+        - Two scope rules are fixed: this repo is **Android only** (the Mac client is
+          a separate repo, on purpose), and the app tracks **Claude usage only** —
+          other AI providers are out of scope, not a gap.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: The situation where you miss it, more than the mechanism.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like it to do?
+    validations:
+      required: true
+  - type: checkboxes
+    id: checked
+    attributes:
+      label: Checked first
+      options:
+        - label: I looked through ROADMAP.md, including the appendix of deliberately-rejected ideas.
+          required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Sketches welcome — new UI here goes through a wireframe review before it's built anyway.
+    validations:
+      required: false
