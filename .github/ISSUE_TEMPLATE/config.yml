@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability (private)
+    url: https://github.com/robineam360/CCooldown/security/advisories/new
+    about: Anything token- or credential-related goes here, never in a public issue. See SECURITY.md.
+  - name: Email feedback
+    url: mailto:robin@eam360.com
+    about: The same channel as "Share feedback" in the app's About section.
