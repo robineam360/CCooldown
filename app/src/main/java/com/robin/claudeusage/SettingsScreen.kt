@@ -101,6 +101,11 @@ import kotlinx.coroutines.withContext
 private const val FEEDBACK_EMAIL = "robin@eam360.com"
 private const val DEBUG_UNLOCK_TAPS = 7
 
+// CCRM-26 (Quick Links) destinations. The status page is shared with the main
+// screen's error state, so it isn't private to this file.
+internal const val ANTHROPIC_STATUS_URL = "https://status.anthropic.com"
+private const val USAGE_DASHBOARD_URL = "https://claude.ai/settings/usage"
+
 @Composable
 fun SettingsScreen(
     repo: UsageRepository,
@@ -591,8 +596,24 @@ private fun installedBrowsers(context: android.content.Context): List<BrowserCho
         .sortedBy { it.label.lowercase() }
 }
 
-/** Opens the sign-in URL in a specific browser (full external app, not an in-app tab). */
-private fun openInBrowser(context: android.content.Context, url: String, pkg: String?) {
+/**
+ * Whether a URL is one the app will hand to a browser: plain web links only.
+ * Every launch site uses a compile-time https constant today; this is the guard
+ * that keeps a future refactor from sending an `intent://` or `javascript:`
+ * payload through the same path.
+ */
+internal fun allowedLinkUrl(url: String): Boolean {
+    val scheme = url.trim().substringBefore(':', missingDelimiterValue = "")
+    return scheme.equals("https", ignoreCase = true) || scheme.equals("http", ignoreCase = true)
+}
+
+/**
+ * Opens a URL in a specific browser (full external app, not an in-app tab).
+ * The single launch path for sign-in and the CCRM-26 (Quick Links) buttons —
+ * shared with MainActivity so the [allowedLinkUrl] check guards every launch.
+ */
+internal fun openInBrowser(context: android.content.Context, url: String, pkg: String?) {
+    if (!allowedLinkUrl(url)) return
     val uri = Uri.parse(url)
     if (pkg != null) {
         try {
@@ -654,11 +675,11 @@ private fun TokenCard(
     val backoffUntil = remember(stateKey) { repo.cacheSettings().backoffUntil(profile) }
     val firstRefreshFailAt = remember(stateKey) { repo.cacheSettings().firstRefreshFailAt(profile) }
 
-    // Open a sign-in URL, letting the user pick a browser when they have more than
-    // one (so they can route Work vs Personal through different browsers). Always
-    // opens a real external browser, never an in-app tab.
+    // Open a URL, letting the user pick a browser when they have more than one
+    // (so they can route Work vs Personal through different browsers). Always
+    // opens a real external browser, never an in-app tab. Used for sign-in and
+    // for the usage-dashboard quick link — same routing question either way.
     fun openWithPicker(url: String) {
-        authUrl = url
         val browsers = installedBrowsers(context)
         if (browsers.size >= 2) {
             pendingPickUrl = url
@@ -672,7 +693,9 @@ private fun TokenCard(
         message = null
         codeInput = ""
         awaitingCode = true
-        openWithPicker(repo.startSignIn(profile))
+        val url = repo.startSignIn(profile)
+        authUrl = url
+        openWithPicker(url)
     }
 
     fun finishSignIn() {
@@ -927,6 +950,21 @@ private fun TokenCard(
                             stateKey++
                         },
                     ) { Text("Clear", color = MaterialTheme.colorScheme.error) }
+                }
+                RowDivider()
+                // Quick escapes, not account actions — hence below the divider.
+                // Status goes to the default browser (account-independent); the
+                // dashboard reuses the sign-in picker, because which browser holds
+                // this profile's Claude session is the same question either way.
+                // Flows rather than a Row so the second label drops to its own
+                // line at large font scales instead of wrapping mid-label.
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = {
+                        openInBrowser(context, ANTHROPIC_STATUS_URL, null)
+                    }) { Text("Anthropic status") }
+                    TextButton(onClick = {
+                        openWithPicker(USAGE_DASHBOARD_URL)
+                    }) { Text("Usage dashboard") }
                 }
                 BackupOptions(
                     expanded = showBackup,
