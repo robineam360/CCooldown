@@ -3,9 +3,9 @@
 # Rebuild the PDF user guide, the brochure, and the "New in vX.Y" one-pager PNG
 # from the HTML sources in src/.
 #
-#   ./Release/docs/build.sh
+#   ./release/docs/build.sh
 #
-# Outputs, all in Release/docs/:
+# Outputs, all in release/docs/:
 #   CCooldown-User-Guide-v<version>.pdf   (version read from app/build.gradle.kts)
 #   CCooldown-Brochure.pdf
 #   CCooldown-whats-new-v<version>.png    (guide page 3, for Slack/email)
@@ -15,8 +15,8 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SRC="$REPO/Release/docs/src"
-OUT="$REPO/Release/docs"
+SRC="$REPO/release/docs/src"
+OUT="$REPO/release/docs"
 CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
 [ -x "$CHROME" ] || { echo "Google Chrome not found at: $CHROME" >&2; exit 1; }
