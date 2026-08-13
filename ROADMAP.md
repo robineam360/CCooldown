@@ -78,14 +78,27 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
   usage gauges, not the logo.
 
 ### CCRM-43 · Bar Pace Marks — pace marks on the bars, and three red toggles
-- **Status:** Done (2026-08-13) · **partly verified on the Fold 7 outer screen the same
-  day**, dark theme, both accounts: in-app bars (tick at 97% not clipped, credits
-  unmarked, a window with no reset clock unmarked), both bar widgets (including a tick
-  hard against the right end, and a real dead-zone state at 61% against 59% elapsed),
-  the notification collapsed bar and expanded panel, the Settings group, and the ring
-  faces' ticks. **The red over-pace segment is still unobserved on device** — every
-  window sat inside or below the dead zone during the pass. Light theme and the inner
-  screen are also still owed.
+- **Status:** Done and **verified on the Fold 7 outer screen, 2026-08-13**, dark theme,
+  both accounts — including the red, which Work's 5-hour window crossed into during the
+  pass. What was seen:
+  - **Under pace / no mark:** tick at 97% hard against the bar's end and not clipped;
+    credits unmarked; a window with no reset clock unmarked. Personal stayed below pace
+    throughout and drew no red anywhere — the negative control.
+  - **Dead zone:** 61% against 59% elapsed drew the tick alone, and the card's own
+    sentence read "On even pace" beside it. The two can't disagree; they share the gate.
+  - **Over pace:** at 66% against 61% elapsed (+5) the in-app bar drew red from the pace
+    line to the fill's edge — straight vertical split, tick on the boundary, red covering
+    the fill's rounded tip — while the card said "4 points above even pace" in amber and
+    the chart washed. One verdict, three elements, no drift. The pinned notification
+    (switched to Work for the sighting) showed the same at 68% on its 8 dp bar, so
+    dropping the `fitXY` stretch worked.
+  - **Rings:** the ring and mini-rings faces showed the red arc *beginning on the tick
+    with no fill-coloured nub past its tip* — the D7 cap fix, which was invisible before
+    this change and is now seen correct.
+  - **Still owed:** light theme, the inner screen, and the three toggles flipped against
+    a live red (the crossing arrived after the device went offline). One thing to watch:
+    on the 8 dp collapsed notification bar the tick is the least legible of the
+    surfaces — present, but only just. Judge it under pace, where it is the only mark.
 - **Provenance/wireframe:** the Mac's CCM-50 [Panel] bars + CCM-51 [Pace] toggle, via
   `ANDROID-PACE-BARS-HANDOVER.md` (which lives outside this repo — copy it in if this
   line should cite something durable). Wireframe rev B approved 2026-08-13 in
@@ -1136,7 +1149,14 @@ keys) would still make this a different product. Not filed, not an open question
   whose window isn't obliging.
 - **Then:** the guide still illustrates only the below-pace case, and the capture above is
   usable for the swap as-is.
-- **The bar half now has a harness** (2026-08-13, CCRM-43 (Bar Pace Marks)):
+- **The bar and ring half is now observed too** (2026-08-13, CCRM-43 (Bar Pace Marks)).
+  Work's 5-hour window crossed during that day's device pass and every over-pace element
+  rendered on real hardware: the in-app bar's red segment, the same on the pinned
+  notification, and the red arc on both ring faces — the last of which exposed and then
+  confirmed the fix for a cap defect nobody could see while no window was over pace.
+  Like the chart sighting above, this one came up **clean**, and like it, it was luck
+  rather than a repeatable test.
+- **The harness that would make it repeatable** (same change):
   `DebugFacesActivity` renders every above-pace bar and ring state — the dead zone, both
   sides of the strict boundary, each red-off variant — through the real renderers, with
   no obliging window required. **But it is a debug-build activity, and the debug build
