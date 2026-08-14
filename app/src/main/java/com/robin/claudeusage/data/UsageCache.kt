@@ -179,6 +179,27 @@ class UsageCache(context: Context) {
         prefs.edit().putBoolean("healthAlertsEnabled", enabled).apply()
     }
 
+    /**
+     * CCBG-12 (Status Icon Swap): how long a one-off *event* alert — a reset, a
+     * threshold, a pace warning, an update notice — stays in the shade before clearing
+     * itself. One of "15m", "30m", "1h", "auto".
+     *
+     * The point is not tidiness. A second notification from this app makes Android
+     * replace our live status-bar meter with the launcher icon, so an alert nobody
+     * dismissed holds the status bar wrong for as long as it sits there. Expiring the
+     * ones that have stopped being true gives the meter back.
+     *
+     * "auto" — the default — means "until the window this alert is about resets", which
+     * is the only option that never expires an alert while it is still true.
+     * Condition alerts (sign-in, data freshness) are not covered: they fold into the
+     * pinned notification's panel and clear when the condition itself resolves.
+     */
+    fun alertLifetime(): String = prefs.getString("alertLifetime", "auto") ?: "auto"
+
+    fun setAlertLifetime(value: String) {
+        prefs.edit().putString("alertLifetime", value).apply()
+    }
+
     // --- pace alerts (CCRM-21): projection-based milestones -------------------------
 
     fun paceAlertsEnabled(): Boolean = prefs.getBoolean("paceAlertsEnabled", true)
@@ -299,6 +320,34 @@ class UsageCache(context: Context) {
 
     fun setCreditsOnWidgets(enabled: Boolean) {
         prefs.edit().putBoolean("creditsOnWidgets", enabled).apply()
+    }
+
+    // --- CCRM-43 (Bar Pace Marks): the red over-pace segment, per surface ---
+    //
+    // Three keys rather than one, by decision of 2026-08-13: the surfaces are read at
+    // very different distances (a glance at a widget, a long look at the usage screen,
+    // a notification you can't dismiss), so the appetite for red differs per surface.
+    // All default ON — the behaviour approved in CCRM-39 (Ring Widget) and shipped —
+    // and each gates *only* the segment. The neutral even-pace tick always draws, and
+    // the 80/90/100 severity ladder is untouched: this is about pace, not severity.
+
+    /** Bars *and* rings on the home screen: one home screen, one answer. */
+    fun paceOverOnWidgets(): Boolean = prefs.getBoolean("paceOverOnWidgets", true)
+
+    fun setPaceOverOnWidgets(enabled: Boolean) {
+        prefs.edit().putBoolean("paceOverOnWidgets", enabled).apply()
+    }
+
+    fun paceOverInApp(): Boolean = prefs.getBoolean("paceOverInApp", true)
+
+    fun setPaceOverInApp(enabled: Boolean) {
+        prefs.edit().putBoolean("paceOverInApp", enabled).apply()
+    }
+
+    fun paceOverOnNotification(): Boolean = prefs.getBoolean("paceOverOnNotification", true)
+
+    fun setPaceOverOnNotification(enabled: Boolean) {
+        prefs.edit().putBoolean("paceOverOnNotification", enabled).apply()
     }
 
     fun use24hTime(): Boolean = prefs.getBoolean("use24hTime", false)

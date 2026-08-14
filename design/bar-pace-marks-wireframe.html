@@ -1,0 +1,1005 @@
+<title>Bar Pace Marks — CCRM-43</title>
+<style>
+  :root {
+    --bg: #FAF8F6;
+    --ink: #26211E;
+    --muted: #6E6660;
+    --accent: #C15F3C;
+    --hair: #E7E1DC;
+    --card: #FFFFFF;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171513;
+      --ink: #EDE8E4;
+      --muted: #9B928B;
+      --accent: #E59980;
+      --hair: #2C2825;
+      --card: #201D1B;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171513;
+    --ink: #EDE8E4;
+    --muted: #9B928B;
+    --accent: #E59980;
+    --hair: #2C2825;
+    --card: #201D1B;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    margin: 0;
+    padding: 48px 24px 96px;
+    line-height: 1.5;
+  }
+  .page { max-width: 1240px; margin: 0 auto; }
+
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 10px;
+  }
+  h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 8px; text-wrap: balance; }
+  .lede { color: var(--muted); max-width: 66ch; margin: 0 0 12px; font-size: 14px; }
+  h2 { font-size: 19px; font-weight: 650; letter-spacing: -0.01em; margin: 56px 0 4px; }
+  h3 { font-size: 14px; font-weight: 650; margin: 26px 0 8px; }
+  .sub { color: var(--muted); font-size: 13px; max-width: 74ch; margin: 0 0 16px; }
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12px;
+    background: color-mix(in srgb, var(--hair) 55%, transparent);
+    padding: 1px 5px; border-radius: 4px;
+  }
+
+  /* ---- boards: a light board and a dark board side by side ---- */
+  .boards { display: flex; flex-wrap: wrap; gap: 14px; }
+  .board {
+    border-radius: 18px; padding: 22px 24px; border: 1px solid var(--hair);
+    display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start;
+    flex: 1 1 100%;
+  }
+  .board.lt { background: linear-gradient(140deg, #BFCEDF 0%, #D9CDBD 55%, #E6D6C3 100%); }
+  .board.dk { background: linear-gradient(140deg, #202C3A 0%, #33292E 60%, #3A2E30 100%); }
+  .boardcap {
+    width: 100%; margin: -4px 0 0;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+  }
+  .lt .boardcap { color: rgba(20,20,30,.6); }
+  .dk .boardcap { color: rgba(255,255,255,.5); }
+
+  .tilewrap { display: flex; flex-direction: column; }
+  /* a bare bar still needs a surface under it — a track at 0.25 alpha over a
+     gradient is not the colour it will actually be */
+  .plate { padding: 11px 13px; border-radius: 11px; }
+  .lt .plate { background: #FFFFFF; }
+  .dk .plate { background: #1E1B19; }
+  .tilecap {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 10px; margin-top: 7px; line-height: 1.45;
+  }
+  .lt .tilecap { color: rgba(30,30,40,.78); }
+  .dk .tilecap { color: rgba(255,255,255,.66); }
+  .tilecap b { font-weight: 700; }
+
+  /* ---- surfaces ----
+     The mock frames are authored in dp (1 px = 1 dp) and shown at zoom 2, so they
+     match the 2 px/dp the bars draw at. Bars inside a frame therefore pass scale 1. */
+  .surface, .w, .notif, .setcard { zoom: 2; }
+  .surface { border-radius: 16px; overflow: visible; }
+  .surface.app  { width: 420px; padding: 16px; }
+  .surface.lt   { background: #FFFFFF; color: #1D1D1F; }
+  .surface.dk   { background: #1E1B19; color: #F2F2F4; }
+  .surface.wide { width: 700px; }
+  .lt .sec { color: rgba(0,0,0,.55); } .dk .sec { color: rgba(255,255,255,.60); }
+
+  .rowline { display: flex; align-items: baseline; gap: 8px; }
+  .rowline .grow { flex: 1; }
+  .t-title { font-size: 14px; font-weight: 600; }
+  .t-val   { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .t-lab   { font-size: 13px; }
+  .t-sub   { font-size: 11.5px; }
+  .gap4 { height: 4px; } .gap6 { height: 6px; } .gap8 { height: 8px; } .gap12 { height: 12px; }
+
+  /* widget frames */
+  .w { border-radius: 24px; box-shadow: 0 12px 32px rgba(0,0,0,.22); padding: 12px 14px; }
+  .w.lt { background: #FFFFFF; color: #1D1D1F; }
+  .w.dk { background: #242428; color: #F5F5F7; }
+  .w.med  { width: 364px; }
+  .w.tall { width: 364px; }
+
+  /* notification frames */
+  .notif { border-radius: 20px; padding: 12px 16px; width: 420px; }
+  .notif.lt { background: #FFFFFF; color: #1D1D1F; }
+  .notif.dk { background: #262626; color: #ECECEC; }
+  .notifhead { display: flex; align-items: center; gap: 10px; }
+  .nicon { width: 20px; height: 20px; border-radius: 5px; background: #C15F3C; flex: none; }
+  .npct { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  /* settings mock */
+  .setcard { border-radius: 14px; padding: 14px 16px; width: 430px; }
+  .setcard.lt { background: #FFFFFF; color: #1D1D1F; }
+  .setcard.dk { background: #232020; color: #F2F2F4; }
+  .setlabel { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 8px; }
+  .lt .setlabel { color: #C15F3C; } .dk .setlabel { color: #E59980; }
+  .srow { display: flex; align-items: center; gap: 12px; padding: 7px 0; }
+  .srow .grow { flex: 1; }
+  .stitle { font-size: 14px; }
+  .ssub { font-size: 11.5px; }
+  .sw { width: 44px; height: 26px; border-radius: 13px; position: relative; flex: none; }
+  .sw i { position: absolute; top: 3px; width: 20px; height: 20px; border-radius: 10px; background: #fff; }
+  .sw.on  { background: #C15F3C; } .sw.on i  { right: 3px; }
+  .dk .sw.on { background: #E59980; } .dk .sw.on i { background: #2A2422; }
+  .sw.off { background: rgba(0,0,0,.20); } .sw.off i { left: 3px; }
+  .dk .sw.off { background: rgba(255,255,255,.22); }
+  .divider { height: 1px; margin: 10px 0; }
+  .lt .divider { background: rgba(0,0,0,.10); } .dk .divider { background: rgba(255,255,255,.12); }
+  .grouphdr { font-size: 14px; font-weight: 600; }
+  .groupfoot { font-size: 11.5px; margin-top: 1px; }
+
+  /* anatomy */
+  .anatomy { display: flex; gap: 28px; flex-wrap: wrap; align-items: flex-start; }
+  .callouts { font-size: 13px; max-width: 44ch; }
+  .callouts li { margin-bottom: 6px; }
+
+  ul.dec { margin: 10px 0 0; padding-left: 20px; font-size: 13.5px; max-width: 84ch; }
+  ul.dec li { margin-bottom: 8px; }
+  ul.dec b { font-weight: 650; }
+  .q {
+    margin-top: 14px; padding: 14px 18px; border-radius: 12px;
+    background: var(--card); border: 1px solid var(--hair);
+    font-size: 13.5px; max-width: 84ch;
+  }
+  .q b { font-weight: 650; }
+  .q ol { padding-left: 20px; margin: 8px 0 0; }
+  .q li { margin-bottom: 7px; }
+  table.geo { border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+  table.geo th, table.geo td { text-align: left; padding: 6px 14px 6px 0; border-bottom: 1px solid var(--hair); }
+  table.geo th { font-weight: 650; }
+  table.geo td code { font-size: 11.5px; }
+</style>
+
+<div class="page">
+  <p class="eyebrow">CCRM-43 (Bar Pace Marks) · wireframe for approval · 2026-08-13 · rev B</p>
+  <h1>Pace marks on the horizontal bars</h1>
+  <p class="lede">
+    The neutral even-pace tick and the red over-pace segment, already shipped on the rings
+    (CCRM-39 (Ring Widget) / CCRM-40 (Mini-Rings Widget)), translated to every bar surface:
+    the in-app usage screen, both bar widgets, and the pinned notification. Plus three
+    Settings toggles for the red segment — one per surface. Geometry per the Mac handover
+    (CCM-50 [Panel] / CCM-51 [Pace]).
+  </p>
+  <p class="lede">
+    Everything below is drawn by one routine that mirrors the proposed <code>BarGeometry</code>,
+    at <b>2&nbsp;px per dp</b>, so the proportions are the real ones. Dead zone
+    <code>PACE_DEAD_ZONE = 3.0</code>, strict. The phone / widget / notification frames are
+    drawn in dp and shown at the same 2&times;, so a bar's size relative to its surface is
+    the real one.
+  </p>
+
+  <!-- ============================================================ -->
+  <h2>1 · Anatomy</h2>
+  <p class="sub">
+    A 12&nbsp;dp bar at 85% with the tick at 60%, blown up to 5&nbsp;px/dp.
+    Draw order bottom&rarr;top: track &middot; fill &middot; red segment &middot; tick.
+  </p>
+  <div class="boards">
+    <div class="board lt full">
+      <div class="boardcap">Light</div>
+      <div class="tilewrap">
+        <span data-anatomy='{"w":100,"h":12,"percent":85,"elapsed":60,"scale":5}'></span>
+      </div>
+    </div>
+    <div class="board dk full">
+      <div class="boardcap">Dark</div>
+      <div class="tilewrap">
+        <span data-anatomy='{"w":100,"h":12,"percent":85,"elapsed":60,"scale":5}'></span>
+      </div>
+    </div>
+  </div>
+
+  <table class="geo">
+    <tr><th>Element</th><th>Geometry</th><th>Light</th><th>Dark</th></tr>
+    <tr>
+      <td>Tick</td>
+      <td>capsule, width <code>max(2px, 0.31h)</code>, height <code>h + 2&times;0.3h</code>,
+        centred on <code>elapsed/100 &times; W</code></td>
+      <td>on-surface <code>#1D1D1F</code> @ 0.48</td>
+      <td>on-surface <code>#F2F2F4</code> @ 0.60</td>
+    </tr>
+    <tr>
+      <td>Red segment</td>
+      <td>starts <b>exactly</b> on the pace line, ends at the fill's edge; bar height;
+        square left edge, right end clipped to the fill's own cap; no minimum width; only when
+        <code>percent &gt; elapsed + 3.0</code></td>
+      <td><code>#C62828</code></td>
+      <td><code>#FF5252</code></td>
+    </tr>
+    <tr>
+      <td>Fill / track</td>
+      <td>unchanged — severity ladder, track = fill @ 0.25</td>
+      <td colspan="2">accent &middot; &gt;80 <code>#F9A825/#FDD663</code> &middot;
+        &gt;90 <code>#F57C00/#FFA726</code> &middot; &ge;100 <code>#C62828/#FF5252</code></td>
+    </tr>
+  </table>
+
+  <!-- ============================================================ -->
+  <h2>2 · The nine states, at in-app size (12&nbsp;dp)</h2>
+  <p class="sub">
+    Bar width 260&nbsp;dp, so pairs sit side by side. Every state that has to be right before
+    any of this ships; §3 repeats them at the true in-app width.
+  </p>
+  <div class="boards">
+    <div class="board lt" id="states-lt"><div class="boardcap">Light</div></div>
+    <div class="board dk" id="states-dk"><div class="boardcap">Dark</div></div>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2>3 · In-app usage screen</h2>
+  <p class="sub">
+    <code>UsageBarLine</code> at 12&nbsp;dp, in the real card layout. The 5-hour card measures
+    against 5&nbsp;h; every 7-day row — All models and each model cap — measures against 7&nbsp;d.
+    The credits card never carries a mark: money has no clock.
+  </p>
+  <div class="boards">
+    <div class="board lt">
+      <div class="boardcap">Light</div>
+      <div class="tilewrap">
+        <div class="surface app lt">
+          <div class="rowline"><span class="t-title">5-hour window</span><span class="grow"></span><span class="t-val">78% used</span></div>
+          <div class="gap8"></div>
+          <span data-bar='{"scale":1,"w":388,"h":12,"percent":78,"elapsed":70}'></span>
+          <div class="gap6"></div>
+          <div class="t-sub sec">8 points above even pace &middot; Resets in 1h 30m</div>
+          <div class="gap12"></div>
+          <div class="divider"></div>
+          <div class="t-title">7-day window</div>
+          <div class="gap8"></div>
+          <div class="rowline"><span class="t-lab sec">All models</span><span class="grow"></span><span class="t-lab">44% used</span></div>
+          <div class="gap4"></div>
+          <span data-bar='{"scale":1,"w":388,"h":12,"percent":44,"elapsed":50}'></span>
+          <div class="gap8"></div>
+          <div class="rowline"><span class="t-lab sec">Opus</span><span class="grow"></span><span class="t-lab">92% used</span></div>
+          <div class="gap4"></div>
+          <span data-bar='{"scale":1,"w":388,"h":12,"percent":92,"elapsed":50}'></span>
+          <div class="gap8"></div>
+          <div class="rowline"><span class="t-lab sec">Sonnet</span><span class="grow"></span><span class="t-lab">52% used</span></div>
+          <div class="gap4"></div>
+          <span data-bar='{"scale":1,"w":388,"h":12,"percent":52,"elapsed":50}'></span>
+          <div class="gap12"></div>
+          <div class="divider"></div>
+          <div class="rowline"><span class="t-lab sec">Extra usage credits</span><span class="grow"></span><span class="t-val">61% used</span></div>
+          <div class="gap8"></div>
+          <span data-bar='{"scale":1,"w":388,"h":12,"percent":61}'></span>
+        </div>
+        <div class="tilecap">
+          5h over pace (red) &middot; All models below &middot; Opus 42 pts over, fill already
+          orange &middot; Sonnet inside the dead zone (tick only)<br>credits: <b>no tick, ever</b>
+        </div>
+      </div>
+    </div>
+    <div class="board dk">
+      <div class="boardcap">Dark</div>
+      <div class="tilewrap">
+        <div class="surface app dk">
+          <div class="rowline"><span class="t-title">5-hour window</span><span class="grow"></span><span class="t-val">78% used</span></div>
+          <div class="gap8"></div>
+          <span data-bar='{"scale":1,"w":388,"h":12,"percent":78,"elapsed":70}'></span>
+          <div class="gap6"></div>
+          <div class="t-sub sec">8 points above even pace &middot; Resets in 1h 30m</div>
+          <div class="gap12"></div>
+          <div class="divider"></div>
+          <div class="t-title">7-day window</div>
+          <div class="gap8"></div>
+          <div class="rowline"><span class="t-lab sec">All models</span><span class="grow"></span><span class="t-lab">44% used</span></div>
+          <div class="gap4"></div>
+          <span data-bar='{"scale":1,"w":388,"h":12,"percent":44,"elapsed":50}'></span>
+          <div class="gap8"></div>
+          <div class="rowline"><span class="t-lab sec">Opus</span><span class="grow"></span><span class="t-lab">92% used</span></div>
+          <div class="gap4"></div>
+          <span data-bar='{"scale":1,"w":388,"h":12,"percent":92,"elapsed":50}'></span>
+          <div class="gap8"></div>
+          <div class="rowline"><span class="t-lab sec">Sonnet</span><span class="grow"></span><span class="t-lab">52% used</span></div>
+          <div class="gap4"></div>
+          <span data-bar='{"scale":1,"w":388,"h":12,"percent":52,"elapsed":50}'></span>
+          <div class="gap12"></div>
+          <div class="divider"></div>
+          <div class="rowline"><span class="t-lab sec">Extra usage credits</span><span class="grow"></span><span class="t-val">61% used</span></div>
+          <div class="gap8"></div>
+          <span data-bar='{"scale":1,"w":388,"h":12,"percent":61}'></span>
+        </div>
+        <div class="tilecap">Same card, dark. Tick at 0.60 opacity reads slightly stronger,
+          matching the shipped rings.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2>4 · Widget bars</h2>
+  <p class="sub">
+    Two bar surfaces: the session block bar (12&nbsp;dp) and the labelled rows of the tall face
+    (14&nbsp;dp). Glance's <code>LinearProgressIndicator</code> can't host a tick, so these become
+    a <code>BarRenderer</code> bitmap in an <code>Image</code> — the same move
+    <code>FaceBits.ringBitmap</code> already makes for the rings.
+  </p>
+  <div class="boards">
+    <div class="board lt">
+      <div class="boardcap">Light</div>
+      <div class="tilewrap">
+        <div class="w med lt">
+          <div class="rowline"><span class="t-title">5h &middot; Work</span><span class="grow"></span><span class="t-val">78% used</span></div>
+          <div class="gap6"></div>
+          <span data-bar='{"scale":1,"w":336,"h":12,"percent":78,"elapsed":70}'></span>
+          <div class="gap4"></div>
+          <div class="rowline t-sub sec"><span>in 1h 30m</span><span class="grow"></span><span>Thu 11:45 PM</span></div>
+        </div>
+        <div class="tilecap">Medium / session block &middot; 12&nbsp;dp &middot; over pace</div>
+      </div>
+      <div class="tilewrap">
+        <div class="w tall lt">
+          <div class="rowline"><span class="t-title">Work</span><span class="grow"></span><span class="t-sub sec">12m ago</span></div>
+          <div class="gap8"></div>
+          <div class="rowline"><span class="t-lab sec">5-hour</span><span class="grow"></span><span class="t-lab">78% used</span></div>
+          <div class="gap4"></div>
+          <span data-bar='{"scale":1,"w":336,"h":14,"percent":78,"elapsed":70}'></span>
+          <div class="gap8"></div>
+          <div class="rowline"><span class="t-lab sec">7-day</span><span class="grow"></span><span class="t-lab">44% used</span></div>
+          <div class="gap4"></div>
+          <span data-bar='{"scale":1,"w":336,"h":14,"percent":44,"elapsed":50}'></span>
+          <div class="gap8"></div>
+          <div class="rowline"><span class="t-lab sec">Opus &middot; 7d</span><span class="grow"></span><span class="t-lab">92% used</span></div>
+          <div class="gap4"></div>
+          <span data-bar='{"scale":1,"w":336,"h":14,"percent":92,"elapsed":50}'></span>
+          <div class="gap8"></div>
+          <div class="rowline"><span class="t-lab sec">Credits</span><span class="grow"></span><span class="t-lab">61% used</span></div>
+          <div class="gap4"></div>
+          <span data-bar='{"scale":1,"w":336,"h":14,"percent":61}'></span>
+        </div>
+        <div class="tilecap">Tall / labelled rows &middot; 14&nbsp;dp &middot; the optional credits row
+          stays unmarked</div>
+      </div>
+    </div>
+    <div class="board dk">
+      <div class="boardcap">Dark</div>
+      <div class="tilewrap">
+        <div class="w med dk">
+          <div class="rowline"><span class="t-title">5h &middot; Work</span><span class="grow"></span><span class="t-val">78% used</span></div>
+          <div class="gap6"></div>
+          <span data-bar='{"scale":1,"w":336,"h":12,"percent":78,"elapsed":70}'></span>
+          <div class="gap4"></div>
+          <div class="rowline t-sub sec"><span>in 1h 30m</span><span class="grow"></span><span>Thu 11:45 PM</span></div>
+        </div>
+        <div class="tilecap">Medium / session block &middot; 12&nbsp;dp</div>
+      </div>
+      <div class="tilewrap">
+        <div class="w tall dk">
+          <div class="rowline"><span class="t-title">Work</span><span class="grow"></span><span class="t-sub sec">12m ago</span></div>
+          <div class="gap8"></div>
+          <div class="rowline"><span class="t-lab sec">5-hour</span><span class="grow"></span><span class="t-lab">78% used</span></div>
+          <div class="gap4"></div>
+          <span data-bar='{"scale":1,"w":336,"h":14,"percent":78,"elapsed":70}'></span>
+          <div class="gap8"></div>
+          <div class="rowline"><span class="t-lab sec">7-day</span><span class="grow"></span><span class="t-lab">44% used</span></div>
+          <div class="gap4"></div>
+          <span data-bar='{"scale":1,"w":336,"h":14,"percent":44,"elapsed":50}'></span>
+          <div class="gap8"></div>
+          <div class="rowline"><span class="t-lab sec">Opus &middot; 7d</span><span class="grow"></span><span class="t-lab">92% used</span></div>
+          <div class="gap4"></div>
+          <span data-bar='{"scale":1,"w":336,"h":14,"percent":92,"elapsed":50}'></span>
+          <div class="gap8"></div>
+          <div class="rowline"><span class="t-lab sec">Credits</span><span class="grow"></span><span class="t-lab">61% used</span></div>
+          <div class="gap4"></div>
+          <span data-bar='{"scale":1,"w":336,"h":14,"percent":61}'></span>
+        </div>
+        <div class="tilecap">Tall / labelled rows &middot; 14&nbsp;dp</div>
+      </div>
+    </div>
+  </div>
+
+  <h3>4b · The narrow case — single-bar widget at 2&times;1</h3>
+  <p class="sub">
+    A 150&nbsp;dp-wide bar — the smallest bar surface. With no minimum width, the thinnest red
+    the dead zone can let through is 3 points, which is 4.5&nbsp;dp here (a bit over 1&nbsp;dp on
+    the narrowest notification row). It stays true to scale rather than being inflated to
+    <code>h</code>; the same values at full width are shown beside it.
+  </p>
+  <div class="boards">
+    <div class="board lt">
+      <div class="boardcap">Light</div>
+      <div class="tilewrap">
+        <div class="w lt" style="width:178px">
+          <div class="rowline"><span class="t-lab" style="font-weight:600">5-hour</span><span class="grow"></span><span class="t-lab">74% used</span></div>
+          <div class="gap6"></div>
+          <span data-bar='{"scale":1,"w":150,"h":12,"percent":74,"elapsed":70}'></span>
+        </div>
+        <div class="tilecap">74 vs 70 &middot; 1 pt past the dead zone &rarr; a <b>6&nbsp;dp</b>
+          slice of red, starting on the tick</div>
+      </div>
+      <div class="tilewrap">
+        <div class="plate"><span data-bar='{"scale":1,"w":388,"h":12,"percent":74,"elapsed":70}'></span></div>
+        <div class="tilecap">Same values at 388&nbsp;dp — the true 4-point segment</div>
+      </div>
+    </div>
+    <div class="board dk">
+      <div class="boardcap">Dark</div>
+      <div class="tilewrap">
+        <div class="w dk" style="width:178px">
+          <div class="rowline"><span class="t-lab" style="font-weight:600">5-hour</span><span class="grow"></span><span class="t-lab">74% used</span></div>
+          <div class="gap6"></div>
+          <span data-bar='{"scale":1,"w":150,"h":12,"percent":74,"elapsed":70}'></span>
+        </div>
+        <div class="tilecap">Same slice, dark</div>
+      </div>
+      <div class="tilewrap">
+        <div class="plate"><span data-bar='{"scale":1,"w":388,"h":12,"percent":74,"elapsed":70}'></span></div>
+        <div class="tilecap">Same values at 388&nbsp;dp</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2>5 · Pinned notification</h2>
+  <p class="sub">
+    Collapsed big-number bar (8&nbsp;dp) and the expanded panel's rows (10&nbsp;dp). The collapsed
+    bitmap is <code>fitXY</code>-stretched from a fixed <code>w = h &times; 80</code> render, which
+    squeezes capsule <i>widths</i> horizontally — the tick's <i>position</i> stays exact. Both the
+    as-is squeeze and a corrected version are shown; see decision D4.
+  </p>
+  <div class="boards">
+    <div class="board lt">
+      <div class="boardcap">Light</div>
+      <div class="tilewrap">
+        <div class="notif lt">
+          <div class="notifhead">
+            <div class="nicon"></div>
+            <div class="grow" style="flex:1">
+              <div class="t-lab" style="font-weight:600">Work &middot; 5-hour</div>
+              <div class="t-sub sec">Resets in 1h 30m</div>
+            </div>
+            <div class="npct" style="color:#F9A825">78%</div>
+          </div>
+          <div class="gap8"></div>
+          <span data-bar='{"scale":1,"w":388,"h":8,"percent":78,"elapsed":70,"squash":0.6}'></span>
+        </div>
+        <div class="tilecap">Collapsed, <b>as-is</b> (aspect 80&times;) — tick squeezed to
+          ~0.19h wide &middot; not chosen</div>
+      </div>
+      <div class="tilewrap">
+        <div class="notif lt">
+          <div class="notifhead">
+            <div class="nicon"></div>
+            <div class="grow" style="flex:1">
+              <div class="t-lab" style="font-weight:600">Work &middot; 5-hour</div>
+              <div class="t-sub sec">Resets in 1h 30m</div>
+            </div>
+            <div class="npct" style="color:#F9A825">78%</div>
+          </div>
+          <div class="gap8"></div>
+          <span data-bar='{"scale":1,"w":388,"h":8,"percent":78,"elapsed":70}'></span>
+        </div>
+        <div class="tilecap">Collapsed, <b>corrected</b> (render at true width, no stretch)</div>
+      </div>
+      <div class="tilewrap">
+        <div class="notif lt wide" style="width:392px">
+          <div class="t-sub sec" style="margin-bottom:8px">Expanded panel</div>
+          <div class="rowline"><span class="t-lab">7-day</span><span class="grow"></span><span class="t-lab" style="font-weight:700">44%</span></div>
+          <div class="gap6"></div>
+          <span data-bar='{"scale":1,"w":360,"h":10,"percent":44,"elapsed":50}'></span>
+          <div class="gap4"></div>
+          <div class="t-sub sec">Resets Mon 9:00 AM</div>
+          <div class="gap12"></div>
+          <div class="rowline"><span class="t-lab">Opus</span><span class="grow"></span><span class="t-lab" style="font-weight:700">92%</span></div>
+          <div class="gap6"></div>
+          <span data-bar='{"scale":1,"w":360,"h":10,"percent":92,"elapsed":50}'></span>
+          <div class="gap4"></div>
+          <div class="t-sub sec">Resets Mon 9:00 AM</div>
+        </div>
+        <div class="tilecap">Expanded panel rows &middot; 10&nbsp;dp &middot; row height grows by
+          2&times;overhang (6&nbsp;dp) so the tick isn't clipped</div>
+      </div>
+    </div>
+    <div class="board dk">
+      <div class="boardcap">Dark</div>
+      <div class="tilewrap">
+        <div class="notif dk">
+          <div class="notifhead">
+            <div class="nicon"></div>
+            <div class="grow" style="flex:1">
+              <div class="t-lab" style="font-weight:600">Work &middot; 5-hour</div>
+              <div class="t-sub sec">Resets in 1h 30m</div>
+            </div>
+            <div class="npct" style="color:#FDD663">78%</div>
+          </div>
+          <div class="gap8"></div>
+          <span data-bar='{"scale":1,"w":388,"h":8,"percent":78,"elapsed":70,"squash":0.6}'></span>
+        </div>
+        <div class="tilecap">Collapsed, <b>as-is</b> (aspect 80&times;) &middot; not chosen</div>
+      </div>
+      <div class="tilewrap">
+        <div class="notif dk">
+          <div class="notifhead">
+            <div class="nicon"></div>
+            <div class="grow" style="flex:1">
+              <div class="t-lab" style="font-weight:600">Work &middot; 5-hour</div>
+              <div class="t-sub sec">Resets in 1h 30m</div>
+            </div>
+            <div class="npct" style="color:#FDD663">78%</div>
+          </div>
+          <div class="gap8"></div>
+          <span data-bar='{"scale":1,"w":388,"h":8,"percent":78,"elapsed":70}'></span>
+        </div>
+        <div class="tilecap">Collapsed, <b>corrected</b> &middot; chosen (D4)</div>
+      </div>
+      <div class="tilewrap">
+        <div class="notif dk wide" style="width:392px">
+          <div class="t-sub sec" style="margin-bottom:8px">Expanded panel</div>
+          <div class="rowline"><span class="t-lab">7-day</span><span class="grow"></span><span class="t-lab" style="font-weight:700">44%</span></div>
+          <div class="gap6"></div>
+          <span data-bar='{"scale":1,"w":360,"h":10,"percent":44,"elapsed":50}'></span>
+          <div class="gap4"></div>
+          <div class="t-sub sec">Resets Mon 9:00 AM</div>
+          <div class="gap12"></div>
+          <div class="rowline"><span class="t-lab">Opus</span><span class="grow"></span><span class="t-lab" style="font-weight:700">92%</span></div>
+          <div class="gap6"></div>
+          <span data-bar='{"scale":1,"w":360,"h":10,"percent":92,"elapsed":50}'></span>
+          <div class="gap4"></div>
+          <div class="t-sub sec">Resets Mon 9:00 AM</div>
+        </div>
+        <div class="tilecap">Expanded panel rows &middot; 10&nbsp;dp</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2>6 · Toggles OFF</h2>
+  <p class="sub">
+    Each toggle removes <b>only</b> the red segment on its own surface. The tick always draws,
+    and the severity ladder (80 / 90 / 100) is untouched — a 92% bar stays orange either way.
+    Same three values in every pair below: 78 vs 70, 92 vs 50, 108 vs 70.
+  </p>
+  <div class="boards">
+    <div class="board lt">
+      <div class="boardcap">Light &middot; ON (left column) vs OFF (right column)</div>
+      <div class="tilewrap">
+        <span data-bar='{"w":250,"h":12,"percent":78,"elapsed":70}'></span>
+        <div class="tilecap">In-app 12&nbsp;dp &middot; ON</div>
+        <div class="gap12"></div>
+        <span data-bar='{"w":250,"h":14,"percent":92,"elapsed":50}'></span>
+        <div class="tilecap">Widget 14&nbsp;dp &middot; ON</div>
+        <div class="gap12"></div>
+        <span data-bar='{"w":250,"h":10,"percent":108,"elapsed":70}'></span>
+        <div class="tilecap">Notification 10&nbsp;dp &middot; ON &middot; at 100%+ the segment is
+          invisible against the red fill anyway</div>
+      </div>
+      <div class="tilewrap">
+        <span data-bar='{"w":250,"h":12,"percent":78,"elapsed":70,"red":false}'></span>
+        <div class="tilecap">In-app &middot; <b>OFF</b> — tick survives</div>
+        <div class="gap12"></div>
+        <span data-bar='{"w":250,"h":14,"percent":92,"elapsed":50,"red":false}'></span>
+        <div class="tilecap">Widget &middot; <b>OFF</b> — still orange (severity, not pace)</div>
+        <div class="gap12"></div>
+        <span data-bar='{"w":250,"h":10,"percent":108,"elapsed":70,"red":false}'></span>
+        <div class="tilecap">Notification &middot; <b>OFF</b> — identical, as expected</div>
+      </div>
+    </div>
+    <div class="board dk">
+      <div class="boardcap">Dark &middot; ON (left) vs OFF (right)</div>
+      <div class="tilewrap">
+        <span data-bar='{"w":250,"h":12,"percent":78,"elapsed":70}'></span>
+        <div class="tilecap">In-app 12&nbsp;dp &middot; ON</div>
+        <div class="gap12"></div>
+        <span data-bar='{"w":250,"h":14,"percent":92,"elapsed":50}'></span>
+        <div class="tilecap">Widget 14&nbsp;dp &middot; ON</div>
+        <div class="gap12"></div>
+        <span data-bar='{"w":250,"h":10,"percent":108,"elapsed":70}'></span>
+        <div class="tilecap">Notification 10&nbsp;dp &middot; ON</div>
+      </div>
+      <div class="tilewrap">
+        <span data-bar='{"w":250,"h":12,"percent":78,"elapsed":70,"red":false}'></span>
+        <div class="tilecap">In-app &middot; <b>OFF</b></div>
+        <div class="gap12"></div>
+        <span data-bar='{"w":250,"h":14,"percent":92,"elapsed":50,"red":false}'></span>
+        <div class="tilecap">Widget &middot; <b>OFF</b></div>
+        <div class="gap12"></div>
+        <span data-bar='{"w":250,"h":10,"percent":108,"elapsed":70,"red":false}'></span>
+        <div class="tilecap">Notification &middot; <b>OFF</b></div>
+      </div>
+    </div>
+  </div>
+
+  <h3>6b · Rings, with the widgets toggle off</h3>
+  <p class="sub">
+    The widgets toggle also gates the shipped ring faces — same rule, tick stays. These rings are
+    drawn with D3's straight split: the red begins on the tick, not half a stroke behind it, which
+    is a small correction to what ships today (D7).
+  </p>
+  <div class="boards">
+    <div class="board lt">
+      <div class="boardcap">Light</div>
+      <div class="tilewrap"><span data-ring='{"size":150,"stroke":15,"percent":78,"elapsed":70}'></span>
+        <div class="tilecap">Ring &middot; ON</div></div>
+      <div class="tilewrap"><span data-ring='{"size":150,"stroke":15,"percent":78,"elapsed":70,"red":false}'></span>
+        <div class="tilecap">Ring &middot; <b>OFF</b></div></div>
+    </div>
+    <div class="board dk">
+      <div class="boardcap">Dark</div>
+      <div class="tilewrap"><span data-ring='{"size":150,"stroke":15,"percent":78,"elapsed":70}'></span>
+        <div class="tilecap">Ring &middot; ON</div></div>
+      <div class="tilewrap"><span data-ring='{"size":150,"stroke":15,"percent":78,"elapsed":70,"red":false}'></span>
+        <div class="tilecap">Ring &middot; <b>OFF</b></div></div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2>7 · Settings &rarr; Appearance</h2>
+  <p class="sub">
+    A group header, a footnote, and three <code>ToggleRow</code>s inside the existing Appearance
+    card — below "24-hour time", above "Theme color". All three default ON.
+  </p>
+  <div class="boards">
+    <div class="board lt">
+      <div class="boardcap">Light</div>
+      <div class="tilewrap">
+        <div class="setcard lt">
+          <div class="setlabel">Appearance</div>
+          <div class="srow">
+            <div class="grow"><div class="stitle">24-hour time</div>
+              <div class="ssub sec">Times shown like Thu 11:45 PM</div></div>
+            <div class="sw off"><i></i></div>
+          </div>
+          <div class="divider"></div>
+          <div class="grouphdr">Show red past the pace mark</div>
+          <div class="groupfoot sec">Off keeps the even-pace tick without the colour.</div>
+          <div class="srow">
+            <div class="grow"><div class="stitle">On widgets</div>
+              <div class="ssub sec">Bars and rings on the home screen</div></div>
+            <div class="sw on"><i></i></div>
+          </div>
+          <div class="srow">
+            <div class="grow"><div class="stitle">In-app bars</div>
+              <div class="ssub sec">The usage screen's bars</div></div>
+            <div class="sw on"><i></i></div>
+          </div>
+          <div class="srow">
+            <div class="grow"><div class="stitle">Pinned notification</div>
+              <div class="ssub sec">The always-on notification's bars</div></div>
+            <div class="sw on"><i></i></div>
+          </div>
+          <div class="divider"></div>
+          <div class="stitle">Theme color</div>
+        </div>
+        <div class="tilecap">Defaults: all three ON</div>
+      </div>
+    </div>
+    <div class="board dk">
+      <div class="boardcap">Dark</div>
+      <div class="tilewrap">
+        <div class="setcard dk">
+          <div class="setlabel">Appearance</div>
+          <div class="srow">
+            <div class="grow"><div class="stitle">24-hour time</div>
+              <div class="ssub sec">Times shown like Thu 23:45</div></div>
+            <div class="sw on"><i></i></div>
+          </div>
+          <div class="divider"></div>
+          <div class="grouphdr">Show red past the pace mark</div>
+          <div class="groupfoot sec">Off keeps the even-pace tick without the colour.</div>
+          <div class="srow">
+            <div class="grow"><div class="stitle">On widgets</div>
+              <div class="ssub sec">Bars and rings on the home screen</div></div>
+            <div class="sw off"><i></i></div>
+          </div>
+          <div class="srow">
+            <div class="grow"><div class="stitle">In-app bars</div>
+              <div class="ssub sec">The usage screen's bars</div></div>
+            <div class="sw on"><i></i></div>
+          </div>
+          <div class="srow">
+            <div class="grow"><div class="stitle">Pinned notification</div>
+              <div class="ssub sec">The always-on notification's bars</div></div>
+            <div class="sw off"><i></i></div>
+          </div>
+          <div class="divider"></div>
+          <div class="stitle">Theme color</div>
+        </div>
+        <div class="tilecap">A mixed state — widgets and notification off, in-app on</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2>8 · Decisions this wireframe makes</h2>
+  <ul class="dec">
+    <li><b>D1 · Subtitles on the three toggle rows.</b> The handover specifies one control with a
+      footnote; three rows need to say which surface each one is. Proposed:
+      "Bars and rings on the home screen" / "The usage screen's bars" / "The always-on
+      notification's bars".</li>
+    <li><b>D2 · The widgets toggle covers rings too.</b> The rings ship with the red segment
+      today; leaving them ungoverned would mean a home screen where the bar widget obeys the
+      setting and the ring widget doesn't.</li>
+    <li><b>D3 · The red starts exactly on the pace line, and the split is a straight edge.</b>
+      <i>Robin, 2026-08-13 — this rev.</i> Two consequences, both deliberate departures from the
+      Mac handover: (a) <b>no minimum width</b> — the segment is exactly tick&rarr;fill edge, so a
+      3-point overshoot draws a 3-point sliver rather than being inflated to <code>h</code> and
+      dragged back past the tick; (b) <b>no capsule end at the split</b> — the red is clipped to
+      the fill's own shape, giving a square vertical boundary where the two colours meet and a
+      right end that <i>is</i> the fill's rounded cap. The pace line is the tick's <i>centre</i>,
+      so the tick straddles the split — left half over the fill, right half over the red — and
+      the boundary lands on the mark itself at every width. Worth telling the Mac side, since CCM-50 [Panel] specifies the
+      capsule and the <code>h</code> floor.</li>
+    <li><b>D4 · The collapsed notification bar stops being stretched.</b>
+      <i>Confirmed this rev.</i> Today it renders at <code>w = h &times; 80</code> and is
+      <code>fitXY</code>'d, which is harmless for a plain capsule but squeezes the tick from about
+      2.5&nbsp;dp to 1.5&nbsp;dp (both tiles in §5). It now renders at the real pixel width with
+      no stretch, which also keeps the fill&rarr;red boundary a true vertical.</li>
+    <li><b>D5 · Bitmaps gain horizontal padding too.</b> A tick at 0% or 100% is centred on the
+      bar's end, so half of it falls outside the track. The bar surfaces inset by
+      <code>tickWidth/2</code> horizontally as well as <code>0.3h</code> vertically, rather than
+      clamping the tick inward and lying about its position.</li>
+    <li><b>D6 · Credits are unmarked everywhere</b> — in-app, tall widget, notification. Carried
+      straight from the handover.</li>
+    <li><b>D7 · The shipped rings adopt D3's straight split too.</b> <code>RingRenderer</code>
+      draws its red arc with the fill's round cap still set, so today the red bulges about
+      0.35&nbsp;&times;&nbsp;stroke <i>backwards</i> past the tick. §6b shows the corrected
+      version: the segment keeps its round tip at the fill end and is trimmed at the tick by
+      re-drawing the fill colour over <code>[0, tick]</code> with a butt cap. Without this, bars
+      and rings would disagree about where the red begins.</li>
+  </ul>
+
+  <div class="q">
+    <b>Rev B changes</b> (rev A &rarr; rev B, 2026-08-13):
+    <ol>
+      <li>Red starts <b>exactly</b> on the pace line — the min-width floor is gone (D3).</li>
+      <li>The fill&rarr;red boundary is a <b>straight vertical edge</b>, not a capsule end; the
+        red's far end is the fill's own cap (D3).</li>
+      <li>Same rule applied to the rings, which needed a cap fix to honour it (D7).</li>
+      <li>D4 resolved: the collapsed notification bar renders unstretched. D1 resolved: the three
+        subtitles stay as shown.</li>
+    </ol>
+  </div>
+</div>
+
+<script>
+  // One drawing routine for every bar on this page — the proposed BarGeometry, in JS.
+  var PACE_DEAD_ZONE = 3.0;
+  var PAL = {
+    light: { fg: '#1D1D1F', tickA: 0.48, accent: '#D97757', y: '#F9A825', o: '#F57C00', r: '#C62828' },
+    dark:  { fg: '#F2F2F4', tickA: 0.60, accent: '#E59980', y: '#FDD663', o: '#FFA726', r: '#FF5252' }
+  };
+  function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
+  var UID = 0;   // unique clipPath ids
+
+  function barColor(pct, p) {
+    var v = pct == null ? 0 : pct;
+    if (v >= 100) return p.r;
+    if (v > 90) return p.o;
+    if (v > 80) return p.y;
+    return p.accent;
+  }
+  function rect(x, y, w, h, r, fill, alpha) {
+    return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h +
+      '" rx="' + r + '" fill="' + fill + '" fill-opacity="' + alpha + '"/>';
+  }
+
+  function drawBar(cfg, dark) {
+    var p = dark ? PAL.dark : PAL.light;
+    var S = cfg.scale || 2;
+    var squash = cfg.squash || 1;          // horizontal capsule distortion (fitXY)
+    var hp = cfg.h * S, wp = cfg.w * S;
+    var tw = Math.max(2, 0.31 * hp) * squash;
+    var over = 0.3 * hp;
+    var padX = Math.max(tw / 2, 1);
+    var H = hp + 2 * over, W = wp + 2 * padX;
+    var x0 = padX, y0 = over, r = hp / 2;
+    var percent = (cfg.percent === undefined || cfg.percent === null) ? null : cfg.percent;
+    var elapsed = (cfg.elapsed === undefined || cfg.elapsed === null) ? null : cfg.elapsed;
+    var fillCol = barColor(percent, p);
+    var minW = hp * squash;
+
+    var s = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H +
+      '" style="display:block;overflow:visible">';
+    s += rect(x0, y0, wp, hp, r, fillCol, 0.25);
+
+    var fillEnd = null;
+    if (percent !== null) {
+      var f = clamp(percent / 100, 0, 1);
+      var fw = f * wp;
+      if (fw > 0) {
+        fw = Math.min(Math.max(fw, minW), wp);
+        fillEnd = x0 + fw;
+        s += rect(x0, y0, fw, hp, r, fillCol, 1);
+      }
+      if (cfg.red !== false && elapsed !== null && fillEnd !== null &&
+          percent > elapsed + PACE_DEAD_ZONE) {
+        var tx = x0 + clamp(elapsed / 100, 0, 1) * wp;
+        if (fillEnd > tx) {
+          // D3: the red starts exactly on the pace line and is clipped to the fill's
+          // own shape — square left edge, and a right end that is the fill's cap.
+          var id = 'fc' + (++UID);
+          s += '<clipPath id="' + id + '"><rect x="' + x0 + '" y="' + y0 + '" width="' +
+            (fillEnd - x0) + '" height="' + hp + '" rx="' + r + '"/></clipPath>';
+          s += '<rect x="' + tx + '" y="' + y0 + '" width="' + (fillEnd - tx) + '" height="' +
+            hp + '" fill="' + p.r + '" clip-path="url(#' + id + ')"/>';
+        }
+      }
+    }
+    if (percent !== null && elapsed !== null) {
+      var tickX = x0 + clamp(elapsed / 100, 0, 1) * wp;
+      s += rect(tickX - tw / 2, 0, tw, H, tw / 2, p.fg, p.tickA);
+    }
+    return s + '</svg>';
+  }
+
+  // The same bar, with dimension callouts. Annotation geometry is derived from the
+  // drawing constants, so a number can't be right in one place and wrong in the other.
+  function drawAnatomy(cfg, dark) {
+    var p = dark ? PAL.dark : PAL.light;
+    var S = cfg.scale, hp = cfg.h * S, wp = cfg.w * S;
+    var tw = Math.max(2, 0.31 * hp), over = 0.3 * hp, padX = tw / 2;
+    var H = hp + 2 * over;
+    var M = { l: 240, r: 250, t: 92, b: 118 };
+    var W = M.l + wp + 2 * padX + M.r, TH = M.t + H + M.b;
+
+    var trackL = M.l + padX, trackR = trackL + wp;
+    var barTop = M.t + over, barBot = barTop + hp;
+    var tickX = trackL + cfg.elapsed / 100 * wp;
+    var fillEnd = trackL + cfg.percent / 100 * wp;
+
+    var ink = p.fg, guide = 'stroke="' + ink + '" stroke-opacity="0.38"';
+    function txt(x, y, t, anchor) {
+      return '<text x="' + x + '" y="' + y + '" fill="' + ink + '" fill-opacity="0.8" ' +
+        'text-anchor="' + (anchor || 'start') + '" font-family="ui-monospace, SF Mono, Menlo, monospace" ' +
+        'font-size="12">' + t + '</text>';
+    }
+    function vdim(x, y1, y2, label, lx) {   // vertical dimension with end caps
+      return '<line x1="' + x + '" y1="' + y1 + '" x2="' + x + '" y2="' + y2 + '" ' + guide + '/>' +
+        '<line x1="' + (x - 4) + '" y1="' + y1 + '" x2="' + (x + 4) + '" y2="' + y1 + '" ' + guide + '/>' +
+        '<line x1="' + (x - 4) + '" y1="' + y2 + '" x2="' + (x + 4) + '" y2="' + y2 + '" ' + guide + '/>' +
+        txt(lx, (y1 + y2) / 2 + 4, label, 'end');
+    }
+    function hdim(x1, x2, y, label) {       // horizontal dimension with end caps
+      return '<line x1="' + x1 + '" y1="' + y + '" x2="' + x2 + '" y2="' + y + '" ' + guide + '/>' +
+        '<line x1="' + x1 + '" y1="' + (y - 4) + '" x2="' + x1 + '" y2="' + (y + 4) + '" ' + guide + '/>' +
+        '<line x1="' + x2 + '" y1="' + (y - 4) + '" x2="' + x2 + '" y2="' + (y + 4) + '" ' + guide + '/>' +
+        txt((x1 + x2) / 2, y + 20, label, 'middle');
+    }
+
+    var s = '<svg width="' + W + '" height="' + TH + '" viewBox="0 0 ' + W + ' ' + TH +
+      '" style="display:block;max-width:100%">';
+    s += '<rect x="' + (trackL - 26) + '" y="' + (M.t - 16) + '" width="' + (wp + 52) +
+      '" height="' + (H + 32) + '" rx="12" fill="' + (dark ? '#1E1B19' : '#FFFFFF') + '"/>';
+    s += '<g transform="translate(' + M.l + ',' + M.t + ')">' + drawBar(cfg, dark).replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '') + '</g>';
+
+    // tick callout
+    s += '<line x1="' + tickX + '" y1="' + (M.t - 62) + '" x2="' + tickX + '" y2="' + M.t + '" ' +
+      guide + ' stroke-dasharray="3 4"/>';
+    s += txt(tickX + 12, M.t - 66, 'even-pace tick · centred on elapsed/100 × W');
+    s += txt(tickX + 12, M.t - 48, 'width max(2 px, 0.31 h) · neutral on-surface @ ' + (dark ? '0.60' : '0.48'));
+    // vertical dims
+    s += vdim(M.l - 34, barTop, barBot, 'h', M.l - 42);
+    s += vdim(M.l - 34, M.t, barTop, '0.3 h', M.l - 42);
+    s += vdim(M.l - 108, M.t, M.t + H, '1.6 h  (bitmap)', M.l - 116);
+    // fill edge
+    s += '<line x1="' + fillEnd + '" y1="' + barBot + '" x2="' + fillEnd + '" y2="' + (barBot + 30) +
+      '" ' + guide + ' stroke-dasharray="3 4"/>';
+    s += txt(fillEnd + 10, barBot + 34, 'fill edge · ' + cfg.percent + '%');
+    // red segment brace
+    s += hdim(tickX, fillEnd, barBot + 62, 'over-pace segment · starts on the pace line · ' + p.r);
+    s += '</svg>';
+    return s;
+  }
+
+  function drawRing(cfg, dark) {
+    var p = dark ? PAL.dark : PAL.light;
+    var size = cfg.size, sw = cfg.stroke;
+    var over = 0.3 * sw, inset = sw / 2 + over;
+    var c = size / 2, R = c - inset;
+    var circ = 2 * Math.PI * R;
+    var pct = clamp(cfg.percent / 100, 0, 1);
+    var el = clamp(cfg.elapsed / 100, 0, 1);
+    var s = '<svg width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size +
+      '" style="display:block"><g transform="rotate(-90 ' + c + ' ' + c + ')">';
+    s += '<circle cx="' + c + '" cy="' + c + '" r="' + R + '" fill="none" stroke="' + p.fg +
+      '" stroke-opacity="' + (dark ? 0.14 : 0.10) + '" stroke-width="' + sw + '"/>';
+    var fillCol = barColor(cfg.percent, p);
+    // Arc from turn a0 to turn a1, clockwise from 12 o'clock (the group is rotated -90°).
+    function arc(a0, a1) {
+      var pt = function (t) {
+        var rad = t * 2 * Math.PI;
+        return (c + R * Math.cos(rad)) + ' ' + (c + R * Math.sin(rad));
+      };
+      var large = (a1 - a0) > 0.5 ? 1 : 0;
+      return 'M ' + pt(a0) + ' A ' + R + ' ' + R + ' 0 ' + large + ' 1 ' + pt(a1);
+    }
+    s += '<path d="' + arc(0, pct) + '" fill="none" stroke="' + fillCol +
+      '" stroke-width="' + sw + '" stroke-linecap="round"/>';
+    if (cfg.red !== false && cfg.percent > cfg.elapsed + PACE_DEAD_ZONE) {
+      // Round cap at BOTH ends, so the red covers the fill's tip completely…
+      s += '<path d="' + arc(el, pct) + '" fill="none" stroke="' + p.r +
+        '" stroke-width="' + sw + '" stroke-linecap="round"/>';
+      // …then trim the cap that bulged back behind the pace line, butt-capped, so the
+      // red begins exactly on the tick. (D7 — RingRenderer needs the same trim pass.)
+      if (el > 0) {
+        s += '<path d="' + arc(0, el) + '" fill="none" stroke="' + fillCol +
+          '" stroke-width="' + sw + '" stroke-linecap="butt"/>';
+      }
+    }
+    var a = -Math.PI / 2 + el * 2 * Math.PI;   // tick, in unrotated coords
+    s += '</g>';
+    var rIn = R - sw / 2 - over, rOut = R + sw / 2 + over;
+    s += '<line x1="' + (c + rIn * Math.cos(a)) + '" y1="' + (c + rIn * Math.sin(a)) +
+      '" x2="' + (c + rOut * Math.cos(a)) + '" y2="' + (c + rOut * Math.sin(a)) +
+      '" stroke="' + p.fg + '" stroke-opacity="' + p.tickA + '" stroke-width="' +
+      Math.max(2, 0.31 * sw) + '" stroke-linecap="round"/>';
+    return s + '</svg>';
+  }
+
+  // --- §2 state gallery, generated so light and dark can't drift ---
+  var STATES = [
+    { cap: '<b>Under pace</b> — 42% used, tick at 0.70. Fill short of the tick, nothing coloured.',
+      cfg: { w: 260, h: 12, percent: 42, elapsed: 70 } },
+    { cap: '<b>Over pace</b> — 78% vs 70%. Red runs tick &rarr; fill edge.',
+      cfg: { w: 260, h: 12, percent: 78, elapsed: 70 } },
+    { cap: '<b>Dead zone</b> — 72% vs 70%. Tick only; the fill runs past it unremarked.',
+      cfg: { w: 260, h: 12, percent: 72, elapsed: 70 } },
+    { cap: '<b>Boundary, not over</b> — 73.0 vs 70.0. Strict: <code>&le; elapsed + 3</code> draws nothing.',
+      cfg: { w: 260, h: 12, percent: 73, elapsed: 70 } },
+    { cap: '<b>Boundary, over</b> — 73.5 vs 70.0. Half a point later a 3.5-point sliver of red appears, starting on the tick. No min width: the sliver is true to scale.',
+      cfg: { w: 260, h: 12, percent: 73.5, elapsed: 70 } },
+    { cap: '<b>Fill covers the tick</b> — 96% vs 40%. Tick drawn last, still legible on the red.',
+      cfg: { w: 260, h: 12, percent: 96, elapsed: 40 } },
+    { cap: '<b>At 100%</b> — fill is already red, so the segment vanishes into it; the tick still records where even pace was.',
+      cfg: { w: 260, h: 12, percent: 100, elapsed: 62 } },
+    { cap: '<b>Tick at the ends</b> — 4% vs 2% and 99% vs 100%. The capsule overhangs the rounded cap; never clipped.',
+      cfg: { w: 260, h: 12, percent: 4, elapsed: 2 }, extra: { w: 260, h: 12, percent: 99, elapsed: 100 } },
+    { cap: '<b>No percent</b> — bare track, no tick. Never a guessed mark.',
+      cfg: { w: 260, h: 12, percent: null, elapsed: 70 } },
+    { cap: '<b>No reset clock</b> — 55% fill, no tick. The window hasn’t started.',
+      cfg: { w: 260, h: 12, percent: 55, elapsed: null } },
+    { cap: '<b>Credits</b> — 61%, never marked. Money has no clock.',
+      cfg: { w: 260, h: 12, percent: 61 } }
+  ];
+
+  function buildStates(id, dark) {
+    var host = document.getElementById(id);
+    STATES.forEach(function (st) {
+      var wrap = document.createElement('div');
+      wrap.className = 'tilewrap';
+      var html = drawBar(st.cfg, dark);
+      if (st.extra) html += '<div style="height:10px"></div>' + drawBar(st.extra, dark);
+      wrap.innerHTML = '<div class="plate">' + html + '</div>' +
+        '<div class="tilecap" style="max-width:534px">' + st.cap + '</div>';
+      host.appendChild(wrap);
+    });
+  }
+  buildStates('states-lt', false);
+  buildStates('states-dk', true);
+
+  // --- inline bars/rings declared in the markup ---
+  document.querySelectorAll('[data-bar]').forEach(function (el) {
+    var dark = !!el.closest('.dk');
+    el.innerHTML = drawBar(JSON.parse(el.getAttribute('data-bar')), dark);
+    // Bars not already sitting on a mock surface get a plate, so the 0.25-alpha
+    // track is composited against the colour it will really have.
+    if (!el.closest('.plate') && !el.closest('.surface, .w, .notif')) {
+      var plate = document.createElement('div');
+      plate.className = 'plate';
+      el.parentNode.insertBefore(plate, el);
+      plate.appendChild(el);
+    }
+  });
+  document.querySelectorAll('[data-anatomy]').forEach(function (el) {
+    el.innerHTML = drawAnatomy(JSON.parse(el.getAttribute('data-anatomy')), !!el.closest('.dk'));
+  });
+  document.querySelectorAll('[data-ring]').forEach(function (el) {
+    el.innerHTML = drawRing(JSON.parse(el.getAttribute('data-ring')), !!el.closest('.dk'));
+    var plate = document.createElement('div');
+    plate.className = 'plate';
+    el.parentNode.insertBefore(plate, el);
+    plate.appendChild(el);
+  });
+</script>

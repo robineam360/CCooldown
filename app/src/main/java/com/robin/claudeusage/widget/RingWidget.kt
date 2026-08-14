@@ -23,9 +23,13 @@ import androidx.glance.background
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
+import androidx.glance.layout.Row
+import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
+import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
+import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
@@ -39,7 +43,6 @@ import com.robin.claudeusage.data.UsageWindow
 import com.robin.claudeusage.data.WidgetPrefs
 import com.robin.claudeusage.ui.elapsedPercent
 import com.robin.claudeusage.work.Polling
-import kotlin.math.min
 
 class RingWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = RingWidget()
@@ -57,10 +60,10 @@ class RingWidgetReceiver : GlanceAppWidgetReceiver() {
 }
 
 /**
- * CCRM-39 (Ring Widget): one window of one profile as a pace-marked ring hero.
- * Everything reads inside the ring; no window title on this face (the config
- * flow names it). Mac provenance: CCRM-18 [Desktop] small face + CCM-49
- * [Desktop] pace marks.
+ * CCRM-39 (Ring Widget): one window of one profile as a pace-marked ring gauge.
+ * The percentage reads inside the ring and everything else sits outside it
+ * ([ringFaceLayout]); no window title on this face (the config flow names it).
+ * Mac provenance: CCRM-18 [Desktop] small face + CCM-49 [Desktop] pace marks.
  */
 class RingWidget : GlanceAppWidget() {
 
@@ -84,6 +87,8 @@ class RingWidget : GlanceAppWidget() {
         val windowLengthMs =
             if (windowKey == "weekly") Projection.WEEKLY_MS else Projection.SESSION_MS
         window?.resetsAt?.let { Polling.armResetRedraw(context, it.toEpochMilli()) }
+        // Widgets read UsageCache directly; there is no composition to hoist into here.
+        val showOverPace = cache.paceOverOnWidgets()
         provideContent {
             GlanceTheme {
                 RingFace(
@@ -94,6 +99,7 @@ class RingWidget : GlanceAppWidget() {
                     windowLengthMs = windowLengthMs,
                     use24h = use24h,
                     themeName = themeName,
+                    showOverPace = showOverPace,
                 )
             }
         }
@@ -109,6 +115,7 @@ private fun RingFace(
     windowLengthMs: Long,
     use24h: Boolean,
     themeName: String,
+    showOverPace: Boolean = true,
 ) {
     val context = LocalContext.current
     val size = LocalSize.current
@@ -127,75 +134,92 @@ private fun RingFace(
         if (state == FaceState.NOT_SIGNED_IN) {
             NotSignedInFace()
         } else {
-            // The ring nearly fills the face; stroke keeps the Mac's proportion.
-            val ringDp = (min(size.width.value, size.height.value) - 18f).coerceAtLeast(72f)
-            val strokeDp = ringDp * (8f / 128f)
+            // CCBG-11 (Ring Face Clutter): the bore holds the percentage and nothing
+            // else. Profile, countdown and exact reset live *outside* the ring, which
+            // is what frees the ring to reach the edge of the face and still be
+            // legible at the declared 110×110 — where the old four-line stack didn't
+            // merely crowd the bore, it overflowed it.
+            val l = ringFaceLayout(size.width.value, size.height.value)
             val percent = window?.percent
             val elapsed = window?.let { elapsedPercent(it, windowLengthMs) }
-            Box(contentAlignment = Alignment.Center) {
-                Image(
-                    provider = ImageProvider(
-                        ringBitmap(context, ringDp, strokeDp, percent, elapsed, accent, dark)
+            val gauge: @Composable () -> Unit = {
+                Box(contentAlignment = Alignment.Center) {
+                    Image(
+                        provider = ImageProvider(
+                            ringBitmap(
+                                context, l.ringDp, l.strokeDp,
+                                percent, elapsed, accent, dark, showOverPace,
+                            )
+                        ),
+                        contentDescription = null,
+                        modifier = GlanceModifier.size(l.ringDp.dp),
+                    )
+                    Text(
+                        // Truncates — never overstates. An em dash for no data,
+                        // never a fake 0%.
+                        if (percent == null) "—" else "${percent.toInt()}%",
+                        style = TextStyle(
+                            color = if (percent == null) GlanceTheme.colors.onSurfaceVariant
+                            else GlanceTheme.colors.onSurface,
+                            fontSize = l.percentSp.sp,
+                            fontWeight = FontWeight.Medium,
+                        ),
+                    )
+                }
+            }
+            val nameLine: @Composable () -> Unit = {
+                if (profileLabel != null) {
+                    Text(
+                        profileLabel.uppercase(),
+                        style = TextStyle(
+                            color = GlanceTheme.colors.onSurfaceVariant,
+                            fontSize = 9.sp,
+                        ),
+                        maxLines = 1,
+                    )
+                }
+            }
+            val countdownLine: @Composable () -> Unit = {
+                Text(
+                    if (percent == null) "Waiting" else widgetCountdown(window?.resetsAt),
+                    style = TextStyle(
+                        color = GlanceTheme.colors.onSurfaceVariant,
+                        fontSize = 11.sp,
                     ),
-                    contentDescription = null,
-                    modifier = GlanceModifier.size(ringDp.dp),
+                    maxLines = 1,
                 )
-                // Inner text is inset (the ring's own bore) so a 100% ring never
-                // strikes through its numbers.
+            }
+            val momentLine: @Composable () -> Unit = {
+                if (percent != null) {
+                    Text(
+                        resetMoment(window?.resetsAt, use24h),
+                        style = TextStyle(
+                            color = GlanceTheme.colors.onSurfaceVariant,
+                            fontSize = 10.sp,
+                        ),
+                        maxLines = 1,
+                    )
+                }
+            }
+
+            if (l.landscape) {
+                // Wide and short: the lines read better beside the ring than under it.
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    gauge()
+                    Spacer(GlanceModifier.width(12.dp))
+                    Column {
+                        nameLine()
+                        countdownLine()
+                        momentLine()
+                    }
+                }
+            } else {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    if (profileLabel != null && percent != null) {
-                        Text(
-                            profileLabel.uppercase(),
-                            style = TextStyle(
-                                color = GlanceTheme.colors.onSurfaceVariant,
-                                fontSize = 9.sp,
-                            ),
-                            maxLines = 1,
-                        )
-                    }
-                    if (percent == null) {
-                        // No data draws the track alone — an em dash, never a fake 0%.
-                        Text(
-                            "—",
-                            style = TextStyle(
-                                color = GlanceTheme.colors.onSurfaceVariant,
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.Medium,
-                            ),
-                        )
-                        Text(
-                            "Waiting for first fetch",
-                            style = TextStyle(
-                                color = GlanceTheme.colors.onSurfaceVariant,
-                                fontSize = 9.sp,
-                            ),
-                            maxLines = 2,
-                        )
-                    } else {
-                        Text(
-                            "${percent.toInt()}%", // truncates — never overstates
-                            style = TextStyle(
-                                color = GlanceTheme.colors.onSurface,
-                                fontSize = 25.sp,
-                                fontWeight = FontWeight.Medium,
-                            ),
-                        )
-                        Text(
-                            widgetCountdown(window.resetsAt),
-                            style = TextStyle(
-                                color = GlanceTheme.colors.onSurfaceVariant,
-                                fontSize = 12.sp,
-                            ),
-                        )
-                        Text(
-                            resetMoment(window.resetsAt, use24h),
-                            style = TextStyle(
-                                color = GlanceTheme.colors.onSurfaceVariant,
-                                fontSize = 10.sp,
-                            ),
-                            maxLines = 1,
-                        )
-                    }
+                    if (l.showName) nameLine()
+                    gauge()
+                    Spacer(GlanceModifier.height(4.dp))
+                    countdownLine()
+                    if (l.showResetMoment) momentLine()
                 }
             }
         }

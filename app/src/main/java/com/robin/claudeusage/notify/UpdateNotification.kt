@@ -86,6 +86,12 @@ object UpdateNotification {
             .addAction(0, "Skip this version", skip)
             .setAutoCancel(true)
             .setOnlyAlertOnce(true)
+            // CCBG-12 (Status Icon Swap): deliberately NOT given a timeout, unlike every
+            // other event alert. This one posts "once per version, ever" — see
+            // [maybePost] — so an expiry would silently demote that to "once per version,
+            // for an hour, then never", and an update that arrived overnight would be lost
+            // to everything but the settings card. Expiring it needs the gate to re-post
+            // on a later check, which is a change to CCRM-28 (Update Check), not to this.
             .build()
         try {
             NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification)

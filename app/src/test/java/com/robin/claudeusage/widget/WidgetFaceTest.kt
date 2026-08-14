@@ -8,6 +8,8 @@ import com.robin.claudeusage.data.Snapshot
 import com.robin.claudeusage.data.UsageData
 import com.robin.claudeusage.data.UsageWindow
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.time.Instant
@@ -201,5 +203,110 @@ class WidgetFaceTest {
     fun `a missing window drops its row instead of faking one`() {
         val rows = windowRows(UsageData(session = null, weekly = window(41.0), modelCaps = emptyList()))
         assertEquals(listOf("7d"), rows.map { it.title })
+    }
+
+    @Test
+    fun `the mini-rings face asks for three, and the fixed windows still survive`() {
+        val rows = windowRows(
+            UsageData(
+                session = window(72.0),
+                weekly = window(41.0),
+                modelCaps = listOf(
+                    ModelCap("Opus 4.5", window(84.0)),
+                    ModelCap("Sonnet 4.5", window(37.0)),
+                ),
+            ),
+            max = 3,
+        )
+        assertEquals(listOf("5h", "7d", "Opus 4.5"), rows.map { it.title })
+    }
+
+    // --- CCBG-10: the mini-rings ring follows the face, and the stack gives way first ---
+
+    @Test
+    fun `the reported face grows its rings instead of leaving a hole`() {
+        // 363×168 dp, two windows — the placement the bug was filed from.
+        val l = miniRingsLayout(363f, 168f, 2)
+        assertEquals(88f, l.ringDp, 0.5f)          // was a hardcoded 56
+        assertTrue(l.showTitle && l.showCountdown)
+        // Columns stop dividing the whole width, so the pair centres as a group.
+        assertTrue("columns should not spread to the quarter points", l.columnDp < (363f - 28f) / 2f)
+        assertEquals(0.098f * l.ringDp, l.strokeDp, 0.01f)
+    }
+
+    @Test
+    fun `the 88dp ceiling holds all the way to three rings at this width`() {
+        // Three is the most this face ever has to serve, and at 363dp wide the
+        // ceiling — not the column width — is still what binds. That is the whole
+        // reason the cap could be raised from four.
+        for (n in 1..3) assertEquals(88f, miniRingsLayout(363f, 168f, n).ringDp, 0.01f)
+        // A fourth would have been the one to shrink them.
+        assertTrue(miniRingsLayout(363f, 168f, 4).ringDp < 88f)
+        // Narrow the face and width binds instead of the ceiling.
+        assertTrue(miniRingsLayout(250f, 200f, 3).ringDp < 88f)
+        // A face with room to spare still stops at the ceiling.
+        assertEquals(88f, miniRingsLayout(600f, 300f, 1).ringDp, 0.01f)
+    }
+
+    @Test
+    fun `a short face drops the countdown, then the title, and never the ring`() {
+        // The declared minimum, where today's fixed ring plus both lines overflow.
+        val min = miniRingsLayout(250f, 110f, 2)
+        assertFalse("countdown goes first", min.showCountdown)
+        assertTrue("the title outlives it", min.showTitle)
+        assertTrue(min.ringDp >= 36f)
+
+        val tiny = miniRingsLayout(250f, 86f, 2)
+        assertFalse(tiny.showCountdown)
+        assertFalse("then the title", tiny.showTitle)
+        assertEquals(36f, tiny.ringDp, 0.01f)      // the ring itself is the floor
+    }
+
+    // --- CCBG-11: the single ring's size classes ---
+
+    @Test
+    fun `the declared 2x2 gets a ring that fills it and one line under`() {
+        val l = ringFaceLayout(110f, 110f)
+        assertEquals(81f, l.ringDp, 0.5f)
+        assertFalse("no room to name the account", l.showName)
+        assertFalse("nor for the exact reset", l.showResetMoment)
+        assertFalse(l.landscape)
+        // The bore has to hold the percentage, so the percentage scales with the ring.
+        assertEquals(21f, l.percentSp, 0.5f)
+    }
+
+    @Test
+    fun `a taller face buys lines, not a bigger circle`() {
+        val tall = ringFaceLayout(178f, 240f)
+        assertEquals(140f, tall.ringDp, 0.01f)     // capped
+        assertTrue(tall.showName && tall.showResetMoment)
+        // Twice the height, same ring: the extra room went to the lines under it.
+        assertEquals(140f, ringFaceLayout(178f, 480f).ringDp, 0.01f)
+    }
+
+    @Test
+    fun `the middle size names the account but not the moment`() {
+        val l = ringFaceLayout(150f, 150f)
+        assertEquals(108f, l.ringDp, 0.5f)
+        assertTrue(l.showName)
+        assertFalse(l.showResetMoment)
+    }
+
+    @Test
+    fun `wide and short puts the lines beside the ring`() {
+        val l = ringFaceLayout(250f, 110f)
+        assertTrue(l.landscape)
+        assertEquals(86f, l.ringDp, 0.5f)
+        assertTrue(l.showName && l.showResetMoment)
+        // Just under the ratio is still a stack, so the switch can't be accidental.
+        assertFalse(ringFaceLayout(170f, 110f).landscape)
+    }
+
+    @Test
+    fun `the stroke ratio and the floor are the shipped ones`() {
+        val l = ringFaceLayout(110f, 110f)
+        assertEquals(l.ringDp / 16f, l.strokeDp, 0.01f)
+        // A face smaller than the provider allows still yields a drawable ring.
+        assertEquals(48f, ringFaceLayout(40f, 40f).ringDp, 0.01f)
     }
 }

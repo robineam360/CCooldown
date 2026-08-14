@@ -40,8 +40,8 @@
         <ImageView
             android:id="@+id/bar"
             android:layout_width="match_parent"
-            android:layout_height="7dp"
-            android:layout_marginTop="5dp"
+            android:layout_height="13dp"
+            android:layout_marginTop="3dp"
             android:scaleType="fitXY"
             android:importantForAccessibility="no" />
 

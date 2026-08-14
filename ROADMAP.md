@@ -77,6 +77,70 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
   (`values/colors.xml` deleted with it). Status-bar/QS glyphs unchanged — they're
   usage gauges, not the logo.
 
+### CCRM-43 · Bar Pace Marks — pace marks on the bars, and three red toggles
+- **Status:** Done and **verified on the Fold 7 outer screen, 2026-08-13**, dark theme,
+  both accounts — including the red, which Work's 5-hour window crossed into during the
+  pass. What was seen:
+  - **Under pace / no mark:** tick at 97% hard against the bar's end and not clipped;
+    credits unmarked; a window with no reset clock unmarked. Personal stayed below pace
+    throughout and drew no red anywhere — the negative control.
+  - **Dead zone:** 61% against 59% elapsed drew the tick alone, and the card's own
+    sentence read "On even pace" beside it. The two can't disagree; they share the gate.
+  - **Over pace:** at 66% against 61% elapsed (+5) the in-app bar drew red from the pace
+    line to the fill's edge — straight vertical split, tick on the boundary, red covering
+    the fill's rounded tip — while the card said "4 points above even pace" in amber and
+    the chart washed. One verdict, three elements, no drift. The pinned notification
+    (switched to Work for the sighting) showed the same at 68% on its 8 dp bar, so
+    dropping the `fitXY` stretch worked.
+  - **Rings:** the ring and mini-rings faces showed the red arc *beginning on the tick
+    with no fill-coloured nub past its tip* — the D7 cap fix, which was invisible before
+    this change and is now seen correct.
+  - **Still owed:** light theme, the inner screen, and the three toggles flipped against
+    a live red (the crossing arrived after the device went offline). One thing to watch:
+    on the 8 dp collapsed notification bar the tick is the least legible of the
+    surfaces — present, but only just. Judge it under pace, where it is the only mark.
+- **Provenance/wireframe:** the Mac's CCM-50 [Panel] bars + CCM-51 [Pace] toggle, via
+  `ANDROID-PACE-BARS-HANDOVER.md` (which lives outside this repo — copy it in if this
+  line should cite something durable). Wireframe rev B approved 2026-08-13 in
+  `design/bar-pace-marks-wireframe.html`, **kept until the on-device pass** as the
+  comparison target for it, then deleted per the design-folder rule.
+- **What:** the neutral even-pace tick and the red over-pace segment — already shipped
+  on the rings in CCRM-39 (Ring Widget) / CCRM-40 (Mini-Rings Widget) — on every bar
+  surface: the in-app usage screen, both bar widgets, and the pinned notification
+  (collapsed bar and expanded panel). Session measures against 5 hours; the 7-day
+  window **and every per-model cap** against 7 days. Credits rows are never marked:
+  money has no clock.
+- **Geometry:** `ui/BarGeometry.kt`, pure and JVM-tested like `RingGeometry`, sharing
+  the one `PACE_DEAD_ZONE` gate (`percent > elapsed + 3.0`, strict) with the chart wash,
+  the pace sentence and the rings. `ui/BarRenderer.kt` paints it for the bitmap
+  surfaces; the in-app bars draw the same numbers with a Compose overlay.
+- **Two deliberate divergences from CCM-50** (decisions of 2026-08-13, worth sending
+  back to the Mac repo): the segment has **no minimum width**, so it begins exactly on
+  the pace line instead of being inflated to `h` and dragged back behind the tick; and
+  the fill→red boundary is a **straight vertical edge**, not a capsule end — the red is
+  clipped to the fill's own rounded rect, so it covers the fill's tip and meets the
+  base colour on a hard line. `RingRenderer` gained a butt-capped trim pass so the
+  rings obey the same rule; before it, their red bulged ~0.35×stroke behind the tick.
+- **Also:** the collapsed notification bar stopped being `fitXY`-stretched from a
+  `w = h × 80` render — at that aspect the tick squeezed to ~0.19 h and the new vertical
+  boundary skewed. It now renders at the same nominal 340 dp the panel assumes.
+- **Three toggles, not one** (decision of 2026-08-13, where the Mac ships a single
+  control): Settings → Appearance, group "Show red past the pace mark", footnote "Off
+  keeps the even-pace tick without the colour.", then **On widgets** / **In-app bars** /
+  **Pinned notification**. All default ON, decoded tolerantly (absent → ON). The
+  surfaces are read at very different distances, so the appetite for red differs per
+  surface. Each gates *only* the red: the tick always draws, and the 80/90/100 severity
+  ladder is untouched — this is about pace, not severity.
+- **Where:** `ui/BarGeometry.kt`, `ui/BarRenderer.kt`, `ui/RingRenderer.kt`,
+  `MainActivity.kt`, `SettingsScreen.kt`, `data/UsageCache.kt`,
+  `notify/PinnedNotification.kt`, `widget/UsageWidget.kt`, `widget/BarWidget.kt`,
+  `widget/RingWidget.kt`, `widget/MiniRingsWidget.kt`, `widget/FaceBits.kt`.
+  Tests: `ui/BarGeometryTest.kt`. Fixtures: every wireframe state, both bar heights,
+  the narrow 150 dp case and the red-off states in `DebugFacesActivity` — which also
+  discharges the CCRM-15 (Above-Pace Verification) residual for bars.
+- The notification's "gauge" style ring still has no pace mark: it predates
+  `RingRenderer` and is the standing follow-up noted in `RingRenderer.kt`.
+
 ### CCRM-20 · Wide Chart — one profile at full width, and a chart you can touch
 - **Status:** Done (2026-08-04) · successor to CCRM-12
 - **Verified on the Fold 7's inner screen** (1968×2184 @ 420dpi = **750×832dp**, which
@@ -1085,6 +1149,23 @@ keys) would still make this a different product. Not filed, not an open question
   whose window isn't obliging.
 - **Then:** the guide still illustrates only the below-pace case, and the capture above is
   usable for the swap as-is.
+- **The bar and ring half is now observed too** (2026-08-13, CCRM-43 (Bar Pace Marks)).
+  Work's 5-hour window crossed during that day's device pass and every over-pace element
+  rendered on real hardware: the in-app bar's red segment, the same on the pinned
+  notification, and the red arc on both ring faces — the last of which exposed and then
+  confirmed the fix for a cap defect nobody could see while no window was over pace.
+  Like the chart sighting above, this one came up **clean**, and like it, it was luck
+  rather than a repeatable test.
+- **The harness that would make it repeatable** (same change):
+  `DebugFacesActivity` renders every above-pace bar and ring state — the dead zone, both
+  sides of the strict boundary, each red-off variant — through the real renderers, with
+  no obliging window required. **But it is a debug-build activity, and the debug build
+  can't be installed beside a release-signed one** (same `applicationId`, different
+  signature), so on the phone that actually has the app it stays out of reach. Uninstall,
+  a second device, or an emulator is the price today; an `applicationIdSuffix` on the
+  debug build type would remove it, and was declined on 2026-08-13 in favour of waiting
+  for a natural crossing. The *chart* half is still uncovered either way: its warning
+  half needs the synthetic series, not a fixture.
 
 ### CCRM-13 · Chart Widget — standalone chart widget
 - **Status:** Done (2026-08-13) — **delivered as CCRM-41 (Pace Widget)**, which is a

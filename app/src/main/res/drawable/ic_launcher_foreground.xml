@@ -1,9 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- CCRM-42 (App Icon): reset ring foreground. Track + arc live together in this
-     layer (not split across background/foreground) so launcher parallax keeps them
-     concentric. Geometry maps the Mac master's 560/824 optical weight onto the
-     66dp safe circle: r=19, stroke=6.7, centre (54,54); arc = 12 o'clock, 260°
-     clockwise, round caps, endpoint ≈ (35.29, 57.30). -->
+<!-- CCRM-42 (App Icon), revised for CCBG-12 (Status Icon Swap): reset ring foreground.
+     Ring + dot live together in this layer (not split across background/foreground) so
+     launcher parallax keeps them concentric. Geometry maps the Mac master's 560/824
+     optical weight onto the 66dp safe circle: r=19, stroke=6.7, centre (54,54).
+
+     The ring is CLOSED and the bore carries a filled dot. It was a 260° arc, which is
+     a gauge reading 72% — and Android puts this icon in the status bar in place of the
+     live meter whenever the app has more than one notification, so that 72% was being
+     read as real usage. A closed ring has no origin and no endpoint, and the filled
+     bore is the inverse of the meter's empty one, so the mark cannot be mistaken for
+     a reading at any fill. Dot r=6.2 leaves a 9.45 annular gap — wider than the 6.7
+     stroke, which is what keeps ring and dot separate down to status-bar sizes. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
@@ -12,12 +19,7 @@
     android:viewportHeight="108">
     <path
         android:pathData="M35,54 a19,19 0 1 0 38,0 a19,19 0 1 0 -38,0"
-        android:strokeColor="#343F50"
-        android:strokeWidth="6.7" />
-    <path
-        android:pathData="M54,35 A19,19 0 1 1 35.29,57.3"
-        android:strokeWidth="6.7"
-        android:strokeLineCap="round">
+        android:strokeWidth="6.7">
         <aapt:attr name="android:strokeColor">
             <gradient
                 android:type="linear"
@@ -29,4 +31,7 @@
                 android:endColor="#E8734D" />
         </aapt:attr>
     </path>
+    <path
+        android:pathData="M47.8,54 a6.2,6.2 0 1 0 12.4,0 a6.2,6.2 0 1 0 -12.4,0"
+        android:fillColor="#F2B25C" />
 </vector>

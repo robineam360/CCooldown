@@ -5,6 +5,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.robin.claudeusage.MainActivity
@@ -15,6 +16,7 @@ import com.robin.claudeusage.data.Projection
 import com.robin.claudeusage.data.SessionLog
 import com.robin.claudeusage.data.UsageCache
 import com.robin.claudeusage.data.UsageWindow
+import com.robin.claudeusage.notify.Conditions
 import com.robin.claudeusage.ui.Fmt
 import java.time.Instant
 
@@ -235,6 +237,14 @@ object Alerts {
      * clears it, so this is best-effort. Deduped per expiry instance.
      */
     private fun checkUpcomingExpiry(context: Context, cache: UsageCache, profile: Profile) {
+        // CCBG-12 (Status Icon Swap): when the pinned notification is showing this profile
+        // it draws the expiry as a condition strip instead, and a second notification here
+        // would be the very thing that costs us the live status-bar meter. Any copy posted
+        // before the fold — or before the pinned notification was switched on — is cleared.
+        if (Conditions.foldedInto(cache, profile)) {
+            NotificationManagerCompat.from(context).cancel(notifId(profile, 6))
+            return
+        }
         val expiry = cache.refreshExpiresAt(profile)
         if (expiry <= 0) return
         val now = System.currentTimeMillis()
@@ -267,6 +277,15 @@ object Alerts {
         profile: Profile,
         snapshot: com.robin.claudeusage.data.Snapshot,
     ) {
+        // CCBG-12 (Status Icon Swap): folded into the pinned notification's panel when it is
+        // showing this profile — see [checkUpcomingExpiry] for why.
+        if (Conditions.foldedInto(cache, profile)) {
+            if (cache.staleNotified(profile)) {
+                NotificationManagerCompat.from(context).cancel(notifId(profile, 7))
+                cache.setStaleNotified(profile, false)
+            }
+            return
+        }
         val now = System.currentTimeMillis()
         val stale = snapshot.fetchedAt > 0 &&
             now - snapshot.fetchedAt > STALE_DATA_MS &&
@@ -324,6 +343,9 @@ object Alerts {
                     context, profile, notifId(profile, if (windowName == "Session") 4 else 5), CHANNEL_RESET,
                     "${cache.profileLabel(profile)}: $windowLabel window reset",
                     "Usage is back at ${pct.toInt()}%. Next reset ${Fmt.relIn(window.resetsAt)}.",
+                    // Under "auto", lives until the fresh window resets in turn — after
+                    // which "your window reset" is about a window two generations old.
+                    timeoutMs = eventTimeout(cache, window.resetsAt),
                 )
             }
             cache.setWindowPeak(profile, windowName, pct)
@@ -363,7 +385,11 @@ object Alerts {
         val alreadyNotified = cache.alertThreshold(profile, keyName)
         val crossed = thresholds.firstOrNull { pct >= it && alreadyNotified < it } ?: return
 
-        notify(context, profile, notificationId, CHANNEL_USAGE, title(pct), resetLine(window.resetsAt, use24h))
+        notify(
+            context, profile, notificationId, CHANNEL_USAGE,
+            title(pct), resetLine(window.resetsAt, use24h),
+            timeoutMs = eventTimeout(cache, window.resetsAt),
+        )
         cache.setAlertState(profile, keyName, windowKey, crossed)
     }
 
@@ -405,7 +431,11 @@ object Alerts {
         step.fire.firstOrNull()?.let { headline ->
             val label = cache.profileLabel(profile)
             val (title, text) = paceCopy(headline, label, windowLabel, window, usedPct, estimate, use24h)
-            if (notify(context, profile, notificationId, CHANNEL_PACE, title, text)) {
+            val posted = notify(
+                context, profile, notificationId, CHANNEL_PACE, title, text,
+                timeoutMs = eventTimeout(cache, window.resetsAt),
+            )
+            if (posted) {
                 val delivered = step.fire.fold(0) { acc, m -> acc or m.bit }
                 state = state.copy(firedMask = state.firedMask or delivered)
             }
@@ -451,6 +481,39 @@ object Alerts {
         return if (rel == "any moment") "Resets any moment ($abs)" else "Resets $rel — $abs"
     }
 
+    /** Passed as [notify]'s timeout when an alert must stay until resolved or dismissed. */
+    const val NO_TIMEOUT = -1L
+
+    /**
+     * CCBG-12 (Status Icon Swap): how long a one-off event alert should live, honouring
+     * the user's "keep alerts for" setting.
+     *
+     * @param windowResetsAt when the window this alert is about resets — what "auto"
+     *   keys off. Null for an event with no window behind it (the update notice), which
+     *   falls back to an hour rather than never expiring.
+     */
+    fun eventTimeout(cache: UsageCache, windowResetsAt: Instant?): Long =
+        when (cache.alertLifetime()) {
+            "15m" -> 15 * 60_000L
+            "30m" -> 30 * 60_000L
+            "1h" -> 60 * 60_000L
+            else -> {
+                val left = windowResetsAt?.toEpochMilli()?.minus(System.currentTimeMillis())
+                // A window already past would mean "expire immediately", which would eat
+                // the alert before it could be read. An hour is the floor either way.
+                if (left == null || left <= 0) 60 * 60_000L else left
+            }
+        }
+
+    /**
+     * Whether alerts should be drawn with our own compact type scale rather than the
+     * platform's. The pinned notification's "big" style renders its own view at 13sp/12sp;
+     * every other style uses the platform's sizes. Matching whichever is in play keeps one
+     * type scale in the shade instead of two. See `notif_alert.xml`.
+     */
+    private fun useCompactScale(cache: UsageCache): Boolean =
+        cache.pinnedEnabled() && cache.pinnedStyle() == "big"
+
     /** @return whether the notification was actually posted — pace alerts roll back on false. */
     private fun notify(
         context: Context,
@@ -459,6 +522,7 @@ object Alerts {
         channel: String,
         title: String,
         text: String,
+        timeoutMs: Long = NO_TIMEOUT,
     ): Boolean {
         // Request code = notification id (already unique per profile+kind), so
         // a Work alert's intent isn't recycled with the Personal extra.
@@ -467,19 +531,38 @@ object Alerts {
             Intent(context, MainActivity::class.java).putExtra("profile", profile.key),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        val notification = NotificationCompat.Builder(context, channel)
+        val builder = NotificationCompat.Builder(context, channel)
             .setSmallIcon(R.drawable.ic_stat_bars)
             .setContentTitle(title)
             .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setContentIntent(openApp)
             .setAutoCancel(true)
-            .build()
+        if (timeoutMs != NO_TIMEOUT) builder.setTimeoutAfter(timeoutMs)
+
+        // Content title/text stay set above regardless: they are what the heads-up,
+        // the lock screen and accessibility read, and what a launcher badge shows.
+        // The custom views only replace the shade row's own text block.
+        if (useCompactScale(UsageCache(context))) {
+            builder.setCustomContentView(alertView(context, R.layout.notif_alert, title, text))
+            builder.setCustomBigContentView(
+                alertView(context, R.layout.notif_alert_expanded, title, text)
+            )
+            builder.setStyle(NotificationCompat.DecoratedCustomViewStyle())
+        }
+
         return try {
-            NotificationManagerCompat.from(context).notify(id, notification)
+            NotificationManagerCompat.from(context).notify(id, builder.build())
             true
         } catch (_: SecurityException) {
             // POST_NOTIFICATIONS not granted — silently skip.
             false
         }
     }
+
+    private fun alertView(context: Context, layout: Int, title: String, text: String) =
+        RemoteViews(context.packageName, layout).apply {
+            setTextViewText(R.id.title, title)
+            setTextViewText(R.id.sub, text)
+        }
 }

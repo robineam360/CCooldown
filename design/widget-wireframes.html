@@ -1,0 +1,443 @@
+<!doctype html>
+<html><head><title>Android Widget Faces</title>
+<style>
+  :root {
+    --bg: #FAF8F6; --ink: #26211E; --muted: #6E6660; --accent: #C15F3C;
+    --hair: #E7E1DC; --card: #FFFFFF;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171513; --ink: #EDE8E4; --muted: #9B928B; --accent: #E59980;
+      --hair: #2C2825; --card: #201D1B;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: Roboto, system-ui, -apple-system, "Segoe UI", sans-serif;
+    margin: 0; padding: 48px 24px 96px; line-height: 1.5;
+  }
+  .page { max-width: 1180px; margin: 0 auto; }
+  .eyebrow {
+    font-family: ui-monospace, Menlo, monospace; font-size: 11px;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin: 0 0 10px;
+  }
+  h1 { font-size: 30px; font-weight: 700; letter-spacing: -.02em; margin: 0 0 8px; }
+  .lede { color: var(--muted); max-width: 68ch; margin: 0 0 12px; font-size: 14px; }
+  h2 { font-size: 19px; font-weight: 650; margin: 56px 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; max-width: 76ch; margin: 0 0 16px; }
+  code, .spec code {
+    font-family: ui-monospace, Menlo, monospace; font-size: 12px;
+    background: color-mix(in srgb, var(--hair) 55%, transparent);
+    padding: 1px 5px; border-radius: 4px;
+  }
+  ul.spec { color: var(--muted); font-size: 13px; max-width: 80ch; margin: 0 0 18px; padding-left: 20px; }
+  ul.spec li { margin: 3px 0; }
+  ul.spec b { color: var(--ink); font-weight: 600; }
+
+  .board {
+    border-radius: 18px; padding: 26px;
+    display: flex; flex-wrap: wrap; gap: 22px; align-items: flex-start;
+    border: 1px solid var(--hair);
+  }
+  .board + .board { margin-top: 14px; }
+  .board.lt { background: linear-gradient(140deg, #BFCEDF 0%, #D9CDBD 55%, #E6D6C3 100%); }
+  .board.dk { background: linear-gradient(140deg, #202C3A 0%, #33292E 60%, #3A2E30 100%); }
+  .tilewrap { display: flex; flex-direction: column; }
+  .tilecap {
+    font-family: ui-monospace, Menlo, monospace; font-size: 10px;
+    margin-top: 8px; text-align: center; max-width: 152px; align-self: center;
+  }
+  .tilecap.wide { max-width: 330px; }
+  .lt .tilecap { color: rgba(30,30,40,.75); }
+  .dk .tilecap { color: rgba(255,255,255,.62); }
+
+  /* widget face shells — rendered at 1 CSS px = 1 dp */
+  .w {
+    border-radius: 24px; position: relative;
+    box-shadow: 0 12px 32px rgba(0,0,0,.22), 0 1px 0 rgba(255,255,255,.15) inset;
+    display: flex; flex-direction: column; overflow: hidden;
+    font-family: Roboto, system-ui, sans-serif;
+  }
+  .w.small  { width: 152px; height: 152px; align-items: center; justify-content: center; }
+  .w.medium { width: 330px; height: 152px; padding: 12px 14px; justify-content: space-between; }
+  .w.large  { width: 330px; height: 345px; padding: 14px 14px 10px; }
+  .w.lt { background: #FFFFFF; color: #1D1D1F; }
+  .w.dk { background: #242428; color: #F2F2F4; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  .approve {
+    margin-top: 64px; border: 1px dashed var(--accent); border-radius: 14px;
+    padding: 18px 22px; font-size: 14px; max-width: 76ch;
+  }
+</style>
+</head><body><div class="page">
+  <p class="eyebrow">CCooldown · Android · wireframe for approval — not built yet · rev 2 (stale pill now overlays the ring)</p>
+  <h1>Three home-screen widget faces</h1>
+  <p class="lede">
+    Android ports of the Mac desktop widget family (CCRM-18 [Desktop]) with pace marks on every
+    ring (CCM-49 [Desktop]), per <code>ANDROID-WIDGET-HANDOVER.md</code>. These ship as three
+    <b>new</b> widget providers alongside the existing two — picker names <b>Ring</b>,
+    <b>Mini-rings</b>, <b>Pace chart</b>. Faces are drawn at 1&nbsp;px&nbsp;=&nbsp;1&nbsp;dp;
+    every board is shown in the widget's light and dark themes. Fixture numbers are the shared
+    ones from the handover §6 so these tiles can sit next to the Mac renders.
+  </p>
+  <ul class="spec">
+    <li><b>Pace marks, all rings:</b> a neutral tick at the even-pace point (foreground at 48% light / 60% dark,
+        width <code>max(2, 0.31·stroke)</code>, overhanging 0.3·stroke past both edges), plus a <b>full-red</b>
+        segment from tick to fill tip only when <code>percent &gt; elapsed + 3.0</code> — the same dead-zoned
+        comparison the chart wash and pace sentence use. Draw order: track · fill · red segment · tick.
+        No percent or no reset clock → no tick at all.</li>
+    <li><b>Severity ladder</b> (independent of pace): accent ≤80 · yellow &gt;80 · orange &gt;90 · red ≥100. Percent always truncates.</li>
+    <li><b>Reset shown both ways</b> on every face; countdowns are two-unit compact and soften to <b>"soon"</b> inside five minutes.</li>
+    <li><b>Refresh ↻</b> asks the app to poll (180-second floor applies); widgets never touch the network.</li>
+    <li><b>Update cadence:</b> redraw after every poll + a 15-minute redraw-only tick + a one-shot redraw at the
+        reset moment when it's &lt;20 min away. No per-second/minute alarms — "soon" is what makes that honest.</li>
+    <li><b>Mac's <code>needsAppUpdate</code> state is omitted:</b> Glance widgets render in the app process from
+        the same APK, so snapshot-vs-binary skew cannot happen on Android. Recorded in code.</li>
+  </ul>
+
+  <div id="root"><h2>1 · Ring widget — small (2×2)</h2><p class="sub">One profile + one window, chosen in the config activity. The ring is the hero; everything reads inside it. No window title on this face. ↻ overlays the top-right corner.</p><ul class="spec"><li>Cell <b>2×2</b>, min 110×110dp, resizable. Ring stroke <b>8dp</b>; hero percent <b>25sp</b> medium, tabular digits; countdown 12sp secondary; exact clock 10sp tertiary.</li><li>Profile caps-label (8.5sp) shows <b>only when both profiles are signed in</b> — tiles 1 vs 2 below.</li><li>Stale / fetch error keep the full-size ring; one amber pill <b>overlays its bottom edge</b> (rev 2, your call), one line, truncating.</li><li>noData: bare track, em dash, "Waiting for first fetch". notSignedIn: text-only face.</li></ul><div class="board lt"><div class="tilewrap"><div class="w small lt"><div style="position:absolute;top:8px;right:10px;font-size:13px;color:rgba(29,29,31,.42);line-height:1">↻</div><div style="position:relative"><svg width="128" height="128" viewBox="0 0 128 128" style="display:block"><circle cx="64" cy="64" r="57.6" fill="none" stroke="rgba(29,29,31,.10)" stroke-width="8"></circle><path d="M 64.00 6.40 A 57.6 57.6 0 1 1 7.42 74.79" fill="none" stroke="#D97757" stroke-width="8" stroke-linecap="round"></path><path d="M 45.17 118.44 A 57.6 57.6 0 0 1 7.42 74.79" fill="none" stroke="#C62828" stroke-width="8" stroke-linecap="round"></path><line x1="47.26" y1="112.39" x2="43.08" y2="124.48" stroke="rgba(29,29,31,.48)" stroke-width="2.48" stroke-linecap="round"></line></svg>
+      <div style="position:absolute;inset:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+        <div style="font-size:8.5px;letter-spacing:.09em;text-transform:uppercase;color:rgba(29,29,31,.42);margin-bottom:1px">Personal</div>
+        <div class="num" style="font-size:25px;font-weight:500;line-height:1.1">72%</div>
+        <div class="num" style="font-size:12px;color:rgba(29,29,31,.60);margin-top:1px">2h 14m</div>
+        <div class="num" style="font-size:10px;color:rgba(29,29,31,.42)">7:34 PM</div>
+      </div>
+    </div></div><div class="tilecap"><b>72% · session</b> — over pace: red segment tick→tip.<br>Both profiles signed in → label shows</div></div><div class="tilewrap"><div class="w small lt"><div style="position:absolute;top:8px;right:10px;font-size:13px;color:rgba(29,29,31,.42);line-height:1">↻</div><div style="position:relative"><svg width="128" height="128" viewBox="0 0 128 128" style="display:block"><circle cx="64" cy="64" r="57.6" fill="none" stroke="rgba(29,29,31,.10)" stroke-width="8"></circle><path d="M 64.00 6.40 A 57.6 57.6 0 0 1 94.86 112.63" fill="none" stroke="#D97757" stroke-width="8" stroke-linecap="round"></path><line x1="48.79" y1="112.89" x2="44.99" y2="125.11" stroke="rgba(29,29,31,.48)" stroke-width="2.48" stroke-linecap="round"></line></svg>
+      <div style="position:absolute;inset:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+        
+        <div class="num" style="font-size:25px;font-weight:500;line-height:1.1">41%</div>
+        <div class="num" style="font-size:12px;color:rgba(29,29,31,.60);margin-top:1px">3d 4h</div>
+        <div class="num" style="font-size:10px;color:rgba(29,29,31,.42)">Aug 16, 9:00 AM</div>
+      </div>
+    </div></div><div class="tilecap"><b>41% · weekly</b> — under pace: tick only.<br>Single account → no label</div></div><div class="tilewrap"><div class="w small lt"><div style="position:absolute;top:8px;right:10px;font-size:13px;color:rgba(29,29,31,.42);line-height:1">↻</div><div style="position:relative"><svg width="128" height="128" viewBox="0 0 128 128" style="display:block"><circle cx="64" cy="64" r="57.6" fill="none" stroke="rgba(29,29,31,.10)" stroke-width="8"></circle><path d="M 64.00 6.40 A 57.6 57.6 0 1 1 49.68 8.21" fill="none" stroke="#F57C00" stroke-width="8" stroke-linecap="round"></path><path d="M 10.05 43.81 A 57.6 57.6 0 0 1 49.68 8.21" fill="none" stroke="#C62828" stroke-width="8" stroke-linecap="round"></path><line x1="16.05" y1="46.05" x2="4.06" y2="41.57" stroke="rgba(29,29,31,.48)" stroke-width="2.48" stroke-linecap="round"></line></svg>
+      <div style="position:absolute;inset:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+        
+        <div class="num" style="font-size:25px;font-weight:500;line-height:1.1">96%</div>
+        <div class="num" style="font-size:12px;color:rgba(29,29,31,.60);margin-top:1px">58m</div>
+        <div class="num" style="font-size:10px;color:rgba(29,29,31,.42)">7:34 PM</div>
+      </div>
+    </div></div><div class="tilecap"><b>96%</b> — orange ladder, red segment</div></div><div class="tilewrap"><div class="w small lt"><div style="position:absolute;top:8px;right:10px;font-size:13px;color:rgba(29,29,31,.42);line-height:1">↻</div><div style="position:relative"><svg width="128" height="128" viewBox="0 0 128 128" style="display:block"><circle cx="64" cy="64" r="57.6" fill="none" stroke="rgba(29,29,31,.10)" stroke-width="8"></circle><circle cx="64" cy="64" r="57.6" fill="none" stroke="#C62828" stroke-width="8"></circle><path d="M 10.05 43.81 A 57.6 57.6 0 0 1 64.00 6.40" fill="none" stroke="#C62828" stroke-width="8" stroke-linecap="round"></path><line x1="16.05" y1="46.05" x2="4.06" y2="41.57" stroke="rgba(29,29,31,.48)" stroke-width="2.48" stroke-linecap="round"></line></svg>
+      <div style="position:absolute;inset:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+        
+        <div class="num" style="font-size:25px;font-weight:500;line-height:1.1">100%</div>
+        <div class="num" style="font-size:12px;color:rgba(29,29,31,.60);margin-top:1px">soon</div>
+        <div class="num" style="font-size:10px;color:rgba(29,29,31,.42)">7:34 PM</div>
+      </div>
+    </div></div><div class="tilecap"><b>100%</b> — red; segment invisible against fill (fine); countdown softened to "soon"</div></div><div class="tilewrap"><div class="w small lt"><div style="position:absolute;top:8px;right:10px;font-size:13px;color:rgba(29,29,31,.42);line-height:1">↻</div><div style="position:relative"><svg width="128" height="128" viewBox="0 0 128 128" style="display:block"><circle cx="64" cy="64" r="57.6" fill="none" stroke="rgba(29,29,31,.10)" stroke-width="8"></circle><path d="M 64.00 6.40 A 57.6 57.6 0 1 1 7.42 74.79" fill="none" stroke="#D97757" stroke-width="8" stroke-linecap="round"></path><path d="M 45.17 118.44 A 57.6 57.6 0 0 1 7.42 74.79" fill="none" stroke="#C62828" stroke-width="8" stroke-linecap="round"></path><line x1="47.26" y1="112.39" x2="43.08" y2="124.48" stroke="rgba(29,29,31,.48)" stroke-width="2.48" stroke-linecap="round"></line></svg>
+      <div style="position:absolute;inset:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+        
+        <div class="num" style="font-size:25px;font-weight:500;line-height:1.1">72%</div>
+        <div class="num" style="font-size:12px;color:rgba(29,29,31,.60);margin-top:1px">2h 14m</div>
+        <div class="num" style="font-size:10px;color:rgba(29,29,31,.42)">7:34 PM</div>
+      </div>
+    </div><div class="num" style="position:absolute;bottom:9px;left:50%;transform:translateX(-50%);max-width:136px;
+        overflow:hidden;text-overflow:ellipsis;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.18);
+        font-size:9.5px;padding:2.5px 9px;border-radius:99px;background:#FBEED3;color:#8A5A00">⚠ Updated 6h 50m ago</div></div><div class="tilecap"><b>stale</b> — full ring + amber pill over its bottom edge (&gt;6h)</div></div><div class="tilewrap"><div class="w small lt"><div style="position:absolute;top:8px;right:10px;font-size:13px;color:rgba(29,29,31,.42);line-height:1">↻</div><div style="position:relative"><svg width="128" height="128" viewBox="0 0 128 128" style="display:block"><circle cx="64" cy="64" r="57.6" fill="none" stroke="rgba(29,29,31,.10)" stroke-width="8"></circle><path d="M 64.00 6.40 A 57.6 57.6 0 1 1 7.42 74.79" fill="none" stroke="#D97757" stroke-width="8" stroke-linecap="round"></path><path d="M 45.17 118.44 A 57.6 57.6 0 0 1 7.42 74.79" fill="none" stroke="#C62828" stroke-width="8" stroke-linecap="round"></path><line x1="47.26" y1="112.39" x2="43.08" y2="124.48" stroke="rgba(29,29,31,.48)" stroke-width="2.48" stroke-linecap="round"></line></svg>
+      <div style="position:absolute;inset:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+        
+        <div class="num" style="font-size:25px;font-weight:500;line-height:1.1">72%</div>
+        <div class="num" style="font-size:12px;color:rgba(29,29,31,.60);margin-top:1px">2h 14m</div>
+        <div class="num" style="font-size:10px;color:rgba(29,29,31,.42)">7:34 PM</div>
+      </div>
+    </div><div class="num" style="position:absolute;bottom:9px;left:50%;transform:translateX(-50%);max-width:136px;
+        overflow:hidden;text-overflow:ellipsis;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.18);
+        font-size:9.5px;padding:2.5px 9px;border-radius:99px;background:#FBEED3;color:#8A5A00">⚠ Rate limited (429) — backing off</div></div><div class="tilecap"><b>fetchError</b> — last data + the fetch's own message</div></div><div class="tilewrap"><div class="w small lt"><div style="position:absolute;top:8px;right:10px;font-size:13px;color:rgba(29,29,31,.42);line-height:1">↻</div><div style="position:relative"><svg width="120" height="120" viewBox="0 0 120 120" style="display:block"><circle cx="60" cy="60" r="53.6" fill="none" stroke="rgba(29,29,31,.10)" stroke-width="8"></circle></svg>
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+          <div class="num" style="font-size:24px;font-weight:500;color:rgba(29,29,31,.60)">—</div>
+          <div style="font-size:9.5px;color:rgba(29,29,31,.42);margin-top:2px;text-align:center;max-width:80px">Waiting for first fetch</div>
+        </div></div></div><div class="tilecap"><b>noData</b> — bare track, never a fake 0%</div></div><div class="tilewrap"><div class="w small lt"><div style="position:absolute;top:8px;right:10px;font-size:13px;color:rgba(29,29,31,.42);line-height:1">↻</div><div style="text-align:center;padding:0 14px">
+         <div style="font-size:13px;font-weight:600">No account connected</div>
+         <div style="font-size:11px;color:rgba(29,29,31,.60);margin-top:3px">Open CCooldown to sign in</div>
+       </div></div><div class="tilecap"><b>notSignedIn</b> — never silently swaps profile</div></div></div><div class="board dk"><div class="tilewrap"><div class="w small dk"><div style="position:absolute;top:8px;right:10px;font-size:13px;color:rgba(242,242,244,.44);line-height:1">↻</div><div style="position:relative"><svg width="128" height="128" viewBox="0 0 128 128" style="display:block"><circle cx="64" cy="64" r="57.6" fill="none" stroke="rgba(242,242,244,.14)" stroke-width="8"></circle><path d="M 64.00 6.40 A 57.6 57.6 0 1 1 7.42 74.79" fill="none" stroke="#E59980" stroke-width="8" stroke-linecap="round"></path><path d="M 45.17 118.44 A 57.6 57.6 0 0 1 7.42 74.79" fill="none" stroke="#FF5252" stroke-width="8" stroke-linecap="round"></path><line x1="47.26" y1="112.39" x2="43.08" y2="124.48" stroke="rgba(242,242,244,.60)" stroke-width="2.48" stroke-linecap="round"></line></svg>
+      <div style="position:absolute;inset:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+        <div style="font-size:8.5px;letter-spacing:.09em;text-transform:uppercase;color:rgba(242,242,244,.44);margin-bottom:1px">Personal</div>
+        <div class="num" style="font-size:25px;font-weight:500;line-height:1.1">72%</div>
+        <div class="num" style="font-size:12px;color:rgba(242,242,244,.62);margin-top:1px">2h 14m</div>
+        <div class="num" style="font-size:10px;color:rgba(242,242,244,.44)">7:34 PM</div>
+      </div>
+    </div></div><div class="tilecap"><b>72% · session</b> — over pace: red segment tick→tip.<br>Both profiles signed in → label shows</div></div><div class="tilewrap"><div class="w small dk"><div style="position:absolute;top:8px;right:10px;font-size:13px;color:rgba(242,242,244,.44);line-height:1">↻</div><div style="position:relative"><svg width="128" height="128" viewBox="0 0 128 128" style="display:block"><circle cx="64" cy="64" r="57.6" fill="none" stroke="rgba(242,242,244,.14)" stroke-width="8"></circle><path d="M 64.00 6.40 A 57.6 57.6 0 0 1 94.86 112.63" fill="none" stroke="#E59980" stroke-width="8" stroke-linecap="round"></path><line x1="48.79" y1="112.89" x2="44.99" y2="125.11" stroke="rgba(242,242,244,.60)" stroke-width="2.48" stroke-linecap="round"></line></svg>
+      <div style="position:absolute;inset:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+        
+        <div class="num" style="font-size:25px;font-weight:500;line-height:1.1">41%</div>
+        <div class="num" style="font-size:12px;color:rgba(242,242,244,.62);margin-top:1px">3d 4h</div>
+        <div class="num" style="font-size:10px;color:rgba(242,242,244,.44)">Aug 16, 9:00 AM</div>
+      </div>
+    </div></div><div class="tilecap"><b>41% · weekly</b> — under pace: tick only.<br>Single account → no label</div></div><div class="tilewrap"><div class="w small dk"><div style="position:absolute;top:8px;right:10px;font-size:13px;color:rgba(242,242,244,.44);line-height:1">↻</div><div style="position:relative"><svg width="128" height="128" viewBox="0 0 128 128" style="display:block"><circle cx="64" cy="64" r="57.6" fill="none" stroke="rgba(242,242,244,.14)" stroke-width="8"></circle><path d="M 64.00 6.40 A 57.6 57.6 0 1 1 49.68 8.21" fill="none" stroke="#FFA726" stroke-width="8" stroke-linecap="round"></path><path d="M 10.05 43.81 A 57.6 57.6 0 0 1 49.68 8.21" fill="none" stroke="#FF5252" stroke-width="8" stroke-linecap="round"></path><line x1="16.05" y1="46.05" x2="4.06" y2="41.57" stroke="rgba(242,242,244,.60)" stroke-width="2.48" stroke-linecap="round"></line></svg>
+      <div style="position:absolute;inset:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+        
+        <div class="num" style="font-size:25px;font-weight:500;line-height:1.1">96%</div>
+        <div class="num" style="font-size:12px;color:rgba(242,242,244,.62);margin-top:1px">58m</div>
+        <div class="num" style="font-size:10px;color:rgba(242,242,244,.44)">7:34 PM</div>
+      </div>
+    </div></div><div class="tilecap"><b>96%</b> — orange ladder, red segment</div></div><div class="tilewrap"><div class="w small dk"><div style="position:absolute;top:8px;right:10px;font-size:13px;color:rgba(242,242,244,.44);line-height:1">↻</div><div style="position:relative"><svg width="128" height="128" viewBox="0 0 128 128" style="display:block"><circle cx="64" cy="64" r="57.6" fill="none" stroke="rgba(242,242,244,.14)" stroke-width="8"></circle><circle cx="64" cy="64" r="57.6" fill="none" stroke="#FF5252" stroke-width="8"></circle><path d="M 10.05 43.81 A 57.6 57.6 0 0 1 64.00 6.40" fill="none" stroke="#FF5252" stroke-width="8" stroke-linecap="round"></path><line x1="16.05" y1="46.05" x2="4.06" y2="41.57" stroke="rgba(242,242,244,.60)" stroke-width="2.48" stroke-linecap="round"></line></svg>
+      <div style="position:absolute;inset:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+        
+        <div class="num" style="font-size:25px;font-weight:500;line-height:1.1">100%</div>
+        <div class="num" style="font-size:12px;color:rgba(242,242,244,.62);margin-top:1px">soon</div>
+        <div class="num" style="font-size:10px;color:rgba(242,242,244,.44)">7:34 PM</div>
+      </div>
+    </div></div><div class="tilecap"><b>100%</b> — red; segment invisible against fill (fine); countdown softened to "soon"</div></div><div class="tilewrap"><div class="w small dk"><div style="position:absolute;top:8px;right:10px;font-size:13px;color:rgba(242,242,244,.44);line-height:1">↻</div><div style="position:relative"><svg width="128" height="128" viewBox="0 0 128 128" style="display:block"><circle cx="64" cy="64" r="57.6" fill="none" stroke="rgba(242,242,244,.14)" stroke-width="8"></circle><path d="M 64.00 6.40 A 57.6 57.6 0 1 1 7.42 74.79" fill="none" stroke="#E59980" stroke-width="8" stroke-linecap="round"></path><path d="M 45.17 118.44 A 57.6 57.6 0 0 1 7.42 74.79" fill="none" stroke="#FF5252" stroke-width="8" stroke-linecap="round"></path><line x1="47.26" y1="112.39" x2="43.08" y2="124.48" stroke="rgba(242,242,244,.60)" stroke-width="2.48" stroke-linecap="round"></line></svg>
+      <div style="position:absolute;inset:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+        
+        <div class="num" style="font-size:25px;font-weight:500;line-height:1.1">72%</div>
+        <div class="num" style="font-size:12px;color:rgba(242,242,244,.62);margin-top:1px">2h 14m</div>
+        <div class="num" style="font-size:10px;color:rgba(242,242,244,.44)">7:34 PM</div>
+      </div>
+    </div><div class="num" style="position:absolute;bottom:9px;left:50%;transform:translateX(-50%);max-width:136px;
+        overflow:hidden;text-overflow:ellipsis;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.18);
+        font-size:9.5px;padding:2.5px 9px;border-radius:99px;background:#3A342A;color:#FDD663">⚠ Updated 6h 50m ago</div></div><div class="tilecap"><b>stale</b> — full ring + amber pill over its bottom edge (&gt;6h)</div></div><div class="tilewrap"><div class="w small dk"><div style="position:absolute;top:8px;right:10px;font-size:13px;color:rgba(242,242,244,.44);line-height:1">↻</div><div style="position:relative"><svg width="128" height="128" viewBox="0 0 128 128" style="display:block"><circle cx="64" cy="64" r="57.6" fill="none" stroke="rgba(242,242,244,.14)" stroke-width="8"></circle><path d="M 64.00 6.40 A 57.6 57.6 0 1 1 7.42 74.79" fill="none" stroke="#E59980" stroke-width="8" stroke-linecap="round"></path><path d="M 45.17 118.44 A 57.6 57.6 0 0 1 7.42 74.79" fill="none" stroke="#FF5252" stroke-width="8" stroke-linecap="round"></path><line x1="47.26" y1="112.39" x2="43.08" y2="124.48" stroke="rgba(242,242,244,.60)" stroke-width="2.48" stroke-linecap="round"></line></svg>
+      <div style="position:absolute;inset:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+        
+        <div class="num" style="font-size:25px;font-weight:500;line-height:1.1">72%</div>
+        <div class="num" style="font-size:12px;color:rgba(242,242,244,.62);margin-top:1px">2h 14m</div>
+        <div class="num" style="font-size:10px;color:rgba(242,242,244,.44)">7:34 PM</div>
+      </div>
+    </div><div class="num" style="position:absolute;bottom:9px;left:50%;transform:translateX(-50%);max-width:136px;
+        overflow:hidden;text-overflow:ellipsis;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.18);
+        font-size:9.5px;padding:2.5px 9px;border-radius:99px;background:#3A342A;color:#FDD663">⚠ Rate limited (429) — backing off</div></div><div class="tilecap"><b>fetchError</b> — last data + the fetch's own message</div></div><div class="tilewrap"><div class="w small dk"><div style="position:absolute;top:8px;right:10px;font-size:13px;color:rgba(242,242,244,.44);line-height:1">↻</div><div style="position:relative"><svg width="120" height="120" viewBox="0 0 120 120" style="display:block"><circle cx="60" cy="60" r="53.6" fill="none" stroke="rgba(242,242,244,.14)" stroke-width="8"></circle></svg>
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+          <div class="num" style="font-size:24px;font-weight:500;color:rgba(242,242,244,.62)">—</div>
+          <div style="font-size:9.5px;color:rgba(242,242,244,.44);margin-top:2px;text-align:center;max-width:80px">Waiting for first fetch</div>
+        </div></div></div><div class="tilecap"><b>noData</b> — bare track, never a fake 0%</div></div><div class="tilewrap"><div class="w small dk"><div style="position:absolute;top:8px;right:10px;font-size:13px;color:rgba(242,242,244,.44);line-height:1">↻</div><div style="text-align:center;padding:0 14px">
+         <div style="font-size:13px;font-weight:600">No account connected</div>
+         <div style="font-size:11px;color:rgba(242,242,244,.62);margin-top:3px">Open CCooldown to sign in</div>
+       </div></div><div class="tilecap"><b>notSignedIn</b> — never silently swaps profile</div></div></div><h2>2 · Mini-rings widget — medium (4×2)</h2><p class="sub">Every window of one profile, battery-style. Ignores the configured window; binds the configured profile. Payload order session · weekly · model caps, capped at four columns so the two fixed windows always survive. Each ring carries <b>its own</b> pace tick — same glance, different verdicts, which is the whole feature.</p><ul class="spec"><li>Cell <b>4×2</b>, min 250×110dp. Mini-rings <b>58dp</b>, stroke 5.5dp; percent inside 13sp; title 10.5sp; compact countdown 9.5sp. No prose reset line — density is the point.</li><li>Header: profile label · "Updated Xm ago" + ↻. Stale/fetchError turn the updated text into the amber pill.</li><li>Session tick vs the 5h clock; weekly <b>and every model cap</b> tick vs the 7d clock.</li></ul><div class="board lt"><div class="tilewrap"><div class="w medium lt"><div style="display:flex;justify-content:space-between;align-items:center;font-size:10.5px">
+       <span style="letter-spacing:.08em;text-transform:uppercase;color:rgba(29,29,31,.60);font-weight:600">Personal</span>
+       <span style="display:flex;gap:7px;align-items:center"><span class="num" style="color:rgba(29,29,31,.42)">Updated 2m ago</span><span style="font-size:13px;color:rgba(29,29,31,.42)">↻</span></span>
+     </div>
+     <div style="display:flex;gap:6px;align-items:flex-start"><div style="flex:1;display:flex;flex-direction:column;align-items:center;min-width:0">
+      <div style="position:relative"><svg width="58" height="58" viewBox="0 0 58 58" style="display:block"><circle cx="29" cy="29" r="24.6" fill="none" stroke="rgba(29,29,31,.10)" stroke-width="5.5"></circle><path d="M 29.00 4.40 A 24.6 24.6 0 1 1 4.84 33.61" fill="none" stroke="#D97757" stroke-width="5.5" stroke-linecap="round"></path><path d="M 20.96 52.25 A 24.6 24.6 0 0 1 4.84 33.61" fill="none" stroke="#C62828" stroke-width="5.5" stroke-linecap="round"></path><line x1="22.40" y1="48.09" x2="19.52" y2="56.41" stroke="rgba(29,29,31,.48)" stroke-width="2.00" stroke-linecap="round"></line></svg>
+        <div class="num" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500">72%</div></div>
+      <div style="font-size:10.5px;font-weight:600;margin-top:3px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">5h</div>
+      <div class="num" style="font-size:9.5px;color:rgba(29,29,31,.60)">2h 14m</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;min-width:0">
+      <div style="position:relative"><svg width="58" height="58" viewBox="0 0 58 58" style="display:block"><circle cx="29" cy="29" r="24.6" fill="none" stroke="rgba(29,29,31,.10)" stroke-width="5.5"></circle><path d="M 29.00 4.40 A 24.6 24.6 0 0 1 42.18 49.77" fill="none" stroke="#D97757" stroke-width="5.5" stroke-linecap="round"></path><line x1="23.00" y1="48.29" x2="20.39" y2="56.69" stroke="rgba(29,29,31,.48)" stroke-width="2.00" stroke-linecap="round"></line></svg>
+        <div class="num" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500">41%</div></div>
+      <div style="font-size:10.5px;font-weight:600;margin-top:3px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">7d</div>
+      <div class="num" style="font-size:9.5px;color:rgba(29,29,31,.60)">3d 4h</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;min-width:0">
+      <div style="position:relative"><svg width="58" height="58" viewBox="0 0 58 58" style="display:block"><circle cx="29" cy="29" r="24.6" fill="none" stroke="rgba(29,29,31,.10)" stroke-width="5.5"></circle><path d="M 29.00 4.40 A 24.6 24.6 0 1 1 8.23 15.82" fill="none" stroke="#F9A825" stroke-width="5.5" stroke-linecap="round"></path><path d="M 21.69 52.49 A 24.6 24.6 0 0 1 8.23 15.82" fill="none" stroke="#C62828" stroke-width="5.5" stroke-linecap="round"></path><line x1="23.00" y1="48.29" x2="20.39" y2="56.69" stroke="rgba(29,29,31,.48)" stroke-width="2.00" stroke-linecap="round"></line></svg>
+        <div class="num" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500">84%</div></div>
+      <div style="font-size:10.5px;font-weight:600;margin-top:3px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Opus 4.5</div>
+      <div class="num" style="font-size:9.5px;color:rgba(29,29,31,.60)">3d 4h</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;min-width:0">
+      <div style="position:relative"><svg width="58" height="58" viewBox="0 0 58 58" style="display:block"><circle cx="29" cy="29" r="24.6" fill="none" stroke="rgba(29,29,31,.10)" stroke-width="5.5"></circle><path d="M 29.00 4.40 A 24.6 24.6 0 0 1 46.93 45.84" fill="none" stroke="#D97757" stroke-width="5.5" stroke-linecap="round"></path><line x1="23.00" y1="48.29" x2="20.39" y2="56.69" stroke="rgba(29,29,31,.48)" stroke-width="2.00" stroke-linecap="round"></line></svg>
+        <div class="num" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500">37%</div></div>
+      <div style="font-size:10.5px;font-weight:600;margin-top:3px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Sonnet 4.5</div>
+      <div class="num" style="font-size:9.5px;color:rgba(29,29,31,.60)">3d 4h</div></div></div></div><div class="tilecap wide"><b>ok</b> — 72% hot (red segment) beside 41% calm; 84% over-pace on a yellow ring; 4-column cap proven (a 5th cap would drop)</div></div><div class="tilewrap"><div class="w medium lt"><div style="display:flex;justify-content:space-between;align-items:center;font-size:10.5px">
+       <span style="letter-spacing:.08em;text-transform:uppercase;color:rgba(29,29,31,.60);font-weight:600">Work</span>
+       <span style="display:flex;gap:7px;align-items:center"><span class="num" style="color:#8A5A00;background:rgba(249,168,37,.18);padding:1px 7px;border-radius:99px">⚠ Updated 6h 50m ago</span><span style="font-size:13px;color:rgba(29,29,31,.42)">↻</span></span>
+     </div>
+     <div style="display:flex;gap:6px;align-items:flex-start"><div style="flex:1;display:flex;flex-direction:column;align-items:center;min-width:0">
+      <div style="position:relative"><svg width="58" height="58" viewBox="0 0 58 58" style="display:block"><circle cx="29" cy="29" r="24.6" fill="none" stroke="rgba(29,29,31,.10)" stroke-width="5.5"></circle><path d="M 29.00 4.40 A 24.6 24.6 0 1 1 4.84 33.61" fill="none" stroke="#D97757" stroke-width="5.5" stroke-linecap="round"></path><path d="M 20.96 52.25 A 24.6 24.6 0 0 1 4.84 33.61" fill="none" stroke="#C62828" stroke-width="5.5" stroke-linecap="round"></path><line x1="22.40" y1="48.09" x2="19.52" y2="56.41" stroke="rgba(29,29,31,.48)" stroke-width="2.00" stroke-linecap="round"></line></svg>
+        <div class="num" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500">72%</div></div>
+      <div style="font-size:10.5px;font-weight:600;margin-top:3px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">5h</div>
+      <div class="num" style="font-size:9.5px;color:rgba(29,29,31,.60)">2h 14m</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;min-width:0">
+      <div style="position:relative"><svg width="58" height="58" viewBox="0 0 58 58" style="display:block"><circle cx="29" cy="29" r="24.6" fill="none" stroke="rgba(29,29,31,.10)" stroke-width="5.5"></circle><path d="M 29.00 4.40 A 24.6 24.6 0 0 1 42.18 49.77" fill="none" stroke="#D97757" stroke-width="5.5" stroke-linecap="round"></path><line x1="23.00" y1="48.29" x2="20.39" y2="56.69" stroke="rgba(29,29,31,.48)" stroke-width="2.00" stroke-linecap="round"></line></svg>
+        <div class="num" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500">41%</div></div>
+      <div style="font-size:10.5px;font-weight:600;margin-top:3px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">7d</div>
+      <div class="num" style="font-size:9.5px;color:rgba(29,29,31,.60)">3d 4h</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;min-width:0">
+      <div style="position:relative"><svg width="58" height="58" viewBox="0 0 58 58" style="display:block"><circle cx="29" cy="29" r="24.6" fill="none" stroke="rgba(29,29,31,.10)" stroke-width="5.5"></circle></svg>
+        <div class="num" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;color:rgba(29,29,31,.60)">—</div></div>
+      <div style="font-size:10.5px;font-weight:600;margin-top:3px;color:rgba(29,29,31,.60)">Opus 4.5</div>
+      <div style="font-size:9.5px;color:rgba(29,29,31,.42)">no data</div></div></div></div><div class="tilecap wide"><b>stale header</b> + a cap with <b>noData</b> — bare track, em dash, no tick (honesty rule)</div></div><div class="tilewrap"><div class="w medium lt"><div style="position:absolute;top:12px;right:14px;font-size:13px;color:rgba(29,29,31,.42);line-height:1">↻</div><div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center">
+         <div style="font-size:13px;font-weight:600">No account connected</div>
+         <div style="font-size:11px;color:rgba(29,29,31,.60);margin-top:2px">Open CCooldown to sign in</div></div></div><div class="tilecap wide"><b>notSignedIn</b></div></div></div><div class="board dk"><div class="tilewrap"><div class="w medium dk"><div style="display:flex;justify-content:space-between;align-items:center;font-size:10.5px">
+       <span style="letter-spacing:.08em;text-transform:uppercase;color:rgba(242,242,244,.62);font-weight:600">Personal</span>
+       <span style="display:flex;gap:7px;align-items:center"><span class="num" style="color:rgba(242,242,244,.44)">Updated 2m ago</span><span style="font-size:13px;color:rgba(242,242,244,.44)">↻</span></span>
+     </div>
+     <div style="display:flex;gap:6px;align-items:flex-start"><div style="flex:1;display:flex;flex-direction:column;align-items:center;min-width:0">
+      <div style="position:relative"><svg width="58" height="58" viewBox="0 0 58 58" style="display:block"><circle cx="29" cy="29" r="24.6" fill="none" stroke="rgba(242,242,244,.14)" stroke-width="5.5"></circle><path d="M 29.00 4.40 A 24.6 24.6 0 1 1 4.84 33.61" fill="none" stroke="#E59980" stroke-width="5.5" stroke-linecap="round"></path><path d="M 20.96 52.25 A 24.6 24.6 0 0 1 4.84 33.61" fill="none" stroke="#FF5252" stroke-width="5.5" stroke-linecap="round"></path><line x1="22.40" y1="48.09" x2="19.52" y2="56.41" stroke="rgba(242,242,244,.60)" stroke-width="2.00" stroke-linecap="round"></line></svg>
+        <div class="num" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500">72%</div></div>
+      <div style="font-size:10.5px;font-weight:600;margin-top:3px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">5h</div>
+      <div class="num" style="font-size:9.5px;color:rgba(242,242,244,.62)">2h 14m</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;min-width:0">
+      <div style="position:relative"><svg width="58" height="58" viewBox="0 0 58 58" style="display:block"><circle cx="29" cy="29" r="24.6" fill="none" stroke="rgba(242,242,244,.14)" stroke-width="5.5"></circle><path d="M 29.00 4.40 A 24.6 24.6 0 0 1 42.18 49.77" fill="none" stroke="#E59980" stroke-width="5.5" stroke-linecap="round"></path><line x1="23.00" y1="48.29" x2="20.39" y2="56.69" stroke="rgba(242,242,244,.60)" stroke-width="2.00" stroke-linecap="round"></line></svg>
+        <div class="num" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500">41%</div></div>
+      <div style="font-size:10.5px;font-weight:600;margin-top:3px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">7d</div>
+      <div class="num" style="font-size:9.5px;color:rgba(242,242,244,.62)">3d 4h</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;min-width:0">
+      <div style="position:relative"><svg width="58" height="58" viewBox="0 0 58 58" style="display:block"><circle cx="29" cy="29" r="24.6" fill="none" stroke="rgba(242,242,244,.14)" stroke-width="5.5"></circle><path d="M 29.00 4.40 A 24.6 24.6 0 1 1 8.23 15.82" fill="none" stroke="#FDD663" stroke-width="5.5" stroke-linecap="round"></path><path d="M 21.69 52.49 A 24.6 24.6 0 0 1 8.23 15.82" fill="none" stroke="#FF5252" stroke-width="5.5" stroke-linecap="round"></path><line x1="23.00" y1="48.29" x2="20.39" y2="56.69" stroke="rgba(242,242,244,.60)" stroke-width="2.00" stroke-linecap="round"></line></svg>
+        <div class="num" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500">84%</div></div>
+      <div style="font-size:10.5px;font-weight:600;margin-top:3px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Opus 4.5</div>
+      <div class="num" style="font-size:9.5px;color:rgba(242,242,244,.62)">3d 4h</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;min-width:0">
+      <div style="position:relative"><svg width="58" height="58" viewBox="0 0 58 58" style="display:block"><circle cx="29" cy="29" r="24.6" fill="none" stroke="rgba(242,242,244,.14)" stroke-width="5.5"></circle><path d="M 29.00 4.40 A 24.6 24.6 0 0 1 46.93 45.84" fill="none" stroke="#E59980" stroke-width="5.5" stroke-linecap="round"></path><line x1="23.00" y1="48.29" x2="20.39" y2="56.69" stroke="rgba(242,242,244,.60)" stroke-width="2.00" stroke-linecap="round"></line></svg>
+        <div class="num" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500">37%</div></div>
+      <div style="font-size:10.5px;font-weight:600;margin-top:3px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Sonnet 4.5</div>
+      <div class="num" style="font-size:9.5px;color:rgba(242,242,244,.62)">3d 4h</div></div></div></div><div class="tilecap wide"><b>ok</b> — 72% hot (red segment) beside 41% calm; 84% over-pace on a yellow ring; 4-column cap proven (a 5th cap would drop)</div></div><div class="tilewrap"><div class="w medium dk"><div style="display:flex;justify-content:space-between;align-items:center;font-size:10.5px">
+       <span style="letter-spacing:.08em;text-transform:uppercase;color:rgba(242,242,244,.62);font-weight:600">Work</span>
+       <span style="display:flex;gap:7px;align-items:center"><span class="num" style="color:#FDD663;background:rgba(253,214,99,.14);padding:1px 7px;border-radius:99px">⚠ Updated 6h 50m ago</span><span style="font-size:13px;color:rgba(242,242,244,.44)">↻</span></span>
+     </div>
+     <div style="display:flex;gap:6px;align-items:flex-start"><div style="flex:1;display:flex;flex-direction:column;align-items:center;min-width:0">
+      <div style="position:relative"><svg width="58" height="58" viewBox="0 0 58 58" style="display:block"><circle cx="29" cy="29" r="24.6" fill="none" stroke="rgba(242,242,244,.14)" stroke-width="5.5"></circle><path d="M 29.00 4.40 A 24.6 24.6 0 1 1 4.84 33.61" fill="none" stroke="#E59980" stroke-width="5.5" stroke-linecap="round"></path><path d="M 20.96 52.25 A 24.6 24.6 0 0 1 4.84 33.61" fill="none" stroke="#FF5252" stroke-width="5.5" stroke-linecap="round"></path><line x1="22.40" y1="48.09" x2="19.52" y2="56.41" stroke="rgba(242,242,244,.60)" stroke-width="2.00" stroke-linecap="round"></line></svg>
+        <div class="num" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500">72%</div></div>
+      <div style="font-size:10.5px;font-weight:600;margin-top:3px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">5h</div>
+      <div class="num" style="font-size:9.5px;color:rgba(242,242,244,.62)">2h 14m</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;min-width:0">
+      <div style="position:relative"><svg width="58" height="58" viewBox="0 0 58 58" style="display:block"><circle cx="29" cy="29" r="24.6" fill="none" stroke="rgba(242,242,244,.14)" stroke-width="5.5"></circle><path d="M 29.00 4.40 A 24.6 24.6 0 0 1 42.18 49.77" fill="none" stroke="#E59980" stroke-width="5.5" stroke-linecap="round"></path><line x1="23.00" y1="48.29" x2="20.39" y2="56.69" stroke="rgba(242,242,244,.60)" stroke-width="2.00" stroke-linecap="round"></line></svg>
+        <div class="num" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500">41%</div></div>
+      <div style="font-size:10.5px;font-weight:600;margin-top:3px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">7d</div>
+      <div class="num" style="font-size:9.5px;color:rgba(242,242,244,.62)">3d 4h</div></div><div style="flex:1;display:flex;flex-direction:column;align-items:center;min-width:0">
+      <div style="position:relative"><svg width="58" height="58" viewBox="0 0 58 58" style="display:block"><circle cx="29" cy="29" r="24.6" fill="none" stroke="rgba(242,242,244,.14)" stroke-width="5.5"></circle></svg>
+        <div class="num" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;color:rgba(242,242,244,.62)">—</div></div>
+      <div style="font-size:10.5px;font-weight:600;margin-top:3px;color:rgba(242,242,244,.62)">Opus 4.5</div>
+      <div style="font-size:9.5px;color:rgba(242,242,244,.44)">no data</div></div></div></div><div class="tilecap wide"><b>stale header</b> + a cap with <b>noData</b> — bare track, em dash, no tick (honesty rule)</div></div><div class="tilewrap"><div class="w medium dk"><div style="position:absolute;top:12px;right:14px;font-size:13px;color:rgba(242,242,244,.44);line-height:1">↻</div><div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center">
+         <div style="font-size:13px;font-weight:600">No account connected</div>
+         <div style="font-size:11px;color:rgba(242,242,244,.62);margin-top:2px">Open CCooldown to sign in</div></div></div><div class="tilecap wide"><b>notSignedIn</b></div></div></div><h2>3 · Pace widget — large (4×3)</h2><p class="sub">One window, the pace story: the app's CCRM-12/CCRM-20 chart plus a verdict sentence. The 5h/7d toggle works on the face itself, beats the configured window on this face only, and persists (works with the app swiped away).</p><ul class="spec"><li>Cell <b>4×3</b>, min 250×180dp. Percent <b>34sp</b>; countdown + exact reset stacked right; footer "Updated Xm ago" + ↻.</li><li>Chart: x = window lifetime 0→1, y fixed 0–100 (never autoscaled); even-pace diagonal always; guides 80/90/100 in ladder colours; one dot per real sample (polling gaps show); dashed projection with hollow labelled endpoint; "now" hairline; red wash over the above-diagonal region at 7% light / 10% dark, drawn <b>only when at-or-above pace</b> (dead-zoned).</li><li>Pace sentence goes amber when the verdict is above. A refused projection prints why — never a silently missing chart.</li></ul><div class="board lt"><div class="tilewrap"><div class="w large lt"><div style="display:flex;justify-content:space-between;align-items:center">
+       <span style="font-size:12.5px;font-weight:600">5-hour window</span>
+       <span style="display:flex;gap:4px"><span class="num" style="font-size:11px;padding:3px 11px;border-radius:99px;
+       background:rgba(217,119,87,.18);color:#B04E2E;font-weight:600">5h</span><span class="num" style="font-size:11px;padding:3px 11px;border-radius:99px;
+       background:rgba(29,29,31,.06);color:rgba(29,29,31,.60);font-weight:400">7d</span></span>
+     </div>
+     <div style="display:flex;justify-content:space-between;align-items:baseline;margin:4px 0 2px">
+       <span class="num" style="font-size:34px;font-weight:500;line-height:1.05">72%</span>
+       <span style="text-align:right">
+         <div class="num" style="font-size:13.5px;font-weight:500">2h 14m</div>
+         <div class="num" style="font-size:10.5px;color:rgba(29,29,31,.42)">today at 7:34 PM</div>
+       </span>
+     </div>
+     <svg width="302" height="172" viewBox="0 0 302 172" style="display:block"><polygon points="26,158 296,10 26,10" fill="#C62828" opacity="0.07"></polygon><line x1="26" y1="39.599999999999994" x2="296" y2="39.599999999999994" stroke="#F9A825" stroke-width="1" opacity=".55" stroke-dasharray="1.5 3"></line><text x="21" y="42.599999999999994" text-anchor="end" font-size="8.5" fill="#F9A825" style="font-variant-numeric:tabular-nums">80</text><line x1="26" y1="24.799999999999997" x2="296" y2="24.799999999999997" stroke="#F57C00" stroke-width="1" opacity=".55" stroke-dasharray="1.5 3"></line><text x="21" y="27.799999999999997" text-anchor="end" font-size="8.5" fill="#F57C00" style="font-variant-numeric:tabular-nums">90</text><line x1="26" y1="10" x2="296" y2="10" stroke="#C62828" stroke-width="1" opacity=".55" stroke-dasharray="1.5 3"></line><text x="21" y="13" text-anchor="end" font-size="8.5" fill="#C62828" style="font-variant-numeric:tabular-nums">100</text><line x1="26" y1="158" x2="296" y2="10" stroke="rgba(29,29,31,.18)" stroke-width="1.2"></line><line x1="175.31" y1="10" x2="175.31" y2="158" stroke="rgba(29,29,31,.30)" stroke-width="1" stroke-dasharray="2 2.5"></line><text x="178.31" y="17" font-size="8.5" fill="rgba(29,29,31,.42)">now</text><polyline points="31.4,153.6 44.9,146.2 58.4,137.3 71.9,129.9 85.4,122.5 98.9,116.6 139.4,91.4 152.9,81.0 161.0,72.2 167.2,63.3 175.3,51.4" fill="none" stroke="#D97757" stroke-width="1.8" stroke-linejoin="round"></polyline><circle cx="31.4" cy="153.56" r="2.1" fill="#D97757"></circle><circle cx="44.900000000000006" cy="146.16" r="2.1" fill="#D97757"></circle><circle cx="58.4" cy="137.28" r="2.1" fill="#D97757"></circle><circle cx="71.9" cy="129.88" r="2.1" fill="#D97757"></circle><circle cx="85.4" cy="122.48" r="2.1" fill="#D97757"></circle><circle cx="98.9" cy="116.56" r="2.1" fill="#D97757"></circle><circle cx="139.39999999999998" cy="91.4" r="2.1" fill="#D97757"></circle><circle cx="152.89999999999998" cy="81.03999999999999" r="2.1" fill="#D97757"></circle><circle cx="161" cy="72.16" r="2.1" fill="#D97757"></circle><circle cx="167.21" cy="63.28" r="2.1" fill="#D97757"></circle><circle cx="175.31" cy="51.440000000000005" r="2.1" fill="#D97757"></circle><line x1="175.31" y1="51.440000000000005" x2="257.39" y2="10" stroke="#D97757" stroke-width="1.6" stroke-dasharray="4 4"></line><circle cx="257.39" cy="10" r="3" fill="#FFFFFF" stroke="#D97757" stroke-width="1.6"></circle><text x="251.39" y="13" text-anchor="end" font-size="9" font-weight="600" fill="#D97757" style="font-variant-numeric:tabular-nums">100%</text><text x="26" y="169" font-size="8.5" fill="rgba(29,29,31,.42)">2:20 PM</text><text x="296" y="169" text-anchor="end" font-size="8.5" fill="rgba(29,29,31,.42)">resets 7:34 PM</text></svg>
+     <div style="margin-top:6px"><div class="num" style="font-size:11px;padding:6px 10px;border-radius:10px;
+         background:rgba(249,168,37,.18);color:#8A5A00">At this pace: 100% at 6:51 PM — 43m before the reset</div></div>
+     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto;font-size:10.5px;color:rgba(29,29,31,.42)">
+       <span class="num">Updated 2m ago</span>
+       <span style="font-size:13px">↻</span>
+     </div></div><div class="tilecap wide"><b>5h · above pace</b> — wash on, amber sentence, polling gap visible between samples</div></div><div class="tilewrap"><div class="w large lt"><div style="display:flex;justify-content:space-between;align-items:center">
+       <span style="font-size:12.5px;font-weight:600">7-day window</span>
+       <span style="display:flex;gap:4px"><span class="num" style="font-size:11px;padding:3px 11px;border-radius:99px;
+       background:rgba(29,29,31,.06);color:rgba(29,29,31,.60);font-weight:400">5h</span><span class="num" style="font-size:11px;padding:3px 11px;border-radius:99px;
+       background:rgba(217,119,87,.18);color:#B04E2E;font-weight:600">7d</span></span>
+     </div>
+     <div style="display:flex;justify-content:space-between;align-items:baseline;margin:4px 0 2px">
+       <span class="num" style="font-size:34px;font-weight:500;line-height:1.05">41%</span>
+       <span style="text-align:right">
+         <div class="num" style="font-size:13.5px;font-weight:500">3d 4h</div>
+         <div class="num" style="font-size:10.5px;color:rgba(29,29,31,.42)">Aug 16 at 9:00 AM</div>
+       </span>
+     </div>
+     <svg width="302" height="172" viewBox="0 0 302 172" style="display:block"><line x1="26" y1="39.599999999999994" x2="296" y2="39.599999999999994" stroke="#F9A825" stroke-width="1" opacity=".55" stroke-dasharray="1.5 3"></line><text x="21" y="42.599999999999994" text-anchor="end" font-size="8.5" fill="#F9A825" style="font-variant-numeric:tabular-nums">80</text><line x1="26" y1="24.799999999999997" x2="296" y2="24.799999999999997" stroke="#F57C00" stroke-width="1" opacity=".55" stroke-dasharray="1.5 3"></line><text x="21" y="27.799999999999997" text-anchor="end" font-size="8.5" fill="#F57C00" style="font-variant-numeric:tabular-nums">90</text><line x1="26" y1="10" x2="296" y2="10" stroke="#C62828" stroke-width="1" opacity=".55" stroke-dasharray="1.5 3"></line><text x="21" y="13" text-anchor="end" font-size="8.5" fill="#C62828" style="font-variant-numeric:tabular-nums">100</text><line x1="26" y1="158" x2="296" y2="10" stroke="rgba(29,29,31,.18)" stroke-width="1.2"></line><line x1="173.96" y1="10" x2="173.96" y2="158" stroke="rgba(29,29,31,.30)" stroke-width="1" stroke-dasharray="2 2.5"></line><text x="176.96" y="17" font-size="8.5" fill="rgba(29,29,31,.42)">now</text><polyline points="34.1,155.0 53.0,149.1 74.6,141.7 93.5,135.8 115.1,128.4 134.0,121.0 144.8,116.6 166.4,103.2 174.0,97.3" fill="none" stroke="#D97757" stroke-width="1.8" stroke-linejoin="round"></polyline><circle cx="34.1" cy="155.04" r="2.1" fill="#D97757"></circle><circle cx="53" cy="149.12" r="2.1" fill="#D97757"></circle><circle cx="74.6" cy="141.72" r="2.1" fill="#D97757"></circle><circle cx="93.5" cy="135.8" r="2.1" fill="#D97757"></circle><circle cx="115.10000000000001" cy="128.4" r="2.1" fill="#D97757"></circle><circle cx="134" cy="121" r="2.1" fill="#D97757"></circle><circle cx="144.8" cy="116.56" r="2.1" fill="#D97757"></circle><circle cx="166.4" cy="103.24" r="2.1" fill="#D97757"></circle><circle cx="173.96" cy="97.32000000000001" r="2.1" fill="#D97757"></circle><line x1="173.96" y1="97.32000000000001" x2="296" y2="42.559999999999995" stroke="#D97757" stroke-width="1.6" stroke-dasharray="4 4"></line><circle cx="296" cy="42.559999999999995" r="3" fill="#FFFFFF" stroke="#D97757" stroke-width="1.6"></circle><text x="290" y="36.559999999999995" text-anchor="end" font-size="9" font-weight="600" fill="#D97757" style="font-variant-numeric:tabular-nums">~78%</text><text x="26" y="169" font-size="8.5" fill="rgba(29,29,31,.42)">Aug 9, 9:00 AM</text><text x="296" y="169" text-anchor="end" font-size="8.5" fill="rgba(29,29,31,.42)">resets Aug 16, 9:00 AM</text></svg>
+     <div style="margin-top:6px"><div class="num" style="font-size:11px;padding:6px 10px;border-radius:10px;
+         background:rgba(29,29,31,.06);color:rgba(29,29,31,.60)">At this pace: 78% by the reset</div></div>
+     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto;font-size:10.5px;color:rgba(29,29,31,.42)">
+       <span class="num">Updated 2m ago</span>
+       <span style="font-size:13px">↻</span>
+     </div></div><div class="tilecap wide"><b>7d · under pace</b> — toggle flipped to 7d, no wash, hollow ~78% endpoint. Weekly stamps carry the date, never weekday-only</div></div><div class="tilewrap"><div class="w large lt"><div style="display:flex;justify-content:space-between;align-items:center">
+       <span style="font-size:12.5px;font-weight:600">5-hour window</span>
+       <span style="display:flex;gap:4px"><span class="num" style="font-size:11px;padding:3px 11px;border-radius:99px;
+       background:rgba(217,119,87,.18);color:#B04E2E;font-weight:600">5h</span><span class="num" style="font-size:11px;padding:3px 11px;border-radius:99px;
+       background:rgba(29,29,31,.06);color:rgba(29,29,31,.60);font-weight:400">7d</span></span>
+     </div>
+     <div style="display:flex;justify-content:space-between;align-items:baseline;margin:4px 0 2px">
+       <span class="num" style="font-size:34px;font-weight:500;line-height:1.05">3%</span>
+       <span style="text-align:right">
+         <div class="num" style="font-size:13.5px;font-weight:500">4h 51m</div>
+         <div class="num" style="font-size:10.5px;color:rgba(29,29,31,.42)">today at 7:34 PM</div>
+       </span>
+     </div>
+     <svg width="302" height="172" viewBox="0 0 302 172" style="display:block"><line x1="26" y1="39.599999999999994" x2="296" y2="39.599999999999994" stroke="#F9A825" stroke-width="1" opacity=".55" stroke-dasharray="1.5 3"></line><text x="21" y="42.599999999999994" text-anchor="end" font-size="8.5" fill="#F9A825" style="font-variant-numeric:tabular-nums">80</text><line x1="26" y1="24.799999999999997" x2="296" y2="24.799999999999997" stroke="#F57C00" stroke-width="1" opacity=".55" stroke-dasharray="1.5 3"></line><text x="21" y="27.799999999999997" text-anchor="end" font-size="8.5" fill="#F57C00" style="font-variant-numeric:tabular-nums">90</text><line x1="26" y1="10" x2="296" y2="10" stroke="#C62828" stroke-width="1" opacity=".55" stroke-dasharray="1.5 3"></line><text x="21" y="13" text-anchor="end" font-size="8.5" fill="#C62828" style="font-variant-numeric:tabular-nums">100</text><line x1="26" y1="158" x2="296" y2="10" stroke="rgba(29,29,31,.18)" stroke-width="1.2"></line><line x1="34.1" y1="10" x2="34.1" y2="158" stroke="rgba(29,29,31,.30)" stroke-width="1" stroke-dasharray="2 2.5"></line><text x="37.1" y="17" font-size="8.5" fill="rgba(29,29,31,.42)">now</text><polyline points="28.7,155.0 34.1,153.6" fill="none" stroke="#D97757" stroke-width="1.8" stroke-linejoin="round"></polyline><circle cx="28.7" cy="155.04" r="2.1" fill="#D97757"></circle><circle cx="34.1" cy="153.56" r="2.1" fill="#D97757"></circle><text x="26" y="169" font-size="8.5" fill="rgba(29,29,31,.42)">2:34 PM</text><text x="296" y="169" text-anchor="end" font-size="8.5" fill="rgba(29,29,31,.42)">resets 7:34 PM</text></svg>
+     <div style="margin-top:6px"><div style="font-size:11px;color:rgba(29,29,31,.60);padding:6px 10px;border-radius:10px;background:rgba(29,29,31,.06)">Usage hasn't moved enough yet to project a pace</div></div>
+     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto;font-size:10.5px;color:rgba(29,29,31,.42)">
+       <span class="num">Updated 1m ago</span>
+       <span style="font-size:13px">↻</span>
+     </div></div><div class="tilecap wide"><b>refused projection</b> — the chart says why (min 20 min span &amp; ≥1 point moved)</div></div><div class="tilewrap"><div class="w large lt"><div style="display:flex;justify-content:space-between;align-items:center">
+       <span style="font-size:12.5px;font-weight:600">5-hour window</span>
+       <span style="display:flex;gap:4px"><span class="num" style="font-size:11px;padding:3px 11px;border-radius:99px;
+       background:rgba(217,119,87,.18);color:#B04E2E;font-weight:600">5h</span><span class="num" style="font-size:11px;padding:3px 11px;border-radius:99px;
+       background:rgba(29,29,31,.06);color:rgba(29,29,31,.60);font-weight:400">7d</span></span>
+     </div>
+     <div style="display:flex;justify-content:space-between;align-items:baseline;margin:4px 0 2px">
+       <span class="num" style="font-size:34px;font-weight:500;line-height:1.05">—</span>
+       <span style="text-align:right">
+         <div class="num" style="font-size:13.5px;font-weight:500">—</div>
+         <div class="num" style="font-size:10.5px;color:rgba(29,29,31,.42)"></div>
+       </span>
+     </div>
+     <svg width="302" height="172" viewBox="0 0 302 172" style="display:block"><line x1="26" y1="39.599999999999994" x2="296" y2="39.599999999999994" stroke="#F9A825" stroke-width="1" opacity=".55" stroke-dasharray="1.5 3"></line><text x="21" y="42.599999999999994" text-anchor="end" font-size="8.5" fill="#F9A825" style="font-variant-numeric:tabular-nums">80</text><line x1="26" y1="24.799999999999997" x2="296" y2="24.799999999999997" stroke="#F57C00" stroke-width="1" opacity=".55" stroke-dasharray="1.5 3"></line><text x="21" y="27.799999999999997" text-anchor="end" font-size="8.5" fill="#F57C00" style="font-variant-numeric:tabular-nums">90</text><line x1="26" y1="10" x2="296" y2="10" stroke="#C62828" stroke-width="1" opacity=".55" stroke-dasharray="1.5 3"></line><text x="21" y="13" text-anchor="end" font-size="8.5" fill="#C62828" style="font-variant-numeric:tabular-nums">100</text><line x1="26" y1="158" x2="296" y2="10" stroke="rgba(29,29,31,.18)" stroke-width="1.2"></line><text x="164" y="84" text-anchor="middle" font-size="11" fill="rgba(29,29,31,.60)">No data yet</text>
+          <text x="164" y="97" text-anchor="middle" font-size="9.5" fill="rgba(29,29,31,.42)">Waiting for first fetch</text><text x="26" y="169" font-size="8.5" fill="rgba(29,29,31,.42)"></text><text x="296" y="169" text-anchor="end" font-size="8.5" fill="rgba(29,29,31,.42)"></text></svg>
+     <div style="margin-top:6px"><div style="font-size:11px;color:rgba(29,29,31,.60);padding:6px 10px;border-radius:10px;background:rgba(29,29,31,.06)">Waiting for first fetch</div></div>
+     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto;font-size:10.5px;color:rgba(29,29,31,.42)">
+       <span class="num">Updated —</span>
+       <span style="font-size:13px">↻</span>
+     </div></div><div class="tilecap wide"><b>noData</b> — em dash, empty plot with its own message</div></div></div><div class="board dk"><div class="tilewrap"><div class="w large dk"><div style="display:flex;justify-content:space-between;align-items:center">
+       <span style="font-size:12.5px;font-weight:600">5-hour window</span>
+       <span style="display:flex;gap:4px"><span class="num" style="font-size:11px;padding:3px 11px;border-radius:99px;
+       background:rgba(229,153,128,.22);color:#E59980;font-weight:600">5h</span><span class="num" style="font-size:11px;padding:3px 11px;border-radius:99px;
+       background:rgba(242,242,244,.08);color:rgba(242,242,244,.62);font-weight:400">7d</span></span>
+     </div>
+     <div style="display:flex;justify-content:space-between;align-items:baseline;margin:4px 0 2px">
+       <span class="num" style="font-size:34px;font-weight:500;line-height:1.05">72%</span>
+       <span style="text-align:right">
+         <div class="num" style="font-size:13.5px;font-weight:500">2h 14m</div>
+         <div class="num" style="font-size:10.5px;color:rgba(242,242,244,.44)">today at 7:34 PM</div>
+       </span>
+     </div>
+     <svg width="302" height="172" viewBox="0 0 302 172" style="display:block"><polygon points="26,158 296,10 26,10" fill="#FF5252" opacity="0.1"></polygon><line x1="26" y1="39.599999999999994" x2="296" y2="39.599999999999994" stroke="#FDD663" stroke-width="1" opacity=".55" stroke-dasharray="1.5 3"></line><text x="21" y="42.599999999999994" text-anchor="end" font-size="8.5" fill="#FDD663" style="font-variant-numeric:tabular-nums">80</text><line x1="26" y1="24.799999999999997" x2="296" y2="24.799999999999997" stroke="#FFA726" stroke-width="1" opacity=".55" stroke-dasharray="1.5 3"></line><text x="21" y="27.799999999999997" text-anchor="end" font-size="8.5" fill="#FFA726" style="font-variant-numeric:tabular-nums">90</text><line x1="26" y1="10" x2="296" y2="10" stroke="#FF5252" stroke-width="1" opacity=".55" stroke-dasharray="1.5 3"></line><text x="21" y="13" text-anchor="end" font-size="8.5" fill="#FF5252" style="font-variant-numeric:tabular-nums">100</text><line x1="26" y1="158" x2="296" y2="10" stroke="rgba(242,242,244,.20)" stroke-width="1.2"></line><line x1="175.31" y1="10" x2="175.31" y2="158" stroke="rgba(242,242,244,.32)" stroke-width="1" stroke-dasharray="2 2.5"></line><text x="178.31" y="17" font-size="8.5" fill="rgba(242,242,244,.44)">now</text><polyline points="31.4,153.6 44.9,146.2 58.4,137.3 71.9,129.9 85.4,122.5 98.9,116.6 139.4,91.4 152.9,81.0 161.0,72.2 167.2,63.3 175.3,51.4" fill="none" stroke="#E59980" stroke-width="1.8" stroke-linejoin="round"></polyline><circle cx="31.4" cy="153.56" r="2.1" fill="#E59980"></circle><circle cx="44.900000000000006" cy="146.16" r="2.1" fill="#E59980"></circle><circle cx="58.4" cy="137.28" r="2.1" fill="#E59980"></circle><circle cx="71.9" cy="129.88" r="2.1" fill="#E59980"></circle><circle cx="85.4" cy="122.48" r="2.1" fill="#E59980"></circle><circle cx="98.9" cy="116.56" r="2.1" fill="#E59980"></circle><circle cx="139.39999999999998" cy="91.4" r="2.1" fill="#E59980"></circle><circle cx="152.89999999999998" cy="81.03999999999999" r="2.1" fill="#E59980"></circle><circle cx="161" cy="72.16" r="2.1" fill="#E59980"></circle><circle cx="167.21" cy="63.28" r="2.1" fill="#E59980"></circle><circle cx="175.31" cy="51.440000000000005" r="2.1" fill="#E59980"></circle><line x1="175.31" y1="51.440000000000005" x2="257.39" y2="10" stroke="#E59980" stroke-width="1.6" stroke-dasharray="4 4"></line><circle cx="257.39" cy="10" r="3" fill="#242428" stroke="#E59980" stroke-width="1.6"></circle><text x="251.39" y="13" text-anchor="end" font-size="9" font-weight="600" fill="#E59980" style="font-variant-numeric:tabular-nums">100%</text><text x="26" y="169" font-size="8.5" fill="rgba(242,242,244,.44)">2:20 PM</text><text x="296" y="169" text-anchor="end" font-size="8.5" fill="rgba(242,242,244,.44)">resets 7:34 PM</text></svg>
+     <div style="margin-top:6px"><div class="num" style="font-size:11px;padding:6px 10px;border-radius:10px;
+         background:rgba(253,214,99,.14);color:#FDD663">At this pace: 100% at 6:51 PM — 43m before the reset</div></div>
+     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto;font-size:10.5px;color:rgba(242,242,244,.44)">
+       <span class="num">Updated 2m ago</span>
+       <span style="font-size:13px">↻</span>
+     </div></div><div class="tilecap wide"><b>5h · above pace</b> — wash on, amber sentence, polling gap visible between samples</div></div><div class="tilewrap"><div class="w large dk"><div style="display:flex;justify-content:space-between;align-items:center">
+       <span style="font-size:12.5px;font-weight:600">7-day window</span>
+       <span style="display:flex;gap:4px"><span class="num" style="font-size:11px;padding:3px 11px;border-radius:99px;
+       background:rgba(242,242,244,.08);color:rgba(242,242,244,.62);font-weight:400">5h</span><span class="num" style="font-size:11px;padding:3px 11px;border-radius:99px;
+       background:rgba(229,153,128,.22);color:#E59980;font-weight:600">7d</span></span>
+     </div>
+     <div style="display:flex;justify-content:space-between;align-items:baseline;margin:4px 0 2px">
+       <span class="num" style="font-size:34px;font-weight:500;line-height:1.05">41%</span>
+       <span style="text-align:right">
+         <div class="num" style="font-size:13.5px;font-weight:500">3d 4h</div>
+         <div class="num" style="font-size:10.5px;color:rgba(242,242,244,.44)">Aug 16 at 9:00 AM</div>
+       </span>
+     </div>
+     <svg width="302" height="172" viewBox="0 0 302 172" style="display:block"><line x1="26" y1="39.599999999999994" x2="296" y2="39.599999999999994" stroke="#FDD663" stroke-width="1" opacity=".55" stroke-dasharray="1.5 3"></line><text x="21" y="42.599999999999994" text-anchor="end" font-size="8.5" fill="#FDD663" style="font-variant-numeric:tabular-nums">80</text><line x1="26" y1="24.799999999999997" x2="296" y2="24.799999999999997" stroke="#FFA726" stroke-width="1" opacity=".55" stroke-dasharray="1.5 3"></line><text x="21" y="27.799999999999997" text-anchor="end" font-size="8.5" fill="#FFA726" style="font-variant-numeric:tabular-nums">90</text><line x1="26" y1="10" x2="296" y2="10" stroke="#FF5252" stroke-width="1" opacity=".55" stroke-dasharray="1.5 3"></line><text x="21" y="13" text-anchor="end" font-size="8.5" fill="#FF5252" style="font-variant-numeric:tabular-nums">100</text><line x1="26" y1="158" x2="296" y2="10" stroke="rgba(242,242,244,.20)" stroke-width="1.2"></line><line x1="173.96" y1="10" x2="173.96" y2="158" stroke="rgba(242,242,244,.32)" stroke-width="1" stroke-dasharray="2 2.5"></line><text x="176.96" y="17" font-size="8.5" fill="rgba(242,242,244,.44)">now</text><polyline points="34.1,155.0 53.0,149.1 74.6,141.7 93.5,135.8 115.1,128.4 134.0,121.0 144.8,116.6 166.4,103.2 174.0,97.3" fill="none" stroke="#E59980" stroke-width="1.8" stroke-linejoin="round"></polyline><circle cx="34.1" cy="155.04" r="2.1" fill="#E59980"></circle><circle cx="53" cy="149.12" r="2.1" fill="#E59980"></circle><circle cx="74.6" cy="141.72" r="2.1" fill="#E59980"></circle><circle cx="93.5" cy="135.8" r="2.1" fill="#E59980"></circle><circle cx="115.10000000000001" cy="128.4" r="2.1" fill="#E59980"></circle><circle cx="134" cy="121" r="2.1" fill="#E59980"></circle><circle cx="144.8" cy="116.56" r="2.1" fill="#E59980"></circle><circle cx="166.4" cy="103.24" r="2.1" fill="#E59980"></circle><circle cx="173.96" cy="97.32000000000001" r="2.1" fill="#E59980"></circle><line x1="173.96" y1="97.32000000000001" x2="296" y2="42.559999999999995" stroke="#E59980" stroke-width="1.6" stroke-dasharray="4 4"></line><circle cx="296" cy="42.559999999999995" r="3" fill="#242428" stroke="#E59980" stroke-width="1.6"></circle><text x="290" y="36.559999999999995" text-anchor="end" font-size="9" font-weight="600" fill="#E59980" style="font-variant-numeric:tabular-nums">~78%</text><text x="26" y="169" font-size="8.5" fill="rgba(242,242,244,.44)">Aug 9, 9:00 AM</text><text x="296" y="169" text-anchor="end" font-size="8.5" fill="rgba(242,242,244,.44)">resets Aug 16, 9:00 AM</text></svg>
+     <div style="margin-top:6px"><div class="num" style="font-size:11px;padding:6px 10px;border-radius:10px;
+         background:rgba(242,242,244,.08);color:rgba(242,242,244,.62)">At this pace: 78% by the reset</div></div>
+     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto;font-size:10.5px;color:rgba(242,242,244,.44)">
+       <span class="num">Updated 2m ago</span>
+       <span style="font-size:13px">↻</span>
+     </div></div><div class="tilecap wide"><b>7d · under pace</b> — toggle flipped to 7d, no wash, hollow ~78% endpoint. Weekly stamps carry the date, never weekday-only</div></div><div class="tilewrap"><div class="w large dk"><div style="display:flex;justify-content:space-between;align-items:center">
+       <span style="font-size:12.5px;font-weight:600">5-hour window</span>
+       <span style="display:flex;gap:4px"><span class="num" style="font-size:11px;padding:3px 11px;border-radius:99px;
+       background:rgba(229,153,128,.22);color:#E59980;font-weight:600">5h</span><span class="num" style="font-size:11px;padding:3px 11px;border-radius:99px;
+       background:rgba(242,242,244,.08);color:rgba(242,242,244,.62);font-weight:400">7d</span></span>
+     </div>
+     <div style="display:flex;justify-content:space-between;align-items:baseline;margin:4px 0 2px">
+       <span class="num" style="font-size:34px;font-weight:500;line-height:1.05">3%</span>
+       <span style="text-align:right">
+         <div class="num" style="font-size:13.5px;font-weight:500">4h 51m</div>
+         <div class="num" style="font-size:10.5px;color:rgba(242,242,244,.44)">today at 7:34 PM</div>
+       </span>
+     </div>
+     <svg width="302" height="172" viewBox="0 0 302 172" style="display:block"><line x1="26" y1="39.599999999999994" x2="296" y2="39.599999999999994" stroke="#FDD663" stroke-width="1" opacity=".55" stroke-dasharray="1.5 3"></line><text x="21" y="42.599999999999994" text-anchor="end" font-size="8.5" fill="#FDD663" style="font-variant-numeric:tabular-nums">80</text><line x1="26" y1="24.799999999999997" x2="296" y2="24.799999999999997" stroke="#FFA726" stroke-width="1" opacity=".55" stroke-dasharray="1.5 3"></line><text x="21" y="27.799999999999997" text-anchor="end" font-size="8.5" fill="#FFA726" style="font-variant-numeric:tabular-nums">90</text><line x1="26" y1="10" x2="296" y2="10" stroke="#FF5252" stroke-width="1" opacity=".55" stroke-dasharray="1.5 3"></line><text x="21" y="13" text-anchor="end" font-size="8.5" fill="#FF5252" style="font-variant-numeric:tabular-nums">100</text><line x1="26" y1="158" x2="296" y2="10" stroke="rgba(242,242,244,.20)" stroke-width="1.2"></line><line x1="34.1" y1="10" x2="34.1" y2="158" stroke="rgba(242,242,244,.32)" stroke-width="1" stroke-dasharray="2 2.5"></line><text x="37.1" y="17" font-size="8.5" fill="rgba(242,242,244,.44)">now</text><polyline points="28.7,155.0 34.1,153.6" fill="none" stroke="#E59980" stroke-width="1.8" stroke-linejoin="round"></polyline><circle cx="28.7" cy="155.04" r="2.1" fill="#E59980"></circle><circle cx="34.1" cy="153.56" r="2.1" fill="#E59980"></circle><text x="26" y="169" font-size="8.5" fill="rgba(242,242,244,.44)">2:34 PM</text><text x="296" y="169" text-anchor="end" font-size="8.5" fill="rgba(242,242,244,.44)">resets 7:34 PM</text></svg>
+     <div style="margin-top:6px"><div style="font-size:11px;color:rgba(242,242,244,.62);padding:6px 10px;border-radius:10px;background:rgba(242,242,244,.08)">Usage hasn't moved enough yet to project a pace</div></div>
+     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto;font-size:10.5px;color:rgba(242,242,244,.44)">
+       <span class="num">Updated 1m ago</span>
+       <span style="font-size:13px">↻</span>
+     </div></div><div class="tilecap wide"><b>refused projection</b> — the chart says why (min 20 min span &amp; ≥1 point moved)</div></div><div class="tilewrap"><div class="w large dk"><div style="display:flex;justify-content:space-between;align-items:center">
+       <span style="font-size:12.5px;font-weight:600">5-hour window</span>
+       <span style="display:flex;gap:4px"><span class="num" style="font-size:11px;padding:3px 11px;border-radius:99px;
+       background:rgba(229,153,128,.22);color:#E59980;font-weight:600">5h</span><span class="num" style="font-size:11px;padding:3px 11px;border-radius:99px;
+       background:rgba(242,242,244,.08);color:rgba(242,242,244,.62);font-weight:400">7d</span></span>
+     </div>
+     <div style="display:flex;justify-content:space-between;align-items:baseline;margin:4px 0 2px">
+       <span class="num" style="font-size:34px;font-weight:500;line-height:1.05">—</span>
+       <span style="text-align:right">
+         <div class="num" style="font-size:13.5px;font-weight:500">—</div>
+         <div class="num" style="font-size:10.5px;color:rgba(242,242,244,.44)"></div>
+       </span>
+     </div>
+     <svg width="302" height="172" viewBox="0 0 302 172" style="display:block"><line x1="26" y1="39.599999999999994" x2="296" y2="39.599999999999994" stroke="#FDD663" stroke-width="1" opacity=".55" stroke-dasharray="1.5 3"></line><text x="21" y="42.599999999999994" text-anchor="end" font-size="8.5" fill="#FDD663" style="font-variant-numeric:tabular-nums">80</text><line x1="26" y1="24.799999999999997" x2="296" y2="24.799999999999997" stroke="#FFA726" stroke-width="1" opacity=".55" stroke-dasharray="1.5 3"></line><text x="21" y="27.799999999999997" text-anchor="end" font-size="8.5" fill="#FFA726" style="font-variant-numeric:tabular-nums">90</text><line x1="26" y1="10" x2="296" y2="10" stroke="#FF5252" stroke-width="1" opacity=".55" stroke-dasharray="1.5 3"></line><text x="21" y="13" text-anchor="end" font-size="8.5" fill="#FF5252" style="font-variant-numeric:tabular-nums">100</text><line x1="26" y1="158" x2="296" y2="10" stroke="rgba(242,242,244,.20)" stroke-width="1.2"></line><text x="164" y="84" text-anchor="middle" font-size="11" fill="rgba(242,242,244,.62)">No data yet</text>
+          <text x="164" y="97" text-anchor="middle" font-size="9.5" fill="rgba(242,242,244,.44)">Waiting for first fetch</text><text x="26" y="169" font-size="8.5" fill="rgba(242,242,244,.44)"></text><text x="296" y="169" text-anchor="end" font-size="8.5" fill="rgba(242,242,244,.44)"></text></svg>
+     <div style="margin-top:6px"><div style="font-size:11px;color:rgba(242,242,244,.62);padding:6px 10px;border-radius:10px;background:rgba(242,242,244,.08)">Waiting for first fetch</div></div>
+     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto;font-size:10.5px;color:rgba(242,242,244,.44)">
+       <span class="num">Updated —</span>
+       <span style="font-size:13px">↻</span>
+     </div></div><div class="tilecap wide"><b>noData</b> — em dash, empty plot with its own message</div></div></div></div>
+
+  <div class="approve">
+    <b>To approve:</b> reply with an explicit go-ahead (per CLAUDE.md rule 2, silence isn't approval).
+    If anything should change, say what — I'll revise this file and ask again before writing any code.
+    Sibling file <code>icon-preview.html</code> covers the new app icon; <code>pace-marks-wireframe.html</code>
+    is the imported Mac design record for the ring marks.
+  </div>
+</div>
+
+
+</body></html>

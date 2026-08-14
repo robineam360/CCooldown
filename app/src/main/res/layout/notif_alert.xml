@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    CCBG-12 (Status Icon Swap): collapsed view for alert notifications.
+
+    Alerts used to go through plain setContentTitle/setContentText, which renders at
+    the platform's 14sp for both lines. The pinned notification's "big" style draws its
+    own view at 13sp title / 12sp sub, so an alert sitting next to it in the shade was
+    visibly larger — two type scales from one app. These sizes are copied from
+    notif_big_number.xml deliberately; change them together or not at all.
+
+    Used only while the pinned notification is on AND set to the "big" style. Under the
+    other styles the pinned notification uses the platform's own sizes, so alerts do too
+    and this layout is not inflated.
+
+    Text colours come from the platform's notification appearances, never from
+    ?android:attr/textColorPrimary — that resolves against Theme.ClaudeUsage rather than
+    the shade, which produces dark text on a dark shade.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingTop="2dp"
+    android:paddingBottom="2dp">
+
+    <TextView
+        android:id="@+id/title"
+        style="@android:style/TextAppearance.Material.Notification.Title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="13sp"
+        android:maxLines="1"
+        android:ellipsize="end" />
+
+    <TextView
+        android:id="@+id/sub"
+        style="@android:style/TextAppearance.Material.Notification.Info"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="3dp"
+        android:textSize="12sp"
+        android:maxLines="1"
+        android:ellipsize="end" />
+</LinearLayout>

@@ -1,0 +1,633 @@
+<title>Widget Pace Marks</title>
+<style>
+  :root {
+    --bg: #FAF8F6;
+    --ink: #26211E;
+    --muted: #6E6660;
+    --accent: #C15F3C;
+    --hair: #E7E1DC;
+    --card: #FFFFFF;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171513;
+      --ink: #EDE8E4;
+      --muted: #9B928B;
+      --accent: #E59980;
+      --hair: #2C2825;
+      --card: #201D1B;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171513;
+    --ink: #EDE8E4;
+    --muted: #9B928B;
+    --accent: #E59980;
+    --hair: #2C2825;
+    --card: #201D1B;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    margin: 0;
+    padding: 48px 24px 96px;
+    line-height: 1.5;
+  }
+  .page { max-width: 1120px; margin: 0 auto; }
+
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 10px;
+  }
+  h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 8px; text-wrap: balance; }
+  .lede { color: var(--muted); max-width: 62ch; margin: 0 0 12px; font-size: 14px; }
+  h2 { font-size: 19px; font-weight: 650; letter-spacing: -0.01em; margin: 56px 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; max-width: 70ch; margin: 0 0 16px; }
+  .sub code, .lede code, ul.dec code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12px;
+    background: color-mix(in srgb, var(--hair) 55%, transparent);
+    padding: 1px 5px; border-radius: 4px;
+  }
+
+  /* ---- desktop boards ---- */
+  .board {
+    border-radius: 18px;
+    padding: 26px;
+    display: flex; flex-wrap: wrap; gap: 22px; align-items: flex-start;
+    border: 1px solid var(--hair);
+  }
+  .board + .board { margin-top: 14px; }
+  .board.lt { background: linear-gradient(140deg, #BFCEDF 0%, #D9CDBD 55%, #E6D6C3 100%); }
+  .board.dk { background: linear-gradient(140deg, #202C3A 0%, #33292E 60%, #3A2E30 100%); }
+  .tilewrap { display: flex; flex-direction: column; }
+  .tilecap {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 10px; margin-top: 8px; text-align: center; max-width: 170px;
+  }
+  .tilecap.wide { max-width: 364px; }
+  .lt .tilecap { color: rgba(30,30,40,.75); }
+  .dk .tilecap { color: rgba(255,255,255,.62); }
+
+  /* ---- widget faces (as built in CCRM-18, not the old pre-build mock) ---- */
+  .w {
+    border-radius: 24px;
+    box-shadow: 0 12px 32px rgba(0,0,0,.22), 0 1px 0 rgba(255,255,255,.15) inset;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .w.small  { width: 170px; height: 170px; padding: 10px; align-items: center; justify-content: center; }
+  .w.medium { width: 364px; height: 170px; padding: 12px 16px; justify-content: space-between; }
+  .w.lt { background: #FFFFFF; color: #1D1D1F; }
+  .w.dk { background: #242428; color: #F5F5F7; }
+  .w.lt .sec { color: rgba(0,0,0,.52); }
+  .w.dk .sec { color: rgba(255,255,255,.58); }
+  .w.lt .ter { color: rgba(0,0,0,.30); }
+  .w.dk .ter { color: rgba(255,255,255,.32); }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* small: hero ring, everything inside it */
+  .hero { position: relative; width: 136px; height: 136px; }
+  .hero svg { display: block; width: 136px; height: 136px; }
+  .heroin {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 1px; text-align: center;
+  }
+  .hprofile { font-size: 9px; font-weight: 600; letter-spacing: .03em; }
+  .hpct { font-size: 25px; font-weight: 500; letter-spacing: -0.01em; line-height: 1.15; }
+  .hpct.dash { font-weight: 400; }
+  .hcd { font-size: 11px; font-weight: 500; }
+  .hclock { font-size: 9.5px; }
+
+  /* medium: header + mini-ring columns */
+  .mhead { display: flex; align-items: baseline; justify-content: space-between; }
+  .mprofile { font-size: 11px; font-weight: 600; }
+  .mupdated { font-size: 10px; }
+  .mrings { display: flex; align-items: flex-start; }
+  .mcol { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .mring { position: relative; width: 62px; height: 62px; }
+  .mring svg { display: block; width: 62px; height: 62px; }
+  .mpct {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 500;
+  }
+  .mtitle { font-size: 11px; font-weight: 500; }
+  .mcd { font-size: 9.5px; }
+
+  /* decisions list */
+  ul.dec { margin: 10px 0 0; padding-left: 20px; font-size: 13.5px; max-width: 78ch; }
+  ul.dec li { margin-bottom: 7px; }
+  ul.dec b { font-weight: 600; }
+
+  .verdict {
+    margin-top: 18px; padding: 14px 18px; border-radius: 12px;
+    background: var(--card); border: 1px solid var(--hair);
+    font-size: 13.5px; max-width: 78ch;
+  }
+  .verdict b { font-weight: 650; }
+</style>
+
+<div class="page">
+  <p class="eyebrow">CCM-49 [Desktop] · decided &amp; built 2026-08-13 — tick (A) with the full-red segment (A2)</p>
+  <h1>Pace Marks on the Widget Rings</h1>
+  <p class="lede">Every circular gauge gains a mark at the <em>even-pace</em> point — where the fill tip would sit if usage were spread evenly across the window. Read it like a watch bezel: fill tip past the mark (clockwise) means above pace, short of it means headroom. The mark's position is <code>Fmt.elapsedPercent</code> — the same number the pace sentence and chart use — so the ring and the prose can never disagree. All faces below show a 5-hour window that is 55% elapsed.</p>
+
+  <!-- ================= THE THREE CANDIDATES ================= -->
+  <h2>The three candidates, same data side by side</h2>
+  <p class="sub">All three: 78% used, 55% elapsed — clearly above pace. Note 78% is still accent-coloured (the <code>BarColor</code> breakpoints answer "how much is left", not "how fast") — that independence is exactly why the ring needs a pace mark at all.</p>
+
+  <div class="board lt">
+    <div class="tilewrap">
+      <div class="w small lt">
+        <div class="hero">
+          <svg viewBox="0 0 128 128">
+            <circle cx="64" cy="64" r="56" fill="none" stroke="rgba(0,0,0,.10)" stroke-width="8"/>
+            <circle cx="64" cy="64" r="56" fill="none" stroke="#D97757" stroke-width="8" stroke-linecap="round" stroke-dasharray="274.45 351.86" transform="rotate(-90 64 64)"/>
+            <line x1="64" y1="2" x2="64" y2="14" stroke="rgba(0,0,0,.48)" stroke-width="2.5" stroke-linecap="round" transform="rotate(198 64 64)"/>
+          </svg>
+          <div class="heroin">
+            <span class="hprofile ter">WORK</span>
+            <span class="hpct num">78%</span>
+            <span class="hcd sec num">2h 15m</span>
+            <span class="hclock ter num">today at 7:34 PM</span>
+          </div>
+        </div>
+      </div>
+      <div class="tilecap">A · tick — a notch crossing the track, drawn above the fill</div>
+    </div>
+    <div class="tilewrap">
+      <div class="w small lt">
+        <div class="hero">
+          <svg viewBox="0 0 128 128">
+            <circle cx="64" cy="64" r="56" fill="none" stroke="rgba(0,0,0,.10)" stroke-width="8"/>
+            <circle cx="64" cy="64" r="56" fill="none" stroke="#D97757" stroke-width="8" stroke-linecap="round" stroke-dasharray="274.45 351.86" transform="rotate(-90 64 64)"/>
+            <circle cx="46.7" cy="117.26" r="4.5" fill="rgba(0,0,0,.48)" stroke="#FFFFFF" stroke-width="2"/>
+          </svg>
+          <div class="heroin">
+            <span class="hprofile ter">WORK</span>
+            <span class="hpct num">78%</span>
+            <span class="hcd sec num">2h 15m</span>
+            <span class="hclock ter num">today at 7:34 PM</span>
+          </div>
+        </div>
+      </div>
+      <div class="tilecap">B · dot riding the track — but the fill's round cap is already a dot shape</div>
+    </div>
+    <div class="tilewrap">
+      <div class="w small lt">
+        <div class="hero">
+          <svg viewBox="0 0 128 128">
+            <circle cx="64" cy="64" r="56" fill="none" stroke="rgba(0,0,0,.10)" stroke-width="8"/>
+            <circle cx="64" cy="64" r="56" fill="none" stroke="rgba(0,0,0,.22)" stroke-width="8" stroke-dasharray="193.52 351.86" transform="rotate(-90 64 64)"/>
+            <circle cx="64" cy="64" r="56" fill="none" stroke="#D97757" stroke-width="8" stroke-linecap="round" stroke-dasharray="274.45 351.86" transform="rotate(-90 64 64)"/>
+          </svg>
+          <div class="heroin">
+            <span class="hprofile ter">WORK</span>
+            <span class="hpct num">78%</span>
+            <span class="hcd sec num">2h 15m</span>
+            <span class="hclock ter num">today at 7:34 PM</span>
+          </div>
+        </div>
+      </div>
+      <div class="tilecap">C · ghost arc — darker track up to the pace point; invisible here because the fill covers it</div>
+    </div>
+  </div>
+
+  <!-- ================= OPTION A ACROSS STATES ================= -->
+  <h2>Option A (tick) across the pace verdicts</h2>
+  <p class="sub">Over, on, and under pace — light and dark. On-pace (middle) is the honesty test: the fill tip sits <em>on</em> the tick and the tick stays legible because it extends past both edges of the stroke. The tick is neutral (black/white at ~50%), never a severity hue, so it can't be misread as a second data series.</p>
+
+  <div class="board lt">
+    <div class="tilewrap">
+      <div class="w small lt">
+        <div class="hero">
+          <svg viewBox="0 0 128 128">
+            <circle cx="64" cy="64" r="56" fill="none" stroke="rgba(0,0,0,.10)" stroke-width="8"/>
+            <circle cx="64" cy="64" r="56" fill="none" stroke="#D97757" stroke-width="8" stroke-linecap="round" stroke-dasharray="274.45 351.86" transform="rotate(-90 64 64)"/>
+            <line x1="64" y1="2" x2="64" y2="14" stroke="rgba(0,0,0,.48)" stroke-width="2.5" stroke-linecap="round" transform="rotate(198 64 64)"/>
+          </svg>
+          <div class="heroin">
+            <span class="hprofile ter">WORK</span>
+            <span class="hpct num">78%</span>
+            <span class="hcd sec num">2h 15m</span>
+            <span class="hclock ter num">today at 7:34 PM</span>
+          </div>
+        </div>
+      </div>
+      <div class="tilecap">above pace · fill 78%, tick 55% — fill ran past the mark</div>
+    </div>
+    <div class="tilewrap">
+      <div class="w small lt">
+        <div class="hero">
+          <svg viewBox="0 0 128 128">
+            <circle cx="64" cy="64" r="56" fill="none" stroke="rgba(0,0,0,.10)" stroke-width="8"/>
+            <circle cx="64" cy="64" r="56" fill="none" stroke="#D97757" stroke-width="8" stroke-linecap="round" stroke-dasharray="197.04 351.86" transform="rotate(-90 64 64)"/>
+            <line x1="64" y1="2" x2="64" y2="14" stroke="rgba(0,0,0,.48)" stroke-width="2.5" stroke-linecap="round" transform="rotate(198 64 64)"/>
+          </svg>
+          <div class="heroin">
+            <span class="hprofile ter">WORK</span>
+            <span class="hpct num">56%</span>
+            <span class="hcd sec num">2h 15m</span>
+            <span class="hclock ter num">today at 7:34 PM</span>
+          </div>
+        </div>
+      </div>
+      <div class="tilecap">on pace · fill 56%, tick 55% — tip kisses the mark</div>
+    </div>
+    <div class="tilewrap">
+      <div class="w small lt">
+        <div class="hero">
+          <svg viewBox="0 0 128 128">
+            <circle cx="64" cy="64" r="56" fill="none" stroke="rgba(0,0,0,.10)" stroke-width="8"/>
+            <circle cx="64" cy="64" r="56" fill="none" stroke="#D97757" stroke-width="8" stroke-linecap="round" stroke-dasharray="112.59 351.86" transform="rotate(-90 64 64)"/>
+            <line x1="64" y1="2" x2="64" y2="14" stroke="rgba(0,0,0,.48)" stroke-width="2.5" stroke-linecap="round" transform="rotate(198 64 64)"/>
+          </svg>
+          <div class="heroin">
+            <span class="hprofile ter">WORK</span>
+            <span class="hpct num">32%</span>
+            <span class="hcd sec num">2h 15m</span>
+            <span class="hclock ter num">today at 7:34 PM</span>
+          </div>
+        </div>
+      </div>
+      <div class="tilecap">under pace · fill 32%, tick 55% — visible headroom on the track</div>
+    </div>
+  </div>
+
+  <div class="board dk">
+    <div class="tilewrap">
+      <div class="w small dk">
+        <div class="hero">
+          <svg viewBox="0 0 128 128">
+            <circle cx="64" cy="64" r="56" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="8"/>
+            <circle cx="64" cy="64" r="56" fill="none" stroke="#E59980" stroke-width="8" stroke-linecap="round" stroke-dasharray="274.45 351.86" transform="rotate(-90 64 64)"/>
+            <line x1="64" y1="2" x2="64" y2="14" stroke="rgba(255,255,255,.60)" stroke-width="2.5" stroke-linecap="round" transform="rotate(198 64 64)"/>
+          </svg>
+          <div class="heroin">
+            <span class="hprofile ter">WORK</span>
+            <span class="hpct num">78%</span>
+            <span class="hcd sec num">2h 15m</span>
+            <span class="hclock ter num">today at 7:34 PM</span>
+          </div>
+        </div>
+      </div>
+      <div class="tilecap">above pace · dark — tick white at 60%</div>
+    </div>
+    <div class="tilewrap">
+      <div class="w small dk">
+        <div class="hero">
+          <svg viewBox="0 0 128 128">
+            <circle cx="64" cy="64" r="56" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="8"/>
+            <circle cx="64" cy="64" r="56" fill="none" stroke="#E59980" stroke-width="8" stroke-linecap="round" stroke-dasharray="197.04 351.86" transform="rotate(-90 64 64)"/>
+            <line x1="64" y1="2" x2="64" y2="14" stroke="rgba(255,255,255,.60)" stroke-width="2.5" stroke-linecap="round" transform="rotate(198 64 64)"/>
+          </svg>
+          <div class="heroin">
+            <span class="hprofile ter">WORK</span>
+            <span class="hpct num">56%</span>
+            <span class="hcd sec num">2h 15m</span>
+            <span class="hclock ter num">today at 7:34 PM</span>
+          </div>
+        </div>
+      </div>
+      <div class="tilecap">on pace · dark</div>
+    </div>
+    <div class="tilewrap">
+      <div class="w small dk">
+        <div class="hero">
+          <svg viewBox="0 0 128 128">
+            <circle cx="64" cy="64" r="56" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="8"/>
+            <circle cx="64" cy="64" r="56" fill="none" stroke="#E59980" stroke-width="8" stroke-linecap="round" stroke-dasharray="112.59 351.86" transform="rotate(-90 64 64)"/>
+            <line x1="64" y1="2" x2="64" y2="14" stroke="rgba(255,255,255,.60)" stroke-width="2.5" stroke-linecap="round" transform="rotate(198 64 64)"/>
+          </svg>
+          <div class="heroin">
+            <span class="hprofile ter">WORK</span>
+            <span class="hpct num">32%</span>
+            <span class="hcd sec num">2h 15m</span>
+            <span class="hclock ter num">today at 7:34 PM</span>
+          </div>
+        </div>
+      </div>
+      <div class="tilecap">under pace · dark</div>
+    </div>
+  </div>
+
+  <!-- ================= OVER-PACE SEGMENT ================= -->
+  <h2>Round two — colouring the fill beyond the tick</h2>
+  <p class="sub">The ring analogue of the chart's warning wash: the chart tints the whole above-pace region red at low opacity, gated by <code>atOrAbovePace</code>. On the ring, the equivalent is the fill segment <em>past the tick</em> wearing a hotter colour. Two intensities below; both keep the tick (it's still the only pace signal when you're <em>under</em>), draw only when the verdict is <code>.above</code> (the shared ±3 dead zone, so a 1-point overshoot can't flicker), and end in the fill's own round cap.</p>
+
+  <div class="board lt">
+    <div class="tilewrap">
+      <div class="w small lt">
+        <div class="hero">
+          <svg viewBox="0 0 128 128">
+            <circle cx="64" cy="64" r="56" fill="none" stroke="rgba(0,0,0,.10)" stroke-width="8"/>
+            <circle cx="64" cy="64" r="56" fill="none" stroke="#D97757" stroke-width="8" stroke-linecap="round" stroke-dasharray="274.45 351.86" transform="rotate(-90 64 64)"/>
+            <circle cx="64" cy="64" r="56" fill="none" stroke="#CF5040" stroke-width="8" stroke-linecap="round" stroke-dasharray="80.93 351.86" transform="rotate(108 64 64)"/>
+            <line x1="64" y1="2" x2="64" y2="14" stroke="rgba(0,0,0,.48)" stroke-width="2.5" stroke-linecap="round" transform="rotate(198 64 64)"/>
+          </svg>
+          <div class="heroin">
+            <span class="hprofile ter">WORK</span>
+            <span class="hpct num">78%</span>
+            <span class="hcd sec num">2h 15m</span>
+            <span class="hclock ter num">today at 7:34 PM</span>
+          </div>
+        </div>
+      </div>
+      <div class="tilecap">A1 · washed segment — window colour blended 50% toward the red role, the chart's wash at stroke strength</div>
+    </div>
+    <div class="tilewrap">
+      <div class="w small lt">
+        <div class="hero">
+          <svg viewBox="0 0 128 128">
+            <circle cx="64" cy="64" r="56" fill="none" stroke="rgba(0,0,0,.10)" stroke-width="8"/>
+            <circle cx="64" cy="64" r="56" fill="none" stroke="#F9A825" stroke-width="8" stroke-linecap="round" stroke-dasharray="295.56 351.86" transform="rotate(-90 64 64)"/>
+            <circle cx="64" cy="64" r="56" fill="none" stroke="#DF6827" stroke-width="8" stroke-linecap="round" stroke-dasharray="73.89 351.86" transform="rotate(136.8 64 64)"/>
+            <line x1="64" y1="2" x2="64" y2="14" stroke="rgba(0,0,0,.48)" stroke-width="2.5" stroke-linecap="round" transform="rotate(226.8 64 64)"/>
+          </svg>
+          <div class="heroin">
+            <span class="hprofile ter">WORK</span>
+            <span class="hpct num">84%</span>
+            <span class="hcd sec num">3d 4h</span>
+            <span class="hclock ter num">Aug 16 at 9:00 AM</span>
+          </div>
+        </div>
+      </div>
+      <div class="tilecap">A1 on a yellow window · 84% used, 63% elapsed — the blend works on every rung of the ladder</div>
+    </div>
+    <div class="tilewrap">
+      <div class="w small lt">
+        <div class="hero">
+          <svg viewBox="0 0 128 128">
+            <circle cx="64" cy="64" r="56" fill="none" stroke="rgba(0,0,0,.10)" stroke-width="8"/>
+            <circle cx="64" cy="64" r="56" fill="none" stroke="#D97757" stroke-width="8" stroke-linecap="round" stroke-dasharray="197.04 351.86" transform="rotate(-90 64 64)"/>
+            <line x1="64" y1="2" x2="64" y2="14" stroke="rgba(0,0,0,.48)" stroke-width="2.5" stroke-linecap="round" transform="rotate(198 64 64)"/>
+          </svg>
+          <div class="heroin">
+            <span class="hprofile ter">WORK</span>
+            <span class="hpct num">56%</span>
+            <span class="hcd sec num">2h 15m</span>
+            <span class="hclock ter num">today at 7:34 PM</span>
+          </div>
+        </div>
+      </div>
+      <div class="tilecap">on pace · inside the dead zone → no segment, tick only — same gate as the chart's wash</div>
+    </div>
+    <div class="tilewrap">
+      <div class="w small lt">
+        <div class="hero">
+          <svg viewBox="0 0 128 128">
+            <circle cx="64" cy="64" r="56" fill="none" stroke="rgba(0,0,0,.10)" stroke-width="8"/>
+            <circle cx="64" cy="64" r="56" fill="none" stroke="#D97757" stroke-width="8" stroke-linecap="round" stroke-dasharray="274.45 351.86" transform="rotate(-90 64 64)"/>
+            <circle cx="64" cy="64" r="56" fill="none" stroke="#C62828" stroke-width="8" stroke-linecap="round" stroke-dasharray="80.93 351.86" transform="rotate(108 64 64)"/>
+            <line x1="64" y1="2" x2="64" y2="14" stroke="rgba(0,0,0,.48)" stroke-width="2.5" stroke-linecap="round" transform="rotate(198 64 64)"/>
+          </svg>
+          <div class="heroin">
+            <span class="hprofile ter">WORK</span>
+            <span class="hpct num">78%</span>
+            <span class="hcd sec num">2h 15m</span>
+            <span class="hclock ter num">today at 7:34 PM</span>
+          </div>
+        </div>
+      </div>
+      <div class="tilecap">A2 · full role-red segment — punchier, but at 78% it wears the colour the ladder reserves for ≥100%</div>
+    </div>
+  </div>
+
+  <div class="board dk">
+    <div class="tilewrap">
+      <div class="w small dk">
+        <div class="hero">
+          <svg viewBox="0 0 128 128">
+            <circle cx="64" cy="64" r="56" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="8"/>
+            <circle cx="64" cy="64" r="56" fill="none" stroke="#E59980" stroke-width="8" stroke-linecap="round" stroke-dasharray="274.45 351.86" transform="rotate(-90 64 64)"/>
+            <circle cx="64" cy="64" r="56" fill="none" stroke="#F27669" stroke-width="8" stroke-linecap="round" stroke-dasharray="80.93 351.86" transform="rotate(108 64 64)"/>
+            <line x1="64" y1="2" x2="64" y2="14" stroke="rgba(255,255,255,.60)" stroke-width="2.5" stroke-linecap="round" transform="rotate(198 64 64)"/>
+          </svg>
+          <div class="heroin">
+            <span class="hprofile ter">WORK</span>
+            <span class="hpct num">78%</span>
+            <span class="hcd sec num">2h 15m</span>
+            <span class="hclock ter num">today at 7:34 PM</span>
+          </div>
+        </div>
+      </div>
+      <div class="tilecap">A1 · dark — blend toward the dark red role #FF5252</div>
+    </div>
+    <div class="tilewrap">
+      <div class="w small dk">
+        <div class="hero">
+          <svg viewBox="0 0 128 128">
+            <circle cx="64" cy="64" r="56" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="8"/>
+            <circle cx="64" cy="64" r="56" fill="none" stroke="#FDD663" stroke-width="8" stroke-linecap="round" stroke-dasharray="295.56 351.86" transform="rotate(-90 64 64)"/>
+            <circle cx="64" cy="64" r="56" fill="none" stroke="#FE945B" stroke-width="8" stroke-linecap="round" stroke-dasharray="73.89 351.86" transform="rotate(136.8 64 64)"/>
+            <line x1="64" y1="2" x2="64" y2="14" stroke="rgba(255,255,255,.60)" stroke-width="2.5" stroke-linecap="round" transform="rotate(226.8 64 64)"/>
+          </svg>
+          <div class="heroin">
+            <span class="hprofile ter">WORK</span>
+            <span class="hpct num">84%</span>
+            <span class="hcd sec num">3d 4h</span>
+            <span class="hclock ter num">Aug 16 at 9:00 AM</span>
+          </div>
+        </div>
+      </div>
+      <div class="tilecap">A1 on a yellow window · dark</div>
+    </div>
+    <div class="tilewrap">
+      <div class="w small dk">
+        <div class="hero">
+          <svg viewBox="0 0 128 128">
+            <circle cx="64" cy="64" r="56" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="8"/>
+            <circle cx="64" cy="64" r="56" fill="none" stroke="#E59980" stroke-width="8" stroke-linecap="round" stroke-dasharray="274.45 351.86" transform="rotate(-90 64 64)"/>
+            <circle cx="64" cy="64" r="56" fill="none" stroke="#FF5252" stroke-width="8" stroke-linecap="round" stroke-dasharray="80.93 351.86" transform="rotate(108 64 64)"/>
+            <line x1="64" y1="2" x2="64" y2="14" stroke="rgba(255,255,255,.60)" stroke-width="2.5" stroke-linecap="round" transform="rotate(198 64 64)"/>
+          </svg>
+          <div class="heroin">
+            <span class="hprofile ter">WORK</span>
+            <span class="hpct num">78%</span>
+            <span class="hcd sec num">2h 15m</span>
+            <span class="hclock ter num">today at 7:34 PM</span>
+          </div>
+        </div>
+      </div>
+      <div class="tilecap">A2 · dark — full #FF5252 segment for comparison</div>
+    </div>
+  </div>
+
+  <!-- ================= MEDIUM ================= -->
+  <h2>Medium — mini-rings at 62 px</h2>
+  <p class="sub">The tick scales down (2 pt wide, shorter overhang) and each ring gets its own mark because each window has its own reset clock: here the 5h window is 55% elapsed while both 7-day windows are 63% elapsed. The mark is why the middle ring reads calm at 41% and the right one reads hot at 84% — same glance, opposite verdicts. Shown with the A1 washed segment on the two over-pace rings.</p>
+
+  <div class="board lt">
+    <div class="tilewrap">
+      <div class="w medium lt">
+        <div class="mhead"><span class="mprofile">Work</span><span class="mupdated sec num">Updated 7:12 PM &nbsp;↻</span></div>
+        <div class="mrings">
+          <div class="mcol">
+            <div class="mring">
+              <svg viewBox="0 0 62 62">
+                <circle cx="31" cy="31" r="25" fill="none" stroke="rgba(0,0,0,.10)" stroke-width="6"/>
+                <circle cx="31" cy="31" r="25" fill="none" stroke="#D97757" stroke-width="6" stroke-linecap="round" stroke-dasharray="122.52 157.08" transform="rotate(-90 31 31)"/>
+                <circle cx="31" cy="31" r="25" fill="none" stroke="#CF5040" stroke-width="6" stroke-linecap="round" stroke-dasharray="36.13 157.08" transform="rotate(108 31 31)"/>
+                <line x1="31" y1="2" x2="31" y2="10" stroke="rgba(0,0,0,.48)" stroke-width="2" stroke-linecap="round" transform="rotate(198 31 31)"/>
+              </svg>
+              <span class="mpct num">78%</span>
+            </div>
+            <span class="mtitle">5h</span>
+            <span class="mcd sec num">2h 15m</span>
+          </div>
+          <div class="mcol">
+            <div class="mring">
+              <svg viewBox="0 0 62 62">
+                <circle cx="31" cy="31" r="25" fill="none" stroke="rgba(0,0,0,.10)" stroke-width="6"/>
+                <circle cx="31" cy="31" r="25" fill="none" stroke="#D97757" stroke-width="6" stroke-linecap="round" stroke-dasharray="64.40 157.08" transform="rotate(-90 31 31)"/>
+                <line x1="31" y1="2" x2="31" y2="10" stroke="rgba(0,0,0,.48)" stroke-width="2" stroke-linecap="round" transform="rotate(226.8 31 31)"/>
+              </svg>
+              <span class="mpct num">41%</span>
+            </div>
+            <span class="mtitle">7d</span>
+            <span class="mcd sec num">3d 4h</span>
+          </div>
+          <div class="mcol">
+            <div class="mring">
+              <svg viewBox="0 0 62 62">
+                <circle cx="31" cy="31" r="25" fill="none" stroke="rgba(0,0,0,.10)" stroke-width="6"/>
+                <circle cx="31" cy="31" r="25" fill="none" stroke="#F9A825" stroke-width="6" stroke-linecap="round" stroke-dasharray="131.95 157.08" transform="rotate(-90 31 31)"/>
+                <circle cx="31" cy="31" r="25" fill="none" stroke="#DF6827" stroke-width="6" stroke-linecap="round" stroke-dasharray="32.99 157.08" transform="rotate(136.8 31 31)"/>
+                <line x1="31" y1="2" x2="31" y2="10" stroke="rgba(0,0,0,.48)" stroke-width="2" stroke-linecap="round" transform="rotate(226.8 31 31)"/>
+              </svg>
+              <span class="mpct num">84%</span>
+            </div>
+            <span class="mtitle">Opus 7d</span>
+            <span class="mcd sec num">3d 4h</span>
+          </div>
+        </div>
+      </div>
+      <div class="tilecap wide">medium · per-ring marks: 5h at 55% elapsed, both 7d rings at 63% — 41% is under pace, 84% is over</div>
+    </div>
+  </div>
+
+  <div class="board dk">
+    <div class="tilewrap">
+      <div class="w medium dk">
+        <div class="mhead"><span class="mprofile">Work</span><span class="mupdated sec num">Updated 7:12 PM &nbsp;↻</span></div>
+        <div class="mrings">
+          <div class="mcol">
+            <div class="mring">
+              <svg viewBox="0 0 62 62">
+                <circle cx="31" cy="31" r="25" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="6"/>
+                <circle cx="31" cy="31" r="25" fill="none" stroke="#E59980" stroke-width="6" stroke-linecap="round" stroke-dasharray="122.52 157.08" transform="rotate(-90 31 31)"/>
+                <circle cx="31" cy="31" r="25" fill="none" stroke="#F27669" stroke-width="6" stroke-linecap="round" stroke-dasharray="36.13 157.08" transform="rotate(108 31 31)"/>
+                <line x1="31" y1="2" x2="31" y2="10" stroke="rgba(255,255,255,.60)" stroke-width="2" stroke-linecap="round" transform="rotate(198 31 31)"/>
+              </svg>
+              <span class="mpct num">78%</span>
+            </div>
+            <span class="mtitle">5h</span>
+            <span class="mcd sec num">2h 15m</span>
+          </div>
+          <div class="mcol">
+            <div class="mring">
+              <svg viewBox="0 0 62 62">
+                <circle cx="31" cy="31" r="25" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="6"/>
+                <circle cx="31" cy="31" r="25" fill="none" stroke="#E59980" stroke-width="6" stroke-linecap="round" stroke-dasharray="64.40 157.08" transform="rotate(-90 31 31)"/>
+                <line x1="31" y1="2" x2="31" y2="10" stroke="rgba(255,255,255,.60)" stroke-width="2" stroke-linecap="round" transform="rotate(226.8 31 31)"/>
+              </svg>
+              <span class="mpct num">41%</span>
+            </div>
+            <span class="mtitle">7d</span>
+            <span class="mcd sec num">3d 4h</span>
+          </div>
+          <div class="mcol">
+            <div class="mring">
+              <svg viewBox="0 0 62 62">
+                <circle cx="31" cy="31" r="25" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="6"/>
+                <circle cx="31" cy="31" r="25" fill="none" stroke="#FDD663" stroke-width="6" stroke-linecap="round" stroke-dasharray="131.95 157.08" transform="rotate(-90 31 31)"/>
+                <circle cx="31" cy="31" r="25" fill="none" stroke="#FE945B" stroke-width="6" stroke-linecap="round" stroke-dasharray="32.99 157.08" transform="rotate(136.8 31 31)"/>
+                <line x1="31" y1="2" x2="31" y2="10" stroke="rgba(255,255,255,.60)" stroke-width="2" stroke-linecap="round" transform="rotate(226.8 31 31)"/>
+              </svg>
+              <span class="mpct num">84%</span>
+            </div>
+            <span class="mtitle">Opus 7d</span>
+            <span class="mcd sec num">3d 4h</span>
+          </div>
+        </div>
+      </div>
+      <div class="tilecap wide">medium · dark</div>
+    </div>
+  </div>
+
+  <!-- ================= EDGE CASES ================= -->
+  <h2>Edge cases the build must honour</h2>
+  <p class="sub">Left to right: window nearly over (tick at 97%, crowding the 12-o'clock cap — kept, drawn above both caps); no percent for the configured window (bare track, em dash, <b>no tick</b> — a pace mark on an empty ring would invent data); reset time unknown (<code>elapsedPercent</code> is nil — fill draws, tick doesn't).</p>
+
+  <div class="board lt">
+    <div class="tilewrap">
+      <div class="w small lt">
+        <div class="hero">
+          <svg viewBox="0 0 128 128">
+            <circle cx="64" cy="64" r="56" fill="none" stroke="rgba(0,0,0,.10)" stroke-width="8"/>
+            <circle cx="64" cy="64" r="56" fill="none" stroke="#F9A825" stroke-width="8" stroke-linecap="round" stroke-dasharray="348.34 351.86" transform="rotate(-90 64 64)"/>
+            <line x1="64" y1="2" x2="64" y2="14" stroke="rgba(0,0,0,.48)" stroke-width="2.5" stroke-linecap="round" transform="rotate(349.2 64 64)"/>
+          </svg>
+          <div class="heroin">
+            <span class="hprofile ter">WORK</span>
+            <span class="hpct num">99%</span>
+            <span class="hcd sec num">9m</span>
+            <span class="hclock ter num">today at 7:34 PM</span>
+          </div>
+        </div>
+      </div>
+      <div class="tilecap">tick at 97%, fill 99% — end of window, everything crowds 12 o'clock and stays legible</div>
+    </div>
+    <div class="tilewrap">
+      <div class="w small lt">
+        <div class="hero">
+          <svg viewBox="0 0 128 128">
+            <circle cx="64" cy="64" r="56" fill="none" stroke="rgba(0,0,0,.10)" stroke-width="8"/>
+          </svg>
+          <div class="heroin">
+            <span class="hprofile ter">WORK</span>
+            <span class="hpct dash num ter">—</span>
+            <span class="hcd sec num">&nbsp;</span>
+          </div>
+        </div>
+      </div>
+      <div class="tilecap">no data · bare track, no tick — the empty-ring rule extends to the mark</div>
+    </div>
+    <div class="tilewrap">
+      <div class="w small lt">
+        <div class="hero">
+          <svg viewBox="0 0 128 128">
+            <circle cx="64" cy="64" r="56" fill="none" stroke="rgba(0,0,0,.10)" stroke-width="8"/>
+            <circle cx="64" cy="64" r="56" fill="none" stroke="#D97757" stroke-width="8" stroke-linecap="round" stroke-dasharray="112.59 351.86" transform="rotate(-90 64 64)"/>
+          </svg>
+          <div class="heroin">
+            <span class="hprofile ter">WORK</span>
+            <span class="hpct num">32%</span>
+          </div>
+        </div>
+      </div>
+      <div class="tilecap">no reset timestamp · fill without tick — never guess the pace point</div>
+    </div>
+  </div>
+
+  <!-- ================= DECISIONS ================= -->
+  <h2>Decisions encoded above</h2>
+  <ul class="dec">
+    <li><b>Mark position</b> is <code>Fmt.elapsedPercent</code>, computed per window at render time — the identical input the pace verdict and large-widget chart already use, so the three surfaces can't drift apart.</li>
+    <li><b>Neutral colour, drawn topmost.</b> Black/white at ~50–60% opacity, above the fill, extending ~4 pt past both stroke edges — legible whether it lands on bare track, accent fill, or a warning hue. In vibrant/tinted rendering it becomes <code>Color.primary</code> at the same opacity, on top of the existing opacity-ladder fill.</li>
+    <li><b>No dead-zone rendering.</b> The ±3 pt <code>paceDeadZone</code> stays in the verdict logic (sentence, colours); drawing it as an arc segment would make the tick a gauge of its own. The tick is purely positional.</li>
+    <li><b>When the tick doesn't draw:</b> no data (bare track), no reset timestamp (<code>elapsedPercent</code> nil), and every message-only state. Same rule as the fill: never fake a value.</li>
+    <li><b>Geometry lives in <code>RingGauge</code></b> — one new optional <code>paceMark: Double?</code> parameter serves both the small hero ring and the medium mini-rings; the large widget keeps its chart and gains nothing here.</li>
+    <li><b>Over-pace segment</b> — the chart-wash rule translated to the stroke: drawn only when the verdict is <code>.above</code> (fill &gt; elapsed + <code>paceDeadZone</code>, so it can never contradict the pace sentence and never flickers on a hairline overshoot), from the tick to the fill tip, in the window's role colour blended 50% toward the red role (A1) — the severity ladder stays the base coat, the wash rides on top, and a ring never wears full ≥100% red before it's earned. Under the tick in z-order; the tick stays topmost. In vibrant/tinted rendering the segment falls back to the next rung of the existing opacity ladder.</li>
+  </ul>
+
+  <div class="verdict"><b>Decision (user, 2026-08-13): Option A tick + A2 full-red segment.</b> Among the marks, the dot (B) is ambiguous — the fill's round cap already ends in a dot shape — and the ghost arc (C) is covered by the fill exactly when you're over pace. Between the segment intensities, the recommendation was the A1 blend, but the user chose A2 deliberately: being over pace means the window <em>will</em> hit 100% at this rate, so the ≥100% red is the honest colour for that segment, just early. A2's trade-off (a 78% ring wearing the limit hue on part of its arc) was shown and accepted.</div>
+</div>

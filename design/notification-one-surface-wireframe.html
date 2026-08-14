@@ -1,0 +1,812 @@
+<title>One-Notification Alternative — CCBG-12</title>
+<style>
+  :root {
+    --bg: #FAF8F6;
+    --ink: #26211E;
+    --muted: #6E6660;
+    --accent: #C15F3C;
+    --hair: #E7E1DC;
+    --card: #FFFFFF;
+    --bad: #B3402A;
+    --good: #2F6D44;
+    --warn: #9A6B1E;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171513;
+      --ink: #EDE8E4;
+      --muted: #9B928B;
+      --accent: #E59980;
+      --hair: #2C2825;
+      --card: #201D1B;
+      --bad: #E08268;
+      --good: #7FC08F;
+      --warn: #D8AC63;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171513;
+    --ink: #EDE8E4;
+    --muted: #9B928B;
+    --accent: #E59980;
+    --hair: #2C2825;
+    --card: #201D1B;
+    --bad: #E08268;
+    --good: #7FC08F;
+    --warn: #D8AC63;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    margin: 0; padding: 48px 24px 96px; line-height: 1.5;
+  }
+  .page { max-width: 1240px; margin: 0 auto; }
+
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 10px;
+  }
+  h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 8px; text-wrap: balance; }
+  .lede { color: var(--muted); max-width: 68ch; margin: 0 0 12px; font-size: 14px; }
+  h2 { font-size: 19px; font-weight: 650; letter-spacing: -0.01em; margin: 56px 0 4px; }
+  h3 { font-size: 14px; font-weight: 650; margin: 28px 0 8px; }
+  .sub { color: var(--muted); font-size: 13px; max-width: 80ch; margin: 0 0 16px; }
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px;
+    background: color-mix(in srgb, var(--hair) 55%, transparent);
+    padding: 1px 5px; border-radius: 4px;
+  }
+  .hr { height: 1px; background: var(--hair); margin: 46px 0 0; border: 0; }
+
+  .row { display: flex; flex-wrap: wrap; gap: 22px; align-items: flex-start; }
+  .col { flex: 0 0 auto; }
+  .cap {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--muted); margin: 0 0 8px;
+  }
+  .cap.bad { color: var(--bad); }
+  .cap.good { color: var(--good); }
+  .cap.warn { color: var(--warn); }
+
+  .phone {
+    width: 340px; border-radius: 26px; padding: 10px 10px 16px;
+    background: linear-gradient(160deg, #1B1E24 0%, #16171A 100%);
+    border: 1px solid #2E3138;
+  }
+  .phone.narrow { width: 250px; }
+  .statusbar {
+    display: flex; align-items: center; gap: 7px; padding: 6px 10px 12px;
+    color: #F2F2F4; font-size: 12px; font-weight: 600;
+  }
+  .statusbar .spacer { flex: 1; }
+  .statusbar .sig { opacity: .75; font-size: 10px; letter-spacing: .04em; }
+
+  .notif {
+    background: #24262B; border-radius: 20px; padding: 11px 13px; margin: 0 0 7px;
+    display: flex; gap: 11px; align-items: flex-start; color: #E9EAEC;
+  }
+  .notif .avatar {
+    width: 30px; height: 30px; border-radius: 50%; background: #2F3238;
+    flex: 0 0 auto; display: flex; align-items: center; justify-content: center;
+  }
+  .notif .body { flex: 1; min-width: 0; }
+  .notif .t { font-size: 12.5px; font-weight: 650; letter-spacing: -.01em; }
+  .notif .s { font-size: 11.5px; color: #A7ABB2; margin-top: 1px; }
+  .notif .r { font-size: 11px; color: #8E939A; flex: 0 0 auto; padding-left: 4px; }
+  .notif .pct { font-size: 21px; font-weight: 700; color: #E59980; letter-spacing: -.02em; }
+
+  .bar { height: 7px; border-radius: 4px; background: #4A3A35; margin: 6px 0 5px; position: relative; }
+  .bar > i { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: #E59980; }
+  .bar > u { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #F2F2F4; opacity: .8; }
+
+  /* expanded panel */
+  .panel { padding: 2px 2px 4px; }
+  .prow { margin: 0 0 13px; }
+  .prow .ph { display: flex; justify-content: space-between; align-items: baseline; }
+  .prow .pl { font-size: 12px; color: #ECECEC; }
+  .prow .pv { font-size: 13.5px; font-weight: 700; color: #ECECEC; }
+  .prow .ps { font-size: 11px; color: #9E9E9E; margin-top: 3px; }
+  .prow .bar { margin: 5px 0 0; }
+
+  /* folded condition line — a tinted strip, type matched to the bar rows */
+  .cond {
+    display: flex; gap: 7px; align-items: flex-start;
+    background: rgba(216, 172, 99, .13);
+    border-radius: 7px; padding: 6px 8px; margin: 0 0 11px;
+  }
+  .cond.err { background: rgba(224, 112, 90, .13); }
+  /* .ct matches .pl (bar label, 13.5 dp); .cs matches .ps (bar sub, 12 dp) */
+  .cond .ct { font-size: 12px; color: #ECECEC; font-weight: 600; }
+  .cond .cs { font-size: 11px; color: #9E9E9E; margin-top: 1px; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--warn); flex: 0 0 auto; margin-top: 5px; }
+  .dot.err { background: #E0705A; }
+
+  .heads {
+    background: #2B2E34; border-radius: 18px; padding: 11px 13px; margin: 0 0 7px;
+    display: flex; gap: 11px; align-items: flex-start; color: #E9EAEC;
+    box-shadow: 0 6px 18px rgba(0,0,0,.45); border: 1px solid #3A3E45;
+  }
+  /* Alerts now carry the pinned notification's type scale — 13 sp title, 12 sp body —
+     instead of the platform's 14 sp default. Same rules as .notif deliberately. */
+  .heads .t { font-size: 12.5px; font-weight: 650; letter-spacing: -.01em; }
+  .heads .s { font-size: 11.5px; color: #A7ABB2; margin-top: 1px; }
+
+  .note { font-size: 12.5px; color: var(--muted); max-width: 36ch; margin: 10px 0 0; }
+  .note strong { color: var(--ink); font-weight: 650; }
+  .note.warn strong { color: var(--warn); }
+  .note.bad strong { color: var(--bad); }
+
+  table { border-collapse: collapse; margin: 10px 0 0; font-size: 13px; width: 100%; max-width: 1000px; }
+  th, td { text-align: left; padding: 8px 14px 8px 0; border-bottom: 1px solid var(--hair); vertical-align: top; }
+  th { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 650; }
+  .yes { color: var(--good); font-weight: 650; }
+  .no { color: var(--bad); font-weight: 650; }
+  .mid { color: var(--warn); font-weight: 650; }
+  .q {
+    border-left: 3px solid var(--accent); padding: 2px 0 2px 14px;
+    margin: 14px 0; font-size: 13.5px; max-width: 76ch;
+  }
+  .done { border-left-color: var(--good); }
+
+  /* settings surface */
+  .sheet {
+    width: 340px; border-radius: 22px; padding: 6px 0 8px;
+    background: #1B1E24; border: 1px solid #2E3138; color: #E9EAEC;
+  }
+  .shead {
+    font-size: 11px; letter-spacing: .07em; text-transform: uppercase;
+    color: #E59980; font-weight: 700; padding: 12px 16px 6px;
+  }
+  .srow { padding: 11px 16px; display: flex; gap: 12px; align-items: flex-start; }
+  .srow + .srow { border-top: 1px solid #26292F; }
+  .srow .st { font-size: 13px; font-weight: 600; }
+  .srow .ss { font-size: 11.5px; color: #9BA0A7; margin-top: 2px; }
+  .srow .sv { font-size: 12.5px; color: #E59980; font-weight: 650; flex: 0 0 auto; }
+  .opt { display: flex; gap: 10px; align-items: flex-start; padding: 9px 16px; font-size: 13px; }
+  .radio {
+    width: 15px; height: 15px; border-radius: 50%; border: 2px solid #6E747C;
+    flex: 0 0 auto; margin-top: 1px;
+  }
+  .radio.on { border-color: #E59980; box-shadow: inset 0 0 0 3px #E59980; }
+  .opt .os { font-size: 11.5px; color: #9BA0A7; margin-top: 1px; }
+</style>
+
+<div class="page">
+
+  <p class="eyebrow">CCBG-12 · Status Icon Swap · alternative</p>
+  <h1>The one-notification alternative</h1>
+  <p class="lede">
+    Instead of owning the group, keep the app down to a single notification almost all the
+    time, so the OS never reaches for its auto-summary. Two mechanisms do the work: long-lived
+    <em>conditions</em> fold into the pinned notification's expanded panel, and one-off
+    <em>events</em> get <code>setTimeoutAfter</code> so they clear themselves.
+  </p>
+
+  <h2>Which alert is which</h2>
+  <p class="sub">
+    Taken from <code>Alerts.kt</code> as it stands. The split is not cosmetic — it decides
+    what folds, what expires, and what has to stay a real notification.
+  </p>
+  <table>
+    <tr><th>Alert</th><th>Channel · importance</th><th>Lives for</th><th>Proposed</th></tr>
+    <tr>
+      <td><b>Sign-in expires in Nd</b></td><td><code>auth_alerts</code> · HIGH</td>
+      <td>Up to 7 days — fires at 7/3/1 days and is never cancelled</td>
+      <td class="yes">Fold into panel</td>
+    </tr>
+    <tr>
+      <td><b>Usage data is stale</b></td><td><code>health_alerts</code> · DEFAULT</td>
+      <td>Until a fetch succeeds</td>
+      <td class="yes">Fold into panel</td>
+    </tr>
+    <tr>
+      <td><b>Window reset</b></td><td><code>reset_alerts</code> · DEFAULT</td>
+      <td>Until dismissed</td>
+      <td class="mid">Timeout</td>
+    </tr>
+    <tr>
+      <td><b>Usage threshold</b></td><td><code>usage_alerts</code> · DEFAULT</td>
+      <td>Until dismissed</td>
+      <td class="mid">Timeout</td>
+    </tr>
+    <tr>
+      <td><b>Pace — will run out</b></td><td><code>pace_alerts</code> · DEFAULT</td>
+      <td>Until dismissed</td>
+      <td class="mid">Timeout</td>
+    </tr>
+    <tr>
+      <td><b>Update available</b></td><td><code>update_alerts</code> · LOW</td>
+      <td>Until dismissed or skipped</td>
+      <td class="mid">Timeout</td>
+    </tr>
+    <tr>
+      <td><b>Needs re-auth</b></td><td><code>auth_alerts</code> · HIGH</td>
+      <td>Until auth recovers</td>
+      <td class="no">Stays a notification</td>
+    </tr>
+    <tr>
+      <td><b>Window not started</b></td><td><code>ping_alerts</code> · HIGH</td>
+      <td>Until dismissed</td>
+      <td class="no">Stays a notification</td>
+    </tr>
+  </table>
+  <p class="sub" style="margin-top:14px">
+    The last two are deliberately <code>IMPORTANCE_HIGH</code> — the code says so about the
+    ping in as many words. Folding them into a silent panel would delete the interruption that
+    is the whole point of the feature. So this approach <strong>does not close the hole
+    completely</strong>; it closes it for every case except two rare, genuinely urgent ones.
+  </p>
+
+  <hr class="hr">
+
+  <h2>Scenario 1 — nothing wrong</h2>
+  <p class="sub">The common case. Unchanged from today, and unchanged from the grouping proposal.</p>
+  <div class="row">
+    <div class="col">
+      <p class="cap good">collapsed</p>
+      <div class="phone">
+        <div class="statusbar">
+          <span>1:26</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" style="margin-left:2px">
+            <circle cx="12" cy="12" r="8" fill="none" stroke="#F2F2F4" stroke-opacity=".3" stroke-width="3.4"/>
+            <circle cx="12" cy="12" r="8" fill="none" stroke="#F2F2F4" stroke-width="3.4"
+                    stroke-linecap="round" stroke-dasharray="4.5 100" transform="rotate(-90 12 12)"/>
+          </svg>
+          <span class="spacer"></span><span class="sig">5G ▮▮▮ 59</span>
+        </div>
+        <div class="notif">
+          <div class="avatar">
+            <svg width="17" height="17" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="8" fill="none" stroke="#6E6660" stroke-width="3.4"/>
+              <circle cx="12" cy="12" r="8" fill="none" stroke="#E59980" stroke-width="3.4"
+                      stroke-linecap="round" stroke-dasharray="36.2 100" transform="rotate(-90 12 12)"/>
+            </svg>
+          </div>
+          <div class="body">
+            <div class="t">Personal · 5-hour window</div>
+            <div class="bar"><i style="width:9%"></i><u style="left:26%"></u></div>
+            <div class="s">Resets in 4h 43m · 6:09 pm</div>
+          </div>
+          <div class="pct">9%</div>
+        </div>
+      </div>
+      <p class="note">Live <strong>9% meter</strong> in the status bar. Meter row on screen, not one tap deep.</p>
+    </div>
+
+    <div class="col">
+      <p class="cap good">expanded — panel as it is today</p>
+      <div class="phone">
+        <div class="notif" style="display:block">
+          <div style="display:flex; gap:11px; align-items:flex-start">
+            <div class="avatar">
+              <svg width="17" height="17" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="8" fill="none" stroke="#6E6660" stroke-width="3.4"/>
+                <circle cx="12" cy="12" r="8" fill="none" stroke="#E59980" stroke-width="3.4"
+                        stroke-linecap="round" stroke-dasharray="36.2 100" transform="rotate(-90 12 12)"/>
+              </svg>
+            </div>
+            <div class="body">
+              <div class="t">Personal · 5-hour window</div>
+              <div class="s">Resets in 4h 43m · 6:09 pm</div>
+            </div>
+            <div class="pct">9%</div>
+          </div>
+          <div class="panel" style="margin-top:12px">
+            <div class="prow">
+              <div class="ph"><span class="pl">7-day</span><span class="pv">34%</span></div>
+              <div class="bar"><i style="width:34%"></i><u style="left:52%"></u></div>
+              <div class="ps">Resets Mon 6:09 pm</div>
+            </div>
+            <div class="prow">
+              <div class="ph"><span class="pl">Opus</span><span class="pv">61%</span></div>
+              <div class="bar"><i style="width:61%"></i><u style="left:52%"></u></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="note">The panel keeps its existing shape — 7-day plus model caps, up to four bars.</p>
+    </div>
+  </div>
+
+  <hr class="hr">
+
+  <h2>Scenario 2 — sign-in expiring (the one in the report)</h2>
+  <p class="sub">
+    Today this posts a separate notification that sits for up to seven days and holds the
+    status bar wrong the whole time. Folded, it becomes a line in the panel — and a marker on
+    the collapsed row, so folding doesn't turn into hiding.
+  </p>
+  <div class="row">
+    <div class="col">
+      <p class="cap warn">collapsed — with the condition marker</p>
+      <div class="phone">
+        <div class="statusbar">
+          <span>1:26</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" style="margin-left:2px">
+            <circle cx="12" cy="12" r="8" fill="none" stroke="#F2F2F4" stroke-opacity=".3" stroke-width="3.4"/>
+            <circle cx="12" cy="12" r="8" fill="none" stroke="#F2F2F4" stroke-width="3.4"
+                    stroke-linecap="round" stroke-dasharray="4.5 100" transform="rotate(-90 12 12)"/>
+          </svg>
+          <span class="spacer"></span><span class="sig">5G ▮▮▮ 59</span>
+        </div>
+        <div class="notif">
+          <div class="avatar">
+            <svg width="17" height="17" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="8" fill="none" stroke="#6E6660" stroke-width="3.4"/>
+              <circle cx="12" cy="12" r="8" fill="none" stroke="#E59980" stroke-width="3.4"
+                      stroke-linecap="round" stroke-dasharray="36.2 100" transform="rotate(-90 12 12)"/>
+            </svg>
+          </div>
+          <div class="body">
+            <div class="t">Personal · 5-hour window</div>
+            <div class="bar"><i style="width:9%"></i><u style="left:26%"></u></div>
+            <div class="s">
+              <span class="dot" style="display:inline-block; vertical-align:middle; margin-right:5px"></span>Sign-in expires in 6d
+            </div>
+          </div>
+          <div class="pct">9%</div>
+        </div>
+      </div>
+      <p class="note warn">
+        Status bar <strong>stays live</strong>. The sub line gives up the reset time to carry the
+        warning — <strong>agreed</strong>; the reset time stays available in the expanded panel.
+      </p>
+    </div>
+
+    <div class="col">
+      <p class="cap warn">expanded — condition above the bars</p>
+      <div class="phone">
+        <div class="notif" style="display:block">
+          <div style="display:flex; gap:11px; align-items:flex-start">
+            <div class="avatar">
+              <svg width="17" height="17" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="8" fill="none" stroke="#6E6660" stroke-width="3.4"/>
+                <circle cx="12" cy="12" r="8" fill="none" stroke="#E59980" stroke-width="3.4"
+                        stroke-linecap="round" stroke-dasharray="36.2 100" transform="rotate(-90 12 12)"/>
+              </svg>
+            </div>
+            <div class="body">
+              <div class="t">Personal · 5-hour window</div>
+              <div class="s">Resets in 4h 43m · 6:09 pm</div>
+            </div>
+            <div class="pct">9%</div>
+          </div>
+          <div class="panel" style="margin-top:12px">
+            <div class="cond">
+              <div class="dot"></div>
+              <div>
+                <div class="ct">Sign-in expires in 6d</div>
+                <div class="cs">Valid until Aug 21, 11:49 am. Paste a fresh token when convenient.</div>
+              </div>
+            </div>
+            <div class="prow">
+              <div class="ph"><span class="pl">7-day</span><span class="pv">34%</span></div>
+              <div class="bar"><i style="width:34%"></i><u style="left:52%"></u></div>
+              <div class="ps">Resets Mon 6:09 pm</div>
+            </div>
+            <div class="prow">
+              <div class="ph"><span class="pl">Opus</span><span class="pv">61%</span></div>
+              <div class="bar"><i style="width:61%"></i><u style="left:52%"></u></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="note">
+        Condition sits above the bars, full wording preserved. It clears itself the moment a
+        fresh token lands — no dismiss needed, unlike today.
+      </p>
+    </div>
+  </div>
+
+  <hr class="hr">
+
+  <h2>Scenario 3 — stale data, and both conditions at once</h2>
+  <p class="sub">
+    Stale is the other folding candidate. When both are live the panel has to hold two condition
+    lines <em>and</em> the bars, which is where height becomes the constraint.
+  </p>
+  <div class="row">
+    <div class="col">
+      <p class="cap warn">stale only — collapsed</p>
+      <div class="phone">
+        <div class="notif">
+          <div class="avatar">
+            <svg width="17" height="17" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="8" fill="none" stroke="#6E6660" stroke-width="3.4"/>
+              <circle cx="12" cy="12" r="8" fill="none" stroke="#E59980" stroke-width="3.4"
+                      stroke-linecap="round" stroke-dasharray="36.2 100" transform="rotate(-90 12 12)"/>
+            </svg>
+          </div>
+          <div class="body">
+            <div class="t">Personal · 5-hour window</div>
+            <div class="bar" style="opacity:.45"><i style="width:9%"></i><u style="left:26%"></u></div>
+            <div class="s">
+              <span class="dot err" style="display:inline-block; vertical-align:middle; margin-right:5px"></span>Stale — nothing since 7:12 am
+            </div>
+          </div>
+          <div class="pct" style="opacity:.5">9%</div>
+        </div>
+      </div>
+      <p class="note bad">
+        The <strong>dimmed bar and percentage</strong> matter here — a stale number that looks
+        crisp is the actual danger. Today's separate notification never dimmed anything.
+      </p>
+    </div>
+
+    <div class="col">
+      <p class="cap bad">both conditions + 4 model caps — height pressure</p>
+      <div class="phone">
+        <div class="notif" style="display:block">
+          <div style="display:flex; gap:11px; align-items:flex-start">
+            <div class="avatar"></div>
+            <div class="body">
+              <div class="t">Personal · 5-hour window</div>
+              <div class="s">Resets in 4h 43m · 6:09 pm</div>
+            </div>
+            <div class="pct">9%</div>
+          </div>
+          <div class="panel" style="margin-top:12px">
+            <div class="cond err">
+              <div class="dot err"></div>
+              <div>
+                <div class="ct">Usage data is stale</div>
+                <div class="cs">Nothing fetched since 7:12 am. Last error: HTTP 503</div>
+              </div>
+            </div>
+            <div class="cond">
+              <div class="dot"></div>
+              <div>
+                <div class="ct">Sign-in expires in 6d</div>
+                <div class="cs">Valid until Aug 21, 11:49 am.</div>
+              </div>
+            </div>
+            <div class="prow">
+              <div class="ph"><span class="pl">7-day</span><span class="pv">34%</span></div>
+              <div class="bar"><i style="width:34%"></i><u style="left:52%"></u></div>
+              <div class="ps">Resets Mon 6:09 pm</div>
+            </div>
+            <div class="prow">
+              <div class="ph"><span class="pl">Opus</span><span class="pv">61%</span></div>
+              <div class="bar"><i style="width:61%"></i><u style="left:52%"></u></div>
+            </div>
+            <div class="prow" style="opacity:.34">
+              <div class="ph"><span class="pl">Sonnet</span><span class="pv">12%</span></div>
+              <div class="bar"><i style="width:12%"></i></div>
+            </div>
+            <div class="prow" style="opacity:.16">
+              <div class="ph"><span class="pl">Haiku</span><span class="pv">3%</span></div>
+              <div class="bar"><i style="width:3%"></i></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="note bad">
+        Panel already caps at <code>.take(4)</code> bars. Two conditions cost roughly two bars'
+        worth of height — <strong>the faded rows are what would drop</strong>. Needs a rule:
+        conditions displace model caps, never the 7-day.
+      </p>
+    </div>
+  </div>
+
+  <hr class="hr">
+
+  <h2>Scenario 4 — an event alert, before and after its timeout</h2>
+  <p class="sub">
+    Reset, threshold, pace and update alerts still post and still heads-up. They simply stop
+    living forever. Shown at the moment of firing and after the timeout elapses.
+  </p>
+  <div class="row">
+    <div class="col">
+      <p class="cap bad">T+0 — fires (icon swaps, briefly)</p>
+      <div class="phone">
+        <div class="statusbar">
+          <span>1:26</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" style="margin-left:2px">
+            <circle cx="12" cy="12" r="8" fill="none" stroke="#F2F2F4" stroke-opacity=".3" stroke-width="3.4"/>
+            <circle cx="12" cy="12" r="8" fill="none" stroke="#E08268" stroke-width="3.4"
+                    stroke-linecap="round" stroke-dasharray="36.2 100" transform="rotate(-90 12 12)"/>
+          </svg>
+          <span class="spacer"></span><span class="sig">5G ▮▮▮ 59</span>
+        </div>
+        <div class="heads">
+          <div class="avatar"></div>
+          <div class="body">
+            <div class="t">Personal: 5-hour window will run out</div>
+            <div class="s">At this pace, 100% around Fri 10:44 am — 1h 55m before the reset.</div>
+          </div>
+        </div>
+        <div class="notif">
+          <div class="avatar"></div>
+          <div class="body">
+            <div class="t">Personal · 5-hour window</div>
+            <div class="bar"><i style="width:58%"></i><u style="left:26%"></u></div>
+            <div class="s">Resets in 1h 47m · 6:10 pm</div>
+          </div>
+          <div class="pct">58%</div>
+        </div>
+      </div>
+      <p class="note bad">
+        For the life of the timeout the icon is <strong>still wrong</strong>. This approach
+        shortens the window; it does not remove it.
+      </p>
+    </div>
+
+    <div class="col">
+      <p class="cap good">T+45m — self-cleared</p>
+      <div class="phone">
+        <div class="statusbar">
+          <span>2:11</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" style="margin-left:2px">
+            <circle cx="12" cy="12" r="8" fill="none" stroke="#F2F2F4" stroke-opacity=".3" stroke-width="3.4"/>
+            <circle cx="12" cy="12" r="8" fill="none" stroke="#F2F2F4" stroke-width="3.4"
+                    stroke-linecap="round" stroke-dasharray="29 100" transform="rotate(-90 12 12)"/>
+          </svg>
+          <span class="spacer"></span><span class="sig">5G ▮▮▮ 57</span>
+        </div>
+        <div class="notif">
+          <div class="avatar"></div>
+          <div class="body">
+            <div class="t">Personal · 5-hour window</div>
+            <div class="bar"><i style="width:58%"></i><u style="left:38%"></u></div>
+            <div class="s">Resets in 1h 02m · 6:10 pm</div>
+          </div>
+          <div class="pct">58%</div>
+        </div>
+      </div>
+      <p class="note">
+        Back to the live meter with no user action. The alert is gone from the shade —
+        <strong>if it wasn't seen, it wasn't seen</strong>.
+      </p>
+    </div>
+  </div>
+
+  <hr class="hr">
+
+  <h2>Scenario 5 — re-auth: the hole this approach leaves open</h2>
+  <p class="sub">
+    Shown because it must not be discovered later. Re-auth and ping-failed keep their
+    <code>IMPORTANCE_HIGH</code> notification, so while either is live the icon still swaps.
+  </p>
+  <div class="row">
+    <div class="col">
+      <p class="cap bad">re-auth live — icon wrong, deliberately</p>
+      <div class="phone">
+        <div class="statusbar">
+          <span>1:26</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" style="margin-left:2px">
+            <circle cx="12" cy="12" r="8" fill="none" stroke="#F2F2F4" stroke-opacity=".3" stroke-width="3.4"/>
+            <circle cx="12" cy="12" r="8" fill="none" stroke="#E08268" stroke-width="3.4"
+                    stroke-linecap="round" stroke-dasharray="36.2 100" transform="rotate(-90 12 12)"/>
+          </svg>
+          <span class="spacer"></span><span class="sig">5G ▮▮▮ 59</span>
+        </div>
+        <div class="notif">
+          <div class="avatar"></div>
+          <div class="body">
+            <div class="t">Personal: Claude Cooldown needs re-auth</div>
+            <div class="s">The saved token stopped working. Open the app and paste a fresh one.</div>
+          </div>
+        </div>
+        <div class="notif">
+          <div class="avatar"></div>
+          <div class="body">
+            <div class="t">Personal · 5-hour window</div>
+            <div class="bar" style="opacity:.45"><i style="width:9%"></i></div>
+            <div class="s">Resets in 4h 43m · 6:09 pm</div>
+          </div>
+          <div class="pct" style="opacity:.5">9%</div>
+        </div>
+      </div>
+      <p class="note bad">
+        Rare and self-cancelling — it clears the moment auth recovers. But while it's up,
+        <strong>CCBG-12 is unfixed</strong>. Grouping would have covered this case.
+      </p>
+    </div>
+  </div>
+
+  <hr class="hr">
+
+  <h2>Scenario 6 — edge states</h2>
+  <p class="sub">No data yet, at 100%, and the narrow width where the condition line has to compete.</p>
+  <div class="row">
+    <div class="col">
+      <p class="cap">no data + expiring</p>
+      <div class="phone">
+        <div class="notif">
+          <div class="avatar"></div>
+          <div class="body">
+            <div class="t">Personal · 5-hour window</div>
+            <div class="bar"></div>
+            <div class="s">
+              <span class="dot" style="display:inline-block; vertical-align:middle; margin-right:5px"></span>Sign-in expires in 6d
+            </div>
+          </div>
+          <div class="pct" style="color:#8E939A">—</div>
+        </div>
+      </div>
+      <p class="note">Empty bar, em-dash. The condition still reads.</p>
+    </div>
+
+    <div class="col">
+      <p class="cap">at 100% + stale</p>
+      <div class="phone">
+        <div class="notif">
+          <div class="avatar"></div>
+          <div class="body">
+            <div class="t">Personal · 5-hour window</div>
+            <div class="bar" style="opacity:.45"><i style="width:100%; background:#C4553C"></i></div>
+            <div class="s">
+              <span class="dot err" style="display:inline-block; vertical-align:middle; margin-right:5px"></span>Stale — nothing since 7:12 am
+            </div>
+          </div>
+          <div class="pct" style="color:#E0705A; opacity:.5">100%</div>
+        </div>
+      </div>
+      <p class="note bad">
+        Worst combination: a <strong>100% that may not be true any more</strong>. Dimming is
+        doing real work.
+      </p>
+    </div>
+
+    <div class="col">
+      <p class="cap">narrow — cover screen</p>
+      <div class="phone narrow">
+        <div class="notif">
+          <div class="avatar"></div>
+          <div class="body">
+            <div class="t">Personal · 5-hour</div>
+            <div class="bar"><i style="width:9%"></i><u style="left:26%"></u></div>
+            <div class="s">
+              <span class="dot" style="display:inline-block; vertical-align:middle; margin-right:5px"></span>Sign-in expires 6d
+            </div>
+          </div>
+          <div class="pct">9%</div>
+        </div>
+      </div>
+      <p class="note">
+        Condition text shortens rather than the reset line returning — the warning outranks
+        the reset once it exists.
+      </p>
+    </div>
+  </div>
+
+  <hr class="hr">
+
+  <h2>How the two approaches actually compare</h2>
+  <table>
+    <tr><th>&nbsp;</th><th>Grouping</th><th>One-notification</th></tr>
+    <tr><td>Status bar correct — expiry warning pending</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+    <tr><td>Status bar correct — stale data</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+    <tr><td>Status bar correct — pace/reset/update alert just fired</td><td class="yes">Yes</td><td class="mid">Wrong until the timeout elapses</td></tr>
+    <tr><td>Status bar correct — re-auth or ping failure</td><td class="yes">Yes</td><td class="no">No — stays wrong</td></tr>
+    <tr><td>Meter row visible without expanding</td><td class="no">No, while children exist</td><td class="yes">Always</td></tr>
+    <tr><td>Alerts persist until the user dismisses</td><td class="yes">Yes</td><td class="no">Events expire unseen</td></tr>
+    <tr><td>Conditions clear themselves when resolved</td><td class="no">Expiry warning still needs dismissing</td><td class="yes">Yes</td></tr>
+    <tr><td>Stale numbers visibly marked as stale</td><td class="no">Unchanged</td><td class="yes">Yes — dimmed</td></tr>
+    <tr><td>Work</td><td>Group plumbing, two files</td><td>Panel layout + condition plumbing + timeouts</td></tr>
+    <tr><td>Risk</td><td>Low — behaviour verified on device</td><td>Bitmap panel grows a new row type; height rules needed</td></tr>
+  </table>
+
+  <p class="sub" style="margin-top:18px">
+    They are not exclusive. Folding the two conditions removes the long-lived offenders whatever
+    else happens; grouping on top would then cover the residual event and urgent cases, and
+    because conditions no longer post separately the collapsed-group state would be rare.
+  </p>
+
+  <hr class="hr">
+
+  <h2>The condition strip, specified</h2>
+  <p class="sub">
+    Revised after review: the strip was carrying its own type scale and a rule border, which made
+    it read heavier than the bars it sits above. It now borrows the bar rows' two type sizes
+    exactly and earns its separation from a tint instead of a border.
+  </p>
+  <table style="max-width:820px">
+    <tr><th>Token</th><th>Value</th><th>Borrowed from</th></tr>
+    <tr><td>Condition title</td><td><b>13.5 dp</b>, semibold, <code>onSurface</code></td><td><code>labelPaint</code> — the bar row's label</td></tr>
+    <tr><td>Condition detail</td><td><b>12 dp</b>, regular, <code>muted</code></td><td><code>subPaint</code> — the bar row's sub line</td></tr>
+    <tr><td>Strip background</td><td>theme accent @ <b>13%</b> alpha; error red @ 13% for stale</td><td>new</td></tr>
+    <tr><td>Corner radius</td><td><b>8 dp</b></td><td>new</td></tr>
+    <tr><td>Padding</td><td><b>7 dp</b> vertical, <b>9 dp</b> horizontal</td><td>new</td></tr>
+    <tr><td>Status dot</td><td><b>6 dp</b>, solid, same hue as the tint</td><td>new</td></tr>
+    <tr><td>Gap below strip</td><td><b>12 dp</b></td><td><code>rowGap</code>, less the bar's tick overhang</td></tr>
+  </table>
+  <p class="sub" style="margin-top:14px">
+    Net height per condition is about <b>44 dp</b> single-line, <b>58 dp</b> when the detail wraps
+    to two — against roughly 55 dp for a bar row with a sub line. So the displacement rule stays
+    one condition ≈ one model cap.
+  </p>
+
+  <hr class="hr">
+
+  <h2>Settings — event alert lifetime</h2>
+  <p class="sub">
+    The timeout becomes a setting rather than a constant. "Auto" ties the alert's life to the
+    thing it is about, which is the only option that never expires an alert while it's still true.
+  </p>
+  <div class="row">
+    <div class="col">
+      <p class="cap">settings row</p>
+      <div class="sheet">
+        <div class="shead">Alerts</div>
+        <div class="srow">
+          <div style="flex:1">
+            <div class="st">Keep alerts in the shade for</div>
+            <div class="ss">Resets, thresholds, pace and update notices clear themselves after this.</div>
+          </div>
+          <div class="sv">Auto</div>
+        </div>
+        <div class="srow">
+          <div style="flex:1">
+            <div class="st">Pace alerts</div>
+            <div class="ss">Warn when a window is on track to run out early</div>
+          </div>
+          <div class="sv">On</div>
+        </div>
+      </div>
+      <p class="note">
+        Sits in the existing Alerts section. Sign-in and data-freshness conditions are
+        <strong>not</strong> affected — they fold into the panel and clear on their own.
+      </p>
+    </div>
+
+    <div class="col">
+      <p class="cap">the four options</p>
+      <div class="sheet">
+        <div class="shead">Keep alerts in the shade for</div>
+        <div class="opt"><div class="radio"></div><div>15 minutes</div></div>
+        <div class="opt"><div class="radio"></div><div>30 minutes</div></div>
+        <div class="opt"><div class="radio"></div><div>1 hour</div></div>
+        <div class="opt">
+          <div class="radio on"></div>
+          <div>
+            <div>Auto</div>
+            <div class="os">Until the window the alert is about resets</div>
+          </div>
+        </div>
+      </div>
+      <p class="note">
+        <strong>Auto is the default.</strong> A "5-hour window will run out" notice is pointless
+        once that window has reset, and meaningful right up until it does.
+      </p>
+    </div>
+
+    <div class="col">
+      <p class="cap warn">what Auto means per alert</p>
+      <div class="sheet">
+        <div class="srow"><div style="flex:1"><div class="st">Pace · threshold</div><div class="ss">Until that window resets</div></div></div>
+        <div class="srow"><div style="flex:1"><div class="st">Window reset</div><div class="ss">Until the next reset of the same window</div></div></div>
+        <div class="srow"><div style="flex:1"><div class="st">Update available</div><div class="ss">No window to key off — falls back to 1 hour</div></div></div>
+      </div>
+      <p class="note bad">
+        The update notice is the <strong>one that doesn't fit the model</strong>. Falling back to
+        an hour is a guess; leaving it permanent is the other option.
+      </p>
+    </div>
+  </div>
+
+  <h3>Settled</h3>
+  <div class="q done">
+    <b>Reset line.</b> Dropped from the collapsed row while a condition is live — the warning
+    outranks it. Reset time remains in the expanded panel throughout.
+  </div>
+  <div class="q done">
+    <b>Event timeout.</b> Configurable: 15m / 30m / 1h / Auto, defaulting to Auto.
+  </div>
+  <div class="q done">
+    <b>Condition type scale.</b> Matched to the bar rows at 13.5/12 dp, separated by a tint
+    rather than a border.
+  </div>
+
+  <h3>Still open</h3>
+  <div class="q">
+    Panel text is drawn into a bitmap, so it ignores the system font-size setting. Two condition
+    strips of wrapped text make that more noticeable than four short bar labels do. Not a blocker
+    for this change — it is pre-existing — but it gets worse here.
+  </div>
+</div>

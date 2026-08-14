@@ -1,0 +1,608 @@
+<title>Ring Faces — CCBG-10 / CCBG-11 (rev B)</title>
+<style>
+  :root {
+    --bg: #FAF8F6; --ink: #26211E; --muted: #6E6660; --accent: #C15F3C;
+    --hair: #E7E1DC; --card: #FFFFFF;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171513; --ink: #EDE8E4; --muted: #9B928B; --accent: #E59980;
+      --hair: #2C2825; --card: #201D1B;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171513; --ink: #EDE8E4; --muted: #9B928B; --accent: #E59980;
+    --hair: #2C2825; --card: #201D1B;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    margin: 0; padding: 48px 24px 96px; line-height: 1.5;
+  }
+  .page { max-width: 1240px; margin: 0 auto; }
+
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 10px;
+  }
+  h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 8px; text-wrap: balance; }
+  .lede { color: var(--muted); max-width: 68ch; margin: 0 0 12px; font-size: 14px; }
+  h2 { font-size: 19px; font-weight: 650; margin: 56px 0 4px; }
+  h3 { font-size: 14px; font-weight: 650; margin: 28px 0 8px; }
+  .sub { color: var(--muted); font-size: 13px; max-width: 76ch; margin: 0 0 16px; }
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px;
+    background: color-mix(in srgb, var(--hair) 55%, transparent);
+    padding: 1px 5px; border-radius: 4px;
+  }
+  .flag {
+    margin: 14px 0 4px; padding: 12px 16px; border-radius: 10px;
+    background: var(--card); border: 1px solid var(--hair);
+    font-size: 13.5px; max-width: 82ch;
+  }
+  .flag b { font-weight: 650; }
+
+  .boards { display: flex; flex-wrap: wrap; gap: 14px; }
+  .board {
+    border-radius: 18px; padding: 22px 24px; border: 1px solid var(--hair);
+    display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; flex: 1 1 100%;
+  }
+  .board.lt { background: linear-gradient(140deg, #BFCEDF 0%, #D9CDBD 55%, #E6D6C3 100%); }
+  .board.dk { background: linear-gradient(140deg, #202C3A 0%, #33292E 60%, #3A2E30 100%); }
+  .boardcap {
+    width: 100%; margin: -4px 0 0;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+  }
+  .lt .boardcap { color: rgba(20,20,30,.6); } .dk .boardcap { color: rgba(255,255,255,.5); }
+
+  .tilewrap { display: flex; flex-direction: column; }
+  .tilecap {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 10px; margin-top: 8px; line-height: 1.45; max-width: 330px;
+  }
+  .lt .tilecap { color: rgba(30,30,40,.78); } .dk .tilecap { color: rgba(255,255,255,.66); }
+  .tilecap b { font-weight: 700; }
+
+  /* Frames are authored in dp (1px = 1dp) at zoom 2, so ring SVGs are drawn at
+     scale 1 and every proportion is the real one. Widgets clip, so these do too. */
+  .w {
+    zoom: 2; border-radius: 22px; box-shadow: 0 10px 26px rgba(0,0,0,.22);
+    position: relative; overflow: hidden;
+  }
+  .w.lt { background: #FFFFFF; color: #1D1D1F; }
+  .w.dk { background: #242428; color: #F5F5F7; }
+  .w .sec { color: rgba(0,0,0,.55); } .w.dk .sec { color: rgba(255,255,255,.60); }
+
+  .mini { padding: 12px 14px; display: flex; flex-direction: column; }
+  .mhead { display: flex; align-items: center; gap: 8px; }
+  .mlabel { font-size: 11px; font-weight: 700; flex: 1; letter-spacing: .04em; }
+  .mupd { font-size: 10px; }
+  .glyph { width: 16px; height: 16px; opacity: .55; }
+  .mrow { display: flex; flex: 1; align-items: center; justify-content: center; }
+  .mcol { display: flex; flex-direction: column; align-items: center; }
+  .mring { position: relative; display: flex; align-items: center; justify-content: center; }
+  .mpct { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-weight: 500; }
+  .mtitle { font-size: 10px; font-weight: 700; margin-top: 3px; }
+  .mcd { font-size: 9px; }
+
+  .rface { display: flex; align-items: center; justify-content: center; }
+  .rstack { display: flex; flex-direction: column; align-items: center; }
+  .rwrap { position: relative; display: flex; align-items: center; justify-content: center; }
+  .rpct { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-weight: 500; }
+  .rprof { font-size: 9px; letter-spacing: .04em; }
+  .rline { font-size: 10px; }
+  .rline.big { font-size: 11px; }
+  .lscape { display: flex; align-items: center; gap: 12px; height: 100%; padding: 12px; }
+  .lcol { display: flex; flex-direction: column; }
+  .bore { position: absolute; border: 1px dashed rgba(220,0,0,.5); border-radius: 50%; }
+  .refresh { position: absolute; top: 5px; right: 5px; width: 15px; height: 15px; opacity: .45; }
+  .pill {
+    position: absolute; left: 50%; transform: translateX(-50%); bottom: 6px;
+    font-size: 9px; padding: 1px 7px; border-radius: 8px;
+    background: #F9A825; color: #1D1D1F; white-space: nowrap;
+  }
+
+  table.geo { border-collapse: collapse; font-size: 13px; margin-top: 10px; }
+  table.geo th, table.geo td { text-align: left; padding: 6px 16px 6px 0; border-bottom: 1px solid var(--hair); }
+  table.geo th { font-weight: 650; }
+  table.geo td code { font-size: 11.5px; }
+
+  ul.dec { margin: 10px 0 0; padding-left: 20px; font-size: 13.5px; max-width: 84ch; }
+  ul.dec li { margin-bottom: 8px; }
+  ul.dec b { font-weight: 650; }
+  .q {
+    margin-top: 14px; padding: 14px 18px; border-radius: 12px;
+    background: var(--card); border: 1px solid var(--hair); font-size: 13.5px; max-width: 84ch;
+  }
+  .q ol { padding-left: 20px; margin: 8px 0 0; }
+  .q li { margin-bottom: 7px; }
+</style>
+
+<div class="page">
+  <p class="eyebrow">CCBG-10 (Mini-Rings Emptiness) &middot; CCBG-11 (Ring Face Clutter) &middot; rev B &middot; 2026-08-13</p>
+  <h1>The two ring faces, small-first</h1>
+  <p class="lede">
+    Rev B, after review: the mini-rings face optimises for <b>three rings, not four</b>, and
+    the single ring is designed for the <b>small size it was always declared for</b> rather
+    than for a large placement. In both, the ring takes as much of the face as it can and
+    the words move out of its way — the battery-gauge read.
+  </p>
+  <p class="lede">
+    Frames are drawn in dp at 2&times; and clip like real widgets. Ring geometry is the
+    shipped <code>RingRenderer</code>, pace marks included (CCRM-43 (Bar Pace Marks)). The
+    dashed red circle is the <b>bore</b>: the largest circle of clear space inside the
+    stroke. Text crossing it is text the ring is crowding.
+  </p>
+
+  <!-- ================================================================= -->
+  <h2>1 · CCBG-10 — mini-rings, tuned for three</h2>
+  <p class="sub">
+    The ring stops being a hardcoded 56&nbsp;dp and takes the room the face has, up to
+    <b>88&nbsp;dp</b>; one or two rings centre as a group instead of spreading to the
+    quarter points. The row cap drops from four to three, so the widest case the layout has
+    to serve is three — which is what lets the ceiling be this high.
+  </p>
+
+  <h3>1a · Your placement, 363&times;168 dp</h3>
+  <div class="boards">
+    <div class="board lt">
+      <div class="boardcap">Light</div>
+      <div class="tilewrap" data-mini='{"w":363,"h":168,"mode":"current","rows":2}'></div>
+      <div class="tilewrap" data-mini='{"w":363,"h":168,"mode":"proposed","rows":2}'></div>
+    </div>
+    <div class="board dk">
+      <div class="boardcap">Dark</div>
+      <div class="tilewrap" data-mini='{"w":363,"h":168,"mode":"current","rows":2}'></div>
+      <div class="tilewrap" data-mini='{"w":363,"h":168,"mode":"proposed","rows":2}'></div>
+    </div>
+  </div>
+
+  <h3>1b · One and three rings at the same size</h3>
+  <p class="sub">
+    Three is the maximum now, and it's the case the ceiling is set against: at 363&nbsp;dp
+    wide, three 88&nbsp;dp rings still leave comfortable gutters. A payload with more model
+    caps keeps the session and weekly windows and drops the extras, exactly as the
+    four-row rule did.
+  </p>
+  <div class="boards">
+    <div class="board lt">
+      <div class="boardcap">Light</div>
+      <div class="tilewrap" data-mini='{"w":363,"h":168,"mode":"proposed","rows":1}'></div>
+      <div class="tilewrap" data-mini='{"w":363,"h":168,"mode":"proposed","rows":3}'></div>
+    </div>
+    <div class="board dk">
+      <div class="boardcap">Dark</div>
+      <div class="tilewrap" data-mini='{"w":363,"h":168,"mode":"proposed","rows":3}'></div>
+    </div>
+  </div>
+
+  <h3>1c · The declared minimum, 250&times;110 dp</h3>
+  <p class="sub">
+    The provider declares 250&times;110&nbsp;dp, and <b>today's face already overflows
+    there</b> — a fixed 56&nbsp;dp ring plus both text lines don't fit, so the countdown is
+    clipped. The proposed rule can't do that: the ring shrinks, and the countdown drops out
+    before anything gets cut.
+  </p>
+  <div class="boards">
+    <div class="board lt">
+      <div class="boardcap">Light</div>
+      <div class="tilewrap" data-mini='{"w":250,"h":110,"mode":"current","rows":2}'></div>
+      <div class="tilewrap" data-mini='{"w":250,"h":110,"mode":"proposed","rows":2}'></div>
+      <div class="tilewrap" data-mini='{"w":250,"h":110,"mode":"proposed","rows":3}'></div>
+    </div>
+  </div>
+
+  <h3>1d · Not the happy path</h3>
+  <div class="boards">
+    <div class="board lt">
+      <div class="boardcap">Light &middot; 363&times;168 dp</div>
+      <div class="tilewrap" data-mini='{"w":363,"h":168,"mode":"proposed","rows":2,"state":"nodata"}'></div>
+      <div class="tilewrap" data-mini='{"w":363,"h":168,"mode":"proposed","rows":2,"state":"signedout"}'></div>
+      <div class="tilewrap" data-mini='{"w":363,"h":168,"mode":"proposed","rows":3,"state":"stale"}'></div>
+      <div class="tilewrap" data-mini='{"w":363,"h":168,"mode":"proposed","rows":3,"state":"hot"}'></div>
+    </div>
+  </div>
+
+  <!-- ================================================================= -->
+  <h2>2 · CCBG-11 — the single ring, at the size it's meant to be</h2>
+
+  <div class="flag">
+    <b>The provider already declares this widget 2&times;2, minimum 110&times;110&nbsp;dp</b>
+    (<code>ring_widget_info.xml</code>). Small is the intended shape, and the
+    178&times;240&nbsp;dp placement is the outlier. That matters, because at the declared
+    size today's four lines are <b>far worse</b> than what was reported: the bore holds about
+    57&nbsp;dp of text and the stack needs roughly 71&nbsp;dp. It doesn't crowd — it
+    overflows.
+  </div>
+
+  <h3>2a · Today, at the three sizes that matter</h3>
+  <div class="boards">
+    <div class="board lt">
+      <div class="boardcap">Light &middot; today</div>
+      <div class="tilewrap" data-ring='{"w":110,"h":110,"mode":"current"}'></div>
+      <div class="tilewrap" data-ring='{"w":150,"h":150,"mode":"current"}'></div>
+      <div class="tilewrap" data-ring='{"w":178,"h":240,"mode":"current"}'></div>
+    </div>
+  </div>
+
+  <h3>2b · Proposed — the bore holds the number, and nothing else</h3>
+  <p class="sub">
+    One rule instead of a stack: <b>the percentage lives inside the ring; every other word
+    lives outside it.</b> That's what lets the ring reach the edge of the face and stay
+    legible at 110&nbsp;dp. How much goes outside depends on the room — one line, two lines,
+    or a column beside the ring on a wide short face.
+  </p>
+  <div class="boards">
+    <div class="board lt">
+      <div class="boardcap">Light &middot; proposed, four size classes</div>
+      <div class="tilewrap" data-ring='{"w":110,"h":110,"mode":"new"}'></div>
+      <div class="tilewrap" data-ring='{"w":150,"h":150,"mode":"new"}'></div>
+      <div class="tilewrap" data-ring='{"w":178,"h":240,"mode":"new"}'></div>
+      <div class="tilewrap" data-ring='{"w":250,"h":110,"mode":"new"}'></div>
+    </div>
+    <div class="board dk">
+      <div class="boardcap">Dark</div>
+      <div class="tilewrap" data-ring='{"w":110,"h":110,"mode":"new"}'></div>
+      <div class="tilewrap" data-ring='{"w":150,"h":150,"mode":"new"}'></div>
+      <div class="tilewrap" data-ring='{"w":178,"h":240,"mode":"new"}'></div>
+      <div class="tilewrap" data-ring='{"w":250,"h":110,"mode":"new"}'></div>
+    </div>
+  </div>
+
+  <h3>2c · Four of them side by side — the point of a small widget</h3>
+  <p class="sub">
+    Two profiles &times; two windows at 110&nbsp;dp, the way they'd sit on a home-screen row.
+    Each ring is its own reading, and the pace tick and the red keep working at this size —
+    the last one is over pace at 100%.
+  </p>
+  <div class="boards">
+    <div class="board lt">
+      <div class="boardcap">Light</div>
+      <div class="tilewrap" data-ring='{"w":110,"h":110,"mode":"new","pct":66,"el":61,"prof":"WORK","cd":"1h 53m"}'></div>
+      <div class="tilewrap" data-ring='{"w":110,"h":110,"mode":"new","pct":13,"el":56,"prof":"WORK","cd":"3d 2h"}'></div>
+      <div class="tilewrap" data-ring='{"w":110,"h":110,"mode":"new","pct":52,"el":97,"prof":"PERSONAL","cd":"5h 13m"}'></div>
+      <div class="tilewrap" data-ring='{"w":110,"h":110,"mode":"new","pct":100,"el":62,"prof":"WORK","cd":"soon"}'></div>
+    </div>
+    <div class="board dk">
+      <div class="boardcap">Dark</div>
+      <div class="tilewrap" data-ring='{"w":110,"h":110,"mode":"new","pct":66,"el":61,"prof":"WORK","cd":"1h 53m"}'></div>
+      <div class="tilewrap" data-ring='{"w":110,"h":110,"mode":"new","pct":13,"el":56,"prof":"WORK","cd":"3d 2h"}'></div>
+      <div class="tilewrap" data-ring='{"w":110,"h":110,"mode":"new","pct":52,"el":97,"prof":"PERSONAL","cd":"5h 13m"}'></div>
+      <div class="tilewrap" data-ring='{"w":110,"h":110,"mode":"new","pct":100,"el":62,"prof":"WORK","cd":"soon"}'></div>
+    </div>
+  </div>
+
+  <h3>2d · Not the happy path</h3>
+  <div class="boards">
+    <div class="board lt">
+      <div class="boardcap">Light</div>
+      <div class="tilewrap" data-ring='{"w":110,"h":110,"mode":"new","state":"nodata"}'></div>
+      <div class="tilewrap" data-ring='{"w":110,"h":110,"mode":"new","state":"signedout"}'></div>
+      <div class="tilewrap" data-ring='{"w":150,"h":150,"mode":"new","state":"stale"}'></div>
+      <div class="tilewrap" data-ring='{"w":150,"h":150,"mode":"new","state":"solo"}'></div>
+    </div>
+  </div>
+
+  <h3>2e · The rule</h3>
+  <table class="geo">
+    <tr><th>Face</th><th>Ring</th><th>Inside</th><th>Outside</th></tr>
+    <tr>
+      <td>110&times;110 — the declared 2&times;2</td>
+      <td><code>81 dp</code></td>
+      <td>percentage, 21 sp</td>
+      <td>countdown under the ring</td>
+    </tr>
+    <tr>
+      <td>150&times;150</td>
+      <td><code>108 dp</code></td>
+      <td>percentage, 28 sp</td>
+      <td>profile above, countdown under</td>
+    </tr>
+    <tr>
+      <td>178&times;240 — your placement</td>
+      <td><code>140 dp</code>, capped</td>
+      <td>percentage, 36 sp</td>
+      <td>profile above; countdown and exact reset under</td>
+    </tr>
+    <tr>
+      <td>250&times;110 — wide and short</td>
+      <td><code>86 dp</code></td>
+      <td>percentage, 22 sp</td>
+      <td>profile, countdown, exact reset in a column beside it</td>
+    </tr>
+    <tr>
+      <td colspan="4" style="border-bottom:none">
+        <code>ring = clamp(min(w, h − outside) − 12, 48, 140)</code> &middot;
+        <code>stroke = ring / 16</code> &middot;
+        <code>percentage = clamp(0.26 × ring, 14, 40) sp</code>
+      </td>
+    </tr>
+  </table>
+
+  <!-- ================================================================= -->
+  <h2>3 · What rev B proposes</h2>
+  <ul class="dec">
+    <li><b>CCBG-10 · the ring takes the room, three-ring maximum.</b> Diameter computed from
+      the face instead of pinned at 56&nbsp;dp, ceiling 88&nbsp;dp; one or two rings centre
+      as a group. <code>windowRows</code> gains a <code>max</code> parameter and the
+      mini-rings face passes <b>3</b>; its only other caller keeps 4, so nothing else
+      moves.</li>
+    <li><b>CCBG-11 · the bore holds the percentage, full stop.</b> Profile, countdown and
+      exact reset all move outside the ring. That is what frees the ring to fill the face,
+      and it is why this now works at 110&nbsp;dp, where today's layout can't.</li>
+    <li><b>The ring is capped at 140&nbsp;dp.</b> Past that a solo ring stops being a gauge
+      and becomes a poster. On a tall placement the extra height goes to the lines under it
+      rather than to a bigger circle.</li>
+    <li><b>Both faces turn out to fix an overflow, not just an emptiness.</b> At their
+      declared minimums — 250&times;110 for mini-rings, 110&times;110 for the ring — today's
+      layouts clip their own text. Neither had been looked at at those sizes.</li>
+    <li><b>Not changing:</b> the pace tick and red segment, the severity ladder, the refresh
+      glyph's corner, the stale pill, or what either face says when signed out.</li>
+  </ul>
+
+  <div class="q">
+    <b>To decide.</b>
+    <ol>
+      <li>The 140&nbsp;dp ring cap — right ceiling, or should a tall placement just keep
+        growing the circle?</li>
+      <li>At 110&nbsp;dp only the percentage and one line fit. Is the countdown the right
+        survivor, or would you rather that line was the profile name on a two-account
+        phone?</li>
+      <li>Mini-rings at 88&nbsp;dp — keep that ceiling, or let a one- or two-ring face go
+        bigger still now that three is the maximum?</li>
+    </ol>
+  </div>
+</div>
+
+<script>
+  var PAL = {
+    light: { fg: '#1D1D1F', tickA: 0.48, accent: '#D97757', y: '#F9A825', o: '#F57C00', r: '#C62828', track: 0.10 },
+    dark:  { fg: '#F2F2F4', tickA: 0.60, accent: '#E59980', y: '#FDD663', o: '#FFA726', r: '#FF5252', track: 0.14 }
+  };
+  var DEAD = 3.0;
+  function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
+  function barColor(pct, p) {
+    var v = pct == null ? 0 : pct;
+    if (v >= 100) return p.r;
+    if (v > 90) return p.o;
+    if (v > 80) return p.y;
+    return p.accent;
+  }
+
+  // The shipped RingRenderer in SVG: track · fill · red · tick, the red round-capped
+  // at both ends and trimmed back to the tick (CCRM-43 D7).
+  function ring(size, stroke, percent, elapsed, dark) {
+    var p = dark ? PAL.dark : PAL.light;
+    var over = 0.3 * stroke, inset = stroke / 2 + over;
+    var c = size / 2, R = c - inset;
+    var pct = percent == null ? 0 : clamp(percent / 100, 0, 1);
+    var el = elapsed == null ? null : clamp(elapsed / 100, 0, 1);
+    var fill = barColor(percent, p);
+    function pt(t) {
+      var rad = t * 2 * Math.PI;
+      return (c + R * Math.cos(rad)) + ' ' + (c + R * Math.sin(rad));
+    }
+    function arc(a0, a1) {
+      return 'M ' + pt(a0) + ' A ' + R + ' ' + R + ' 0 ' + ((a1 - a0) > 0.5 ? 1 : 0) + ' 1 ' + pt(a1);
+    }
+    var s = '<svg width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size +
+      '" style="display:block"><g transform="rotate(-90 ' + c + ' ' + c + ')">';
+    s += '<circle cx="' + c + '" cy="' + c + '" r="' + R + '" fill="none" stroke="' + p.fg +
+      '" stroke-opacity="' + p.track + '" stroke-width="' + stroke + '"/>';
+    if (percent != null && pct > 0) {
+      if (pct >= 1) {
+        s += '<circle cx="' + c + '" cy="' + c + '" r="' + R + '" fill="none" stroke="' + fill +
+          '" stroke-width="' + stroke + '"/>';
+      } else {
+        s += '<path d="' + arc(0, pct) + '" fill="none" stroke="' + fill +
+          '" stroke-width="' + stroke + '" stroke-linecap="round"/>';
+      }
+      if (el != null && percent > elapsed + DEAD) {
+        s += '<path d="' + arc(el, Math.min(pct, 0.9995)) + '" fill="none" stroke="' + p.r +
+          '" stroke-width="' + stroke + '" stroke-linecap="round"/>';
+        if (el > 0) {
+          s += '<path d="' + arc(0, el) + '" fill="none" stroke="' + fill +
+            '" stroke-width="' + stroke + '" stroke-linecap="butt"/>';
+        }
+      }
+    }
+    s += '</g>';
+    if (percent != null && el != null) {
+      var a = -Math.PI / 2 + el * 2 * Math.PI;
+      var rIn = R - stroke / 2 - over, rOut = R + stroke / 2 + over;
+      s += '<line x1="' + (c + rIn * Math.cos(a)) + '" y1="' + (c + rIn * Math.sin(a)) +
+        '" x2="' + (c + rOut * Math.cos(a)) + '" y2="' + (c + rOut * Math.sin(a)) +
+        '" stroke="' + p.fg + '" stroke-opacity="' + p.tickA + '" stroke-width="' +
+        Math.max(2, 0.31 * stroke) + '" stroke-linecap="round"/>';
+    }
+    return s + '</svg>';
+  }
+
+  var REFRESH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+    'stroke-linecap="round"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/></svg>';
+
+  // ---------- mini-rings ----------
+  var WINDOWS = [
+    { title: '5h', pct: 66, elapsed: 61, cd: '1h 53m' },
+    { title: '7d', pct: 13, elapsed: 56, cd: '3d 2h' },
+    { title: 'Opus', pct: 84, elapsed: 56, cd: '3d 2h' }
+  ];
+
+  function miniGeom(cfg) {
+    var n = cfg.rows, contentW = cfg.w - 28, rowH = cfg.h - 24 - 16 - 6;
+    if (cfg.mode === 'current') {
+      return {
+        d: 56, stroke: 5.5, pctSp: 13, showCd: true, showTitle: true,
+        colW: contentW / n, overflow: rowH < 56 + 28
+      };
+    }
+    var d = clamp(Math.min(contentW / n - 12, rowH - 28 - 6), 36, 88);
+    var showCd = d >= 44;
+    // Reclaim the countdown's height before judging the title, or the title drops
+    // on the strength of a diameter that no longer applies.
+    if (!showCd) d = clamp(Math.min(contentW / n - 12, rowH - 16 - 6), 36, 88);
+    return {
+      d: d, stroke: 0.098 * d, pctSp: clamp(13 * d / 56, 11, 20),
+      showCd: showCd, showTitle: d >= 38,
+      colW: Math.min(contentW / n, d + 28), overflow: false
+    };
+  }
+
+  function miniFace(cfg, dark) {
+    var g = miniGeom(cfg), state = cfg.state || 'ok', body;
+    if (state === 'signedout') {
+      body = '<div class="mrow"><div style="text-align:center"><div style="font-size:13px">' +
+        'No account connected</div><div class="sec" style="font-size:11px">Tap to set up</div></div></div>';
+    } else if (state === 'nodata') {
+      body = '<div class="mrow"><div style="text-align:center"><div style="font-size:13px">' +
+        'No data yet</div><div class="sec" style="font-size:11px">Waiting for first fetch</div></div></div>';
+    } else {
+      var cols = '';
+      for (var i = 0; i < cfg.rows; i++) {
+        var win = WINDOWS[i];
+        var pct = state === 'hot' ? [100, 96, 84][i] : win.pct;
+        var el = state === 'hot' ? [62, 61, 56][i] : win.elapsed;
+        cols += '<div class="mcol" style="width:' + g.colW + 'px">' +
+          '<div class="mring" style="width:' + g.d + 'px;height:' + g.d + 'px">' +
+            ring(g.d, g.stroke, pct, el, dark) +
+            '<div class="mpct" style="font-size:' + g.pctSp.toFixed(1) + 'px">' + Math.trunc(pct) + '%</div>' +
+          '</div>' +
+          (g.showTitle ? '<div class="mtitle">' + win.title + '</div>' : '') +
+          (g.showCd ? '<div class="mcd sec">' + win.cd + '</div>' : '') +
+        '</div>';
+      }
+      body = '<div class="mrow">' + cols + '</div>';
+    }
+    var right = state === 'stale'
+      ? '<span class="pill" style="position:static;transform:none">Stale · 2h</span>'
+      : '<span class="mupd sec">Updated 1m ago</span>';
+    return '<div class="w mini ' + (dark ? 'dk' : 'lt') + '" style="width:' + cfg.w +
+      'px;height:' + cfg.h + 'px"><div class="mhead"><span class="mlabel">WORK</span>' +
+      right + '<span class="glyph">' + REFRESH + '</span></div>' + body + '</div>';
+  }
+
+  document.querySelectorAll('[data-mini]').forEach(function (el) {
+    var cfg = JSON.parse(el.getAttribute('data-mini'));
+    var dark = !!el.closest('.dk');
+    var g = miniGeom(cfg), cap;
+    if (cfg.state && cfg.state !== 'ok') {
+      cap = '<b>' + ({ nodata: 'No data', signedout: 'Signed out', stale: 'Stale pill',
+                       hot: 'Over pace · 100%, 96%, 84%' })[cfg.state] + '</b>';
+    } else if (cfg.mode === 'current') {
+      cap = '<b>Today</b> · ' + cfg.rows + ' rings · fixed <b>56dp</b>' +
+        (g.overflow ? ' · <b>the stack overflows at this height, so the countdown is clipped</b>'
+                    : ' · columns split the full width');
+    } else {
+      cap = '<b>Proposed</b> · ' + cfg.rows + ' ring' + (cfg.rows > 1 ? 's' : '') + ' · <b>' +
+        Math.round(g.d) + 'dp</b>' + (g.showCd ? '' : ' · countdown dropped') +
+        (g.showTitle ? '' : ', title dropped');
+    }
+    el.innerHTML = miniFace(cfg, dark) + '<div class="tilecap">' + cap + '</div>';
+  });
+
+  // ---------- the single ring ----------
+  function ringGeom(cfg) {
+    if (cfg.w >= cfg.h * 1.6) {
+      var dl = clamp(cfg.h - 24, 48, 140);
+      return { kind: 'landscape', d: dl, stroke: dl / 16, pctSp: clamp(0.26 * dl, 14, 40) };
+    }
+    var lines = cfg.h >= 200 ? 2 : 1;          // countdown, then the exact reset
+    var above = cfg.h >= 140;                  // room for the profile name over the ring
+    var outside = lines * 13 + 4 + (above ? 13 : 0);
+    var d = clamp(Math.min(cfg.w, cfg.h - outside) - 12, 48, 140);
+    return {
+      kind: 'stack', d: d, stroke: d / 16, pctSp: clamp(0.26 * d, 14, 40),
+      lines: lines, above: above
+    };
+  }
+
+  function ringFace(cfg, dark) {
+    var state = cfg.state || 'ok';
+    var pct = cfg.pct != null ? cfg.pct : 66;
+    var el = cfg.el != null ? cfg.el : 61;
+    var prof = cfg.prof || 'WORK';
+    var cd = cfg.cd || '1h 53m';
+    var moment = 'today at 9:10 pm';
+    if (state === 'nodata' || state === 'signedout') { pct = null; el = null; }
+
+    var d, stroke, bore;
+    if (cfg.mode === 'current') {
+      d = Math.max(72, Math.min(cfg.w, cfg.h) - 18);
+      stroke = d * (8 / 128);
+      bore = d - 2 * stroke - 8;
+      return '<div class="w rface ' + (dark ? 'dk' : 'lt') + '" style="width:' + cfg.w +
+        'px;height:' + cfg.h + 'px">' +
+        '<div class="rwrap" style="width:' + d + 'px;height:' + d + 'px">' +
+          ring(d, stroke, pct, el, dark) +
+          '<div class="rpct" style="flex-direction:column;font-weight:400">' +
+            '<div class="rprof sec">' + prof + '</div>' +
+            '<div style="font-size:25px;font-weight:500;line-height:1.1">' + pct + '%</div>' +
+            '<div style="font-size:12px" class="sec">' + cd + '</div>' +
+            '<div style="font-size:10px" class="sec">' + moment + '</div>' +
+          '</div>' +
+          '<div class="bore" style="width:' + bore + 'px;height:' + bore + 'px"></div>' +
+        '</div><span class="refresh">' + REFRESH + '</span></div>';
+    }
+
+    var g = ringGeom(cfg);
+    d = g.d; stroke = g.stroke; bore = d - 2 * stroke - 8;
+    var ringBlock =
+      '<div class="rwrap" style="width:' + d + 'px;height:' + d + 'px">' +
+        ring(d, stroke, pct, el, dark) +
+        '<div class="rpct" style="font-size:' + g.pctSp.toFixed(1) + 'px">' +
+          (pct == null ? '—' : pct + '%') + '</div>' +
+        '<div class="bore" style="width:' + bore + 'px;height:' + bore + 'px"></div>' +
+      '</div>';
+
+    var body;
+    if (state === 'signedout') {
+      body = '<div style="text-align:center;font-size:12px">No account<br>connected' +
+        '<div class="rline sec">Tap to set up</div></div>';
+    } else if (g.kind === 'landscape') {
+      body = '<div class="lscape">' + ringBlock +
+        '<div class="lcol"><div class="rprof sec">' + prof + '</div>' +
+        '<div class="rline big">' + cd + '</div>' +
+        '<div class="rline sec">' + moment + '</div></div></div>';
+    } else {
+      body = '<div class="rstack">' +
+        (g.above && state !== 'solo' ? '<div class="rprof sec" style="margin-bottom:3px">' + prof + '</div>' : '') +
+        ringBlock +
+        (state === 'nodata'
+          ? '<div class="rline sec" style="margin-top:4px">Waiting</div>'
+          : '<div class="rline sec" style="margin-top:4px">' + cd + '</div>' +
+            (g.lines > 1 ? '<div class="rline sec">' + moment + '</div>' : '')) +
+      '</div>';
+    }
+
+    return '<div class="w rface ' + (dark ? 'dk' : 'lt') + '" style="width:' + cfg.w +
+      'px;height:' + cfg.h + 'px">' + body + '<span class="refresh">' + REFRESH + '</span>' +
+      (state === 'stale' ? '<span class="pill">Stale · 2h</span>' : '') + '</div>';
+  }
+
+  document.querySelectorAll('[data-ring]').forEach(function (el) {
+    var cfg = JSON.parse(el.getAttribute('data-ring'));
+    var dark = !!el.closest('.dk');
+    var cap;
+    if (cfg.mode === 'current') {
+      var d = Math.max(72, Math.min(cfg.w, cfg.h) - 18);
+      var boreSq = ((d - 2 * (d * 8 / 128) - 8) / 1.414).toFixed(0);
+      cap = '<b>Today</b> · ' + cfg.w + '×' + cfg.h + ' · ring ' + Math.round(d) +
+        'dp · bore fits ~' + boreSq + 'dp of text; the stack needs ~71dp';
+    } else if (cfg.state && cfg.state !== 'ok') {
+      cap = '<b>' + ({ nodata: 'No data', signedout: 'Signed out', stale: 'Stale pill',
+                       solo: 'Single profile — no name' })[cfg.state] + '</b> · ' +
+        cfg.w + '×' + cfg.h;
+    } else {
+      var g = ringGeom(cfg);
+      cap = '<b>Proposed</b> · ' + cfg.w + '×' + cfg.h + ' · ring <b>' + Math.round(g.d) + 'dp</b> · ' +
+        (g.kind === 'landscape'
+          ? 'column beside'
+          : g.lines + ' line' + (g.lines > 1 ? 's' : '') + ' under' + (g.above ? ', name above' : ''));
+    }
+    el.innerHTML = ringFace(cfg, dark) + '<div class="tilecap">' + cap + '</div>';
+  });
+</script>
