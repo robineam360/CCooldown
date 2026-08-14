@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    CCBG-12 (Status Icon Swap): expanded view for alert notifications.
+
+    Mirrors notif_big_number_expanded.xml's scale — the title goes up to 14sp once there
+    is room, the body stays at 12sp — so an expanded alert and the expanded pinned
+    notification agree line for line. The body is the one place the two differ on line
+    count: an alert's text is a sentence rather than a reset stamp, so it wraps.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingTop="2dp"
+    android:paddingBottom="4dp">
+
+    <TextView
+        android:id="@+id/title"
+        style="@android:style/TextAppearance.Material.Notification.Title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="14sp"
+        android:maxLines="2"
+        android:ellipsize="end" />
+
+    <TextView
+        android:id="@+id/sub"
+        style="@android:style/TextAppearance.Material.Notification.Info"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:textSize="12sp"
+        android:maxLines="8"
+        android:ellipsize="end" />
+</LinearLayout>

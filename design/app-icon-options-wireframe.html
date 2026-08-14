@@ -1,0 +1,344 @@
+<title>App Icon Options — CCBG-12</title>
+<style>
+  :root {
+    --bg: #FAF8F6; --ink: #26211E; --muted: #6E6660; --accent: #C15F3C;
+    --hair: #E7E1DC; --card: #FFFFFF; --bad: #B3402A; --good: #2F6D44; --warn: #9A6B1E;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171513; --ink: #EDE8E4; --muted: #9B928B; --accent: #E59980;
+      --hair: #2C2825; --card: #201D1B; --bad: #E08268; --good: #7FC08F; --warn: #D8AC63;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171513; --ink: #EDE8E4; --muted: #9B928B; --accent: #E59980;
+    --hair: #2C2825; --card: #201D1B; --bad: #E08268; --good: #7FC08F; --warn: #D8AC63;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    margin: 0; padding: 48px 24px 96px; line-height: 1.5;
+  }
+  .page { max-width: 1240px; margin: 0 auto; }
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 10px;
+  }
+  h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 8px; text-wrap: balance; }
+  .lede { color: var(--muted); max-width: 70ch; margin: 0 0 12px; font-size: 14px; }
+  h2 { font-size: 19px; font-weight: 650; letter-spacing: -0.01em; margin: 54px 0 4px; }
+  h3 { font-size: 14px; font-weight: 650; margin: 26px 0 8px; }
+  .sub { color: var(--muted); font-size: 13px; max-width: 80ch; margin: 0 0 18px; }
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px;
+    background: color-mix(in srgb, var(--hair) 55%, transparent);
+    padding: 1px 5px; border-radius: 4px;
+  }
+  .hr { height: 1px; background: var(--hair); margin: 46px 0 0; border: 0; }
+  .cap {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--muted); margin: 0 0 10px;
+  }
+  .cap.bad { color: var(--bad); }
+  .cap.good { color: var(--good); }
+
+  .grid { display: flex; flex-wrap: wrap; gap: 18px; align-items: stretch; }
+  .opt {
+    flex: 1 1 268px; max-width: 300px;
+    border: 1px solid var(--hair); border-radius: 18px; padding: 20px;
+    background: var(--card);
+  }
+  .opt.reject { opacity: .62; }
+  .opt h4 { margin: 0 0 2px; font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
+  .opt .tag {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent);
+  }
+  .opt p { font-size: 12.5px; color: var(--muted); margin: 10px 0 0; }
+  .opt p b { color: var(--ink); }
+
+  .launch {
+    width: 96px; height: 96px; border-radius: 22px; margin: 16px 0 14px;
+    background: #343F50; display: flex; align-items: center; justify-content: center;
+  }
+  .statusstrip {
+    display: flex; align-items: center; gap: 10px;
+    background: #16171A; border-radius: 10px; padding: 8px 12px; margin: 0 0 4px;
+    color: #F2F2F4; font-size: 11px; font-weight: 600;
+  }
+  .statusstrip .sp { flex: 1; }
+  .statusstrip .sig { opacity: .7; font-size: 9px; }
+  .sizes { display: flex; align-items: flex-end; gap: 14px; margin: 12px 0 0; }
+  .sizes .z { text-align: center; }
+  .sizes .z span { display: block; font-size: 9.5px; color: var(--muted); margin-top: 4px; }
+
+  table { border-collapse: collapse; margin: 12px 0 0; font-size: 13px; width: 100%; max-width: 1020px; }
+  th, td { text-align: left; padding: 8px 14px 8px 0; border-bottom: 1px solid var(--hair); vertical-align: top; }
+  th { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 650; }
+  .yes { color: var(--good); font-weight: 650; }
+  .no { color: var(--bad); font-weight: 650; }
+  .mid { color: var(--warn); font-weight: 650; }
+  .q {
+    border-left: 3px solid var(--accent); padding: 2px 0 2px 14px;
+    margin: 14px 0; font-size: 13.5px; max-width: 78ch;
+  }
+</style>
+
+<div class="page">
+
+  <p class="eyebrow">CCBG-12 · Status Icon Swap · CCRM-42 revision</p>
+  <h1>App icon options — a ring that can't be mistaken for a meter</h1>
+  <p class="lede">
+    The current icon is a 260° arc. That is a gauge at 72%, and the OS puts it in the status bar
+    in place of the real meter. Even once CCBG-12 is fixed, an icon that reads as a filled gauge
+    is a trap waiting for the next OS behaviour change. These options keep the ring and remove
+    the reading.
+  </p>
+
+  <div class="q">
+    <b>Blast radius.</b> This is the launcher icon — home screen, app drawer, Play listing, share
+    card. It is not a status-bar-only change, and there is no way to make it one: the OS reaches
+    for <code>mipmap/ic_launcher</code> specifically. Treat it as a revision to CCRM-42 (App Icon).
+  </div>
+
+  <h2>Today, and why it misreads</h2>
+  <div class="grid">
+    <div class="opt reject">
+      <span class="tag">current</span>
+      <h4>260° arc</h4>
+      <div class="launch">
+        <svg width="70" height="70" viewBox="0 0 108 108">
+          <path d="M35,54 a19,19 0 1 0 38,0 a19,19 0 1 0 -38,0" fill="none" stroke="#5A6376" stroke-width="6.7"/>
+          <path d="M54,35 A19,19 0 1 1 35.29,57.3" fill="none" stroke-width="6.7" stroke-linecap="round"
+                stroke="url(#g0)"/>
+          <defs><linearGradient id="g0" x1="35" y1="35" x2="73" y2="73">
+            <stop offset="0" stop-color="#F2B25C"/><stop offset="1" stop-color="#E8734D"/>
+          </linearGradient></defs>
+        </svg>
+      </div>
+      <div class="statusstrip">
+        <span>1:26</span>
+        <svg width="15" height="15" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="8" fill="none" stroke="#F2F2F4" stroke-opacity=".3" stroke-width="3.4"/>
+          <circle cx="12" cy="12" r="8" fill="none" stroke="#F2F2F4" stroke-width="3.4"
+                  stroke-linecap="round" stroke-dasharray="36.2 100" transform="rotate(-90 12 12)"/>
+        </svg>
+        <span class="sp"></span><span class="sig">5G 59</span>
+      </div>
+      <p>
+        A start point, an end point, and a gap. Every convention says <b>72% of something</b>.
+        Worse, it is the same visual language as our own meter, so it reads as a real reading.
+      </p>
+    </div>
+  </div>
+
+  <hr class="hr">
+
+  <h2>Three options</h2>
+  <p class="sub">
+    Each keeps the ring, the palette, and the stroke weight. Each is shown as the launcher icon
+    and as the status-bar silhouette, which is where the test actually happens — the status bar
+    renders it small and largely stripped of colour.
+  </p>
+
+  <div class="grid">
+
+    <div class="opt">
+      <span class="tag">option A</span>
+      <h4>Closed ring</h4>
+      <div class="launch">
+        <svg width="70" height="70" viewBox="0 0 108 108">
+          <circle cx="54" cy="54" r="19" fill="none" stroke="url(#gA)" stroke-width="6.7"/>
+          <defs><linearGradient id="gA" x1="35" y1="35" x2="73" y2="73">
+            <stop offset="0" stop-color="#F2B25C"/><stop offset="1" stop-color="#E8734D"/>
+          </linearGradient></defs>
+        </svg>
+      </div>
+      <div class="statusstrip">
+        <span>1:26</span>
+        <svg width="15" height="15" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="8" fill="none" stroke="#F2F2F4" stroke-width="3.4"/>
+        </svg>
+        <span class="sp"></span><span class="sig">5G 59</span>
+      </div>
+      <div class="sizes">
+        <div class="z">
+          <svg width="34" height="34" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="3.4"/></svg>
+          <span>34 px</span>
+        </div>
+        <div class="z">
+          <svg width="22" height="22" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="3.4"/></svg>
+          <span>22 px</span>
+        </div>
+        <div class="z">
+          <svg width="15" height="15" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="3.4"/></svg>
+          <span>15 px</span>
+        </div>
+      </div>
+      <p>
+        Remove the gap, keep everything else. <b>No start, no end, nothing to read as progress.</b>
+        Smallest possible change to CCRM-42 — same geometry, same weight, one path instead of two.
+        Risk: a plain <b>O</b> is generic, and the icon loses the two-tone depth the track gave it.
+      </p>
+    </div>
+
+    <div class="opt">
+      <span class="tag">option B</span>
+      <h4>Ring with a centre dot</h4>
+      <div class="launch">
+        <svg width="70" height="70" viewBox="0 0 108 108">
+          <circle cx="54" cy="54" r="19" fill="none" stroke="url(#gB)" stroke-width="6.7"/>
+          <circle cx="54" cy="54" r="6.2" fill="#F2B25C"/>
+          <defs><linearGradient id="gB" x1="35" y1="35" x2="73" y2="73">
+            <stop offset="0" stop-color="#F2B25C"/><stop offset="1" stop-color="#E8734D"/>
+          </linearGradient></defs>
+        </svg>
+      </div>
+      <div class="statusstrip">
+        <span>1:26</span>
+        <svg width="15" height="15" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="8" fill="none" stroke="#F2F2F4" stroke-width="3.4"/>
+          <circle cx="12" cy="12" r="2.6" fill="#F2F2F4"/>
+        </svg>
+        <span class="sp"></span><span class="sig">5G 59</span>
+      </div>
+      <div class="sizes">
+        <div class="z">
+          <svg width="34" height="34" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="3.4"/><circle cx="12" cy="12" r="2.6" fill="currentColor"/></svg>
+          <span>34 px</span>
+        </div>
+        <div class="z">
+          <svg width="22" height="22" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="3.4"/><circle cx="12" cy="12" r="2.6" fill="currentColor"/></svg>
+          <span>22 px</span>
+        </div>
+        <div class="z">
+          <svg width="15" height="15" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="3.4"/><circle cx="12" cy="12" r="2.6" fill="currentColor"/></svg>
+          <span>15 px</span>
+        </div>
+      </div>
+      <p>
+        Closed ring plus a filled bore. Reads as a <b>target or a record mark</b>, never a gauge —
+        the filled centre is the opposite of the meter's empty bore, which is what makes it
+        distinct from our own widget faces. Keeps two tones. Risk: at 15 px the dot and ring can
+        close up on low-density screens; the bore gap needs a floor.
+      </p>
+    </div>
+
+    <div class="opt">
+      <span class="tag">option C</span>
+      <h4>Segmented ring</h4>
+      <div class="launch">
+        <svg width="70" height="70" viewBox="0 0 108 108">
+          <circle cx="54" cy="54" r="19" fill="none" stroke="url(#gC)" stroke-width="6.7"
+                  stroke-linecap="round" stroke-dasharray="20.9 9.95" transform="rotate(-77 54 54)"/>
+          <defs><linearGradient id="gC" x1="35" y1="35" x2="73" y2="73">
+            <stop offset="0" stop-color="#F2B25C"/><stop offset="1" stop-color="#E8734D"/>
+          </linearGradient></defs>
+        </svg>
+      </div>
+      <div class="statusstrip">
+        <span>1:26</span>
+        <svg width="15" height="15" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="8" fill="none" stroke="#F2F2F4" stroke-width="3.4"
+                  stroke-linecap="round" stroke-dasharray="8.8 4.2" transform="rotate(-77 12 12)"/>
+        </svg>
+        <span class="sp"></span><span class="sig">5G 59</span>
+      </div>
+      <div class="sizes">
+        <div class="z">
+          <svg width="34" height="34" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="8.8 4.2" transform="rotate(-77 12 12)"/></svg>
+          <span>34 px</span>
+        </div>
+        <div class="z">
+          <svg width="22" height="22" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="8.8 4.2" transform="rotate(-77 12 12)"/></svg>
+          <span>22 px</span>
+        </div>
+        <div class="z">
+          <svg width="15" height="15" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="8.8 4.2" transform="rotate(-77 12 12)"/></svg>
+          <span>15 px</span>
+        </div>
+      </div>
+      <p>
+        Four equal arcs with four equal gaps, rotationally symmetric. Symmetry is the trick —
+        <b>a gauge needs an origin, and this has none</b>. Reads as a dial or a timer face, which
+        is on-message for a cooldown app. Risk: the busiest of the three at 15 px, and the gaps
+        can fill in on a low-density status bar.
+      </p>
+    </div>
+
+  </div>
+
+  <h3>Considered and rejected</h3>
+  <div class="grid">
+    <div class="opt reject">
+      <span class="tag">rejected</span>
+      <h4>Symmetric gap at the base</h4>
+      <div class="launch">
+        <svg width="70" height="70" viewBox="0 0 108 108">
+          <circle cx="54" cy="54" r="19" fill="none" stroke="#B9805A" stroke-width="6.7"
+                  stroke-linecap="round" stroke-dasharray="95 24" transform="rotate(102 54 54)"/>
+        </svg>
+      </div>
+      <p>Still a gauge — a speedometer instead of a ring gauge. It moves the origin, it doesn't remove it.</p>
+    </div>
+    <div class="opt reject">
+      <span class="tag">rejected</span>
+      <h4>Ring with a filled disc</h4>
+      <div class="launch">
+        <svg width="70" height="70" viewBox="0 0 108 108">
+          <circle cx="54" cy="54" r="19" fill="#B9805A" stroke="#E8734D" stroke-width="6.7"/>
+        </svg>
+      </div>
+      <p>Reads as <b>100% full</b> — the same failure as today, at the far end of the scale.</p>
+    </div>
+    <div class="opt reject">
+      <span class="tag">rejected</span>
+      <h4>Concentric double ring</h4>
+      <div class="launch">
+        <svg width="70" height="70" viewBox="0 0 108 108">
+          <circle cx="54" cy="54" r="21" fill="none" stroke="#E8734D" stroke-width="4.4"/>
+          <circle cx="54" cy="54" r="12" fill="none" stroke="#F2B25C" stroke-width="4.4"/>
+        </svg>
+      </div>
+      <p>Not a gauge, but the two rings merge into a blur below about 18 px. Fails the size that matters.</p>
+    </div>
+  </div>
+
+  <hr class="hr">
+
+  <h2>Comparison</h2>
+  <table>
+    <tr><th>&nbsp;</th><th>A · closed ring</th><th>B · ring + dot</th><th>C · segmented</th></tr>
+    <tr><td>Can be read as a percentage</td><td class="yes">No</td><td class="yes">No</td><td class="yes">No</td></tr>
+    <tr><td>Distinct from our own meter icon</td><td class="mid">Weakly — a full meter looks like this</td><td class="yes">Clearly</td><td class="yes">Clearly</td></tr>
+    <tr><td>Kinship with CCRM-42 as shipped</td><td class="yes">Highest</td><td class="yes">High</td><td class="mid">Moderate</td></tr>
+    <tr><td>Legible at 15 px</td><td class="yes">Best</td><td class="mid">Needs a bore floor</td><td class="mid">Busiest</td></tr>
+    <tr><td>Keeps two-tone depth</td><td class="no">No</td><td class="yes">Yes</td><td class="mid">Only in the gradient</td></tr>
+    <tr><td>Change to the vector</td><td>One path</td><td>Two paths</td><td>One path + dash array</td></tr>
+  </table>
+
+  <p class="sub" style="margin-top:18px">
+    <b>Worth naming:</b> option A's weakness is real. A closed ring is exactly what our own meter
+    looks like at 100%, so in the failure case the icon would read as "maxed out" rather than as a
+    neutral mark. B and C do not have that collision, which is the argument for spending the extra
+    path.
+  </p>
+
+  <h3>Needs deciding</h3>
+  <div class="q">
+    <b>1.</b> Which option — and does the monochrome themed-icon variant
+    (<code>ic_launcher_monochrome.xml</code>) follow it, or stay as it is?
+  </div>
+  <div class="q">
+    <b>2.</b> Does the notification small icon <code>ic_stat_bars</code> (currently three bars,
+    unrelated to the ring) move to match the new mark, or is the family split deliberate?
+  </div>
+  <div class="q">
+    <b>3.</b> These are drawn at the sizes the status bar uses, but not yet <b>on a device</b>.
+    Whichever wins should be rendered on the Fold 7 before it lands — the 15 px column is the one
+    that decides it, and a browser is not a status bar.
+  </div>
+</div>

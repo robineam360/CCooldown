@@ -1,0 +1,481 @@
+<title>Notification Grouping — CCBG-12</title>
+<style>
+  :root {
+    --bg: #FAF8F6;
+    --ink: #26211E;
+    --muted: #6E6660;
+    --accent: #C15F3C;
+    --hair: #E7E1DC;
+    --card: #FFFFFF;
+    --bad: #B3402A;
+    --good: #2F6D44;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171513;
+      --ink: #EDE8E4;
+      --muted: #9B928B;
+      --accent: #E59980;
+      --hair: #2C2825;
+      --card: #201D1B;
+      --bad: #E08268;
+      --good: #7FC08F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171513;
+    --ink: #EDE8E4;
+    --muted: #9B928B;
+    --accent: #E59980;
+    --hair: #2C2825;
+    --card: #201D1B;
+    --bad: #E08268;
+    --good: #7FC08F;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    margin: 0;
+    padding: 48px 24px 96px;
+    line-height: 1.5;
+  }
+  .page { max-width: 1240px; margin: 0 auto; }
+
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 10px;
+  }
+  h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 8px; text-wrap: balance; }
+  .lede { color: var(--muted); max-width: 66ch; margin: 0 0 12px; font-size: 14px; }
+  h2 { font-size: 19px; font-weight: 650; letter-spacing: -0.01em; margin: 56px 0 4px; }
+  h3 { font-size: 14px; font-weight: 650; margin: 26px 0 8px; }
+  .sub { color: var(--muted); font-size: 13px; max-width: 78ch; margin: 0 0 16px; }
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12px;
+    background: color-mix(in srgb, var(--hair) 55%, transparent);
+    padding: 1px 5px; border-radius: 4px;
+  }
+  .hr { height: 1px; background: var(--hair); margin: 44px 0 0; border: 0; }
+
+  /* ---- phone boards ---- */
+  .row { display: flex; flex-wrap: wrap; gap: 22px; align-items: flex-start; }
+  .col { flex: 0 0 auto; }
+  .cap {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--muted); margin: 0 0 8px;
+  }
+  .cap.bad { color: var(--bad); }
+  .cap.good { color: var(--good); }
+
+  .phone {
+    width: 330px;
+    border-radius: 26px;
+    padding: 10px 10px 16px;
+    background: linear-gradient(160deg, #1B1E24 0%, #16171A 100%);
+    border: 1px solid #2E3138;
+  }
+  .statusbar {
+    display: flex; align-items: center; gap: 7px;
+    padding: 6px 10px 12px;
+    color: #F2F2F4; font-size: 12px; font-weight: 600;
+  }
+  .statusbar .spacer { flex: 1; }
+  .statusbar .sig { opacity: .75; font-size: 10px; letter-spacing: .04em; }
+
+  .notif {
+    background: #24262B;
+    border-radius: 20px;
+    padding: 11px 13px;
+    margin: 0 0 7px;
+    display: flex; gap: 11px; align-items: flex-start;
+    color: #E9EAEC;
+  }
+  .notif .avatar {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: #2F3238; flex: 0 0 auto;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .notif .body { flex: 1; min-width: 0; }
+  .notif .t { font-size: 12.5px; font-weight: 650; letter-spacing: -.01em; }
+  .notif .s { font-size: 11.5px; color: #A7ABB2; margin-top: 1px; }
+  .notif .r { font-size: 11px; color: #8E939A; flex: 0 0 auto; padding-left: 4px; }
+  .notif .pct { font-size: 21px; font-weight: 700; color: #E59980; letter-spacing: -.02em; }
+  .notif.child { margin-left: 20px; background: #202226; }
+
+  .bar { height: 7px; border-radius: 4px; background: #4A3A35; margin: 6px 0 5px; position: relative; }
+  .bar > i { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: #E59980; }
+  .bar > u { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #F2F2F4; opacity: .8; }
+
+  .grouphdr {
+    display: flex; align-items: center; gap: 8px;
+    color: #C9CDD3; font-size: 11.5px; font-weight: 650;
+    padding: 2px 4px 7px 6px;
+  }
+
+  .note {
+    font-size: 12.5px; color: var(--muted);
+    max-width: 34ch; margin: 10px 0 0;
+  }
+  .note strong { color: var(--ink); font-weight: 650; }
+
+  table { border-collapse: collapse; margin: 10px 0 0; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 16px 7px 0; border-bottom: 1px solid var(--hair); vertical-align: top; }
+  th { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 650; }
+  .yes { color: var(--good); font-weight: 650; }
+  .no { color: var(--bad); font-weight: 650; }
+
+  .iconrow { display: flex; gap: 26px; flex-wrap: wrap; align-items: flex-end; margin: 6px 0 0; }
+  .iconcell { text-align: center; }
+  .iconcell .chip {
+    width: 54px; height: 54px; border-radius: 14px;
+    background: #1B1E24; display: flex; align-items: center; justify-content: center;
+    border: 1px solid #2E3138;
+  }
+  .iconcell .lbl { font-size: 11px; color: var(--muted); margin-top: 7px; }
+  .iconcell .lbl b { color: var(--ink); }
+</style>
+
+<div class="page">
+
+  <p class="eyebrow">CCBG-12 · Status Icon Swap</p>
+  <h1>Notification grouping — keeping the live meter in the status bar</h1>
+  <p class="lede">
+    A second notification from the app makes Android swap our live meter for the launcher
+    icon, which is a ring frozen at 72%. Fixing it means owning the notification group,
+    and that changes what the shade looks like. This sketch is about that change.
+  </p>
+
+  <h2>The icon at the heart of it</h2>
+  <p class="sub">
+    The launcher ring is a fixed 260° arc. It is not a meter, but at 24 dp it reads exactly
+    like one — which is why the swap misinforms rather than merely looking wrong.
+  </p>
+  <div class="iconrow">
+    <div class="iconcell">
+      <div class="chip">
+        <svg width="30" height="30" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="8" fill="none" stroke="#F2F2F4" stroke-opacity=".28" stroke-width="3.2"/>
+          <circle cx="12" cy="12" r="8" fill="none" stroke="#F2F2F4" stroke-width="3.2"
+                  stroke-linecap="round" stroke-dasharray="4.5 100" transform="rotate(-90 12 12)"/>
+        </svg>
+      </div>
+      <div class="lbl"><b>9%</b><br>true meter</div>
+    </div>
+    <div class="iconcell">
+      <div class="chip">
+        <svg width="30" height="30" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="8" fill="none" stroke="#F2F2F4" stroke-opacity=".28" stroke-width="3.2"/>
+          <circle cx="12" cy="12" r="8" fill="none" stroke="#F2F2F4" stroke-width="3.2"
+                  stroke-linecap="round" stroke-dasharray="25.1 100" transform="rotate(-90 12 12)"/>
+        </svg>
+      </div>
+      <div class="lbl"><b>50%</b><br>true meter</div>
+    </div>
+    <div class="iconcell">
+      <div class="chip">
+        <svg width="30" height="30" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="8" fill="none" stroke="#F2F2F4" stroke-opacity=".28" stroke-width="3.2"/>
+          <circle cx="12" cy="12" r="8" fill="none" stroke="#F2F2F4" stroke-width="3.2"
+                  stroke-linecap="round" stroke-dasharray="50.3 100" transform="rotate(-90 12 12)"/>
+        </svg>
+      </div>
+      <div class="lbl"><b>100%</b><br>true meter</div>
+    </div>
+    <div class="iconcell">
+      <div class="chip">
+        <svg width="30" height="30" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="8" fill="none" stroke="#F2F2F4" stroke-opacity=".28" stroke-width="3.2"/>
+          <circle cx="12" cy="12" r="8" fill="none" stroke="#E59980" stroke-width="3.2"
+                  stroke-linecap="round" stroke-dasharray="36.2 100" transform="rotate(-90 12 12)"/>
+        </svg>
+      </div>
+      <div class="lbl"><b style="color:var(--bad)">72%, always</b><br>launcher icon</div>
+    </div>
+  </div>
+
+  <hr class="hr">
+
+  <h2>Today</h2>
+  <p class="sub">Both states below are current behaviour, unchanged. The first is correct; the second is the defect.</p>
+
+  <div class="row">
+
+    <div class="col">
+      <p class="cap good">A · pinned alone — correct</p>
+      <div class="phone">
+        <div class="statusbar">
+          <span>1:26</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" style="margin-left:2px">
+            <circle cx="12" cy="12" r="8" fill="none" stroke="#F2F2F4" stroke-opacity=".3" stroke-width="3.4"/>
+            <circle cx="12" cy="12" r="8" fill="none" stroke="#F2F2F4" stroke-width="3.4"
+                    stroke-linecap="round" stroke-dasharray="4.5 100" transform="rotate(-90 12 12)"/>
+          </svg>
+          <span class="spacer"></span>
+          <span class="sig">5G ▮▮▮ 59</span>
+        </div>
+        <div class="notif">
+          <div class="avatar">
+            <svg width="17" height="17" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="8" fill="none" stroke="#6E6660" stroke-width="3.4"/>
+              <circle cx="12" cy="12" r="8" fill="none" stroke="#E59980" stroke-width="3.4"
+                      stroke-linecap="round" stroke-dasharray="36.2 100" transform="rotate(-90 12 12)"/>
+            </svg>
+          </div>
+          <div class="body">
+            <div class="t">Personal · 5-hour window</div>
+            <div class="bar"><i style="width:9%"></i><u style="left:26%"></u></div>
+            <div class="s">Resets in 4h 43m · 6:09 pm</div>
+          </div>
+          <div class="pct">9%</div>
+        </div>
+      </div>
+      <p class="note">Status bar carries the <strong>live 9% meter</strong>. Nothing to fix here.</p>
+    </div>
+
+    <div class="col">
+      <p class="cap bad">B · pinned + any alert — the defect</p>
+      <div class="phone">
+        <div class="statusbar">
+          <span>1:26</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" style="margin-left:2px">
+            <circle cx="12" cy="12" r="8" fill="none" stroke="#F2F2F4" stroke-opacity=".3" stroke-width="3.4"/>
+            <circle cx="12" cy="12" r="8" fill="none" stroke="#E08268" stroke-width="3.4"
+                    stroke-linecap="round" stroke-dasharray="36.2 100" transform="rotate(-90 12 12)"/>
+          </svg>
+          <span class="spacer"></span>
+          <span class="sig">5G ▮▮▮ 59</span>
+        </div>
+        <div class="notif">
+          <div class="avatar">
+            <svg width="17" height="17" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="8" fill="none" stroke="#6E6660" stroke-width="3.4"/>
+              <circle cx="12" cy="12" r="8" fill="none" stroke="#E59980" stroke-width="3.4"
+                      stroke-linecap="round" stroke-dasharray="36.2 100" transform="rotate(-90 12 12)"/>
+            </svg>
+          </div>
+          <div class="body">
+            <div class="t">Personal · 5-hour window</div>
+            <div class="bar"><i style="width:9%"></i><u style="left:26%"></u></div>
+            <div class="s">Resets in 4h 43m · 6:09 pm</div>
+          </div>
+          <div class="pct">9%</div>
+        </div>
+        <div class="notif">
+          <div class="avatar"></div>
+          <div class="body">
+            <div class="t">Personal: sign-in expires in 6d</div>
+            <div class="s">Valid until Aug 21, 11:49 am.</div>
+          </div>
+          <div class="r">12:49 pm</div>
+        </div>
+      </div>
+      <p class="note">
+        Shade is fine. Status bar now shows the <strong>launcher ring at 72%</strong> while
+        actual usage is 9% — and holds it until the alert is cleared.
+      </p>
+    </div>
+
+  </div>
+
+  <hr class="hr">
+
+  <h2>Proposal — the pinned notification becomes the group summary</h2>
+  <p class="sub">
+    One group, owned by us, with the pinned notification as its summary. That suppresses the
+    system's auto-summary and hands the status-bar slot back to our bitmap. Measured on the
+    Fold 7: the meter survives with three alerts posted.
+  </p>
+
+  <div class="row">
+
+    <div class="col">
+      <p class="cap good">C · no alerts — identical to A</p>
+      <div class="phone">
+        <div class="statusbar">
+          <span>1:26</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" style="margin-left:2px">
+            <circle cx="12" cy="12" r="8" fill="none" stroke="#F2F2F4" stroke-opacity=".3" stroke-width="3.4"/>
+            <circle cx="12" cy="12" r="8" fill="none" stroke="#F2F2F4" stroke-width="3.4"
+                    stroke-linecap="round" stroke-dasharray="4.5 100" transform="rotate(-90 12 12)"/>
+          </svg>
+          <span class="spacer"></span>
+          <span class="sig">5G ▮▮▮ 59</span>
+        </div>
+        <div class="notif">
+          <div class="avatar">
+            <svg width="17" height="17" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="8" fill="none" stroke="#6E6660" stroke-width="3.4"/>
+              <circle cx="12" cy="12" r="8" fill="none" stroke="#E59980" stroke-width="3.4"
+                      stroke-linecap="round" stroke-dasharray="36.2 100" transform="rotate(-90 12 12)"/>
+            </svg>
+          </div>
+          <div class="body">
+            <div class="t">Personal · 5-hour window</div>
+            <div class="bar"><i style="width:9%"></i><u style="left:26%"></u></div>
+            <div class="s">Resets in 4h 43m · 6:09 pm</div>
+          </div>
+          <div class="pct">9%</div>
+        </div>
+      </div>
+      <p class="note">
+        A summary with no children renders as an ordinary row — <strong>verified on device</strong>.
+        The common case is untouched.
+      </p>
+    </div>
+
+    <div class="col">
+      <p class="cap bad">D · one alert, collapsed — the cost</p>
+      <div class="phone">
+        <div class="statusbar">
+          <span>1:26</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" style="margin-left:2px">
+            <circle cx="12" cy="12" r="8" fill="none" stroke="#F2F2F4" stroke-opacity=".3" stroke-width="3.4"/>
+            <circle cx="12" cy="12" r="8" fill="none" stroke="#F2F2F4" stroke-width="3.4"
+                    stroke-linecap="round" stroke-dasharray="4.5 100" transform="rotate(-90 12 12)"/>
+          </svg>
+          <span class="spacer"></span>
+          <span class="sig">5G ▮▮▮ 59</span>
+        </div>
+        <div class="notif">
+          <div class="avatar"></div>
+          <div class="body">
+            <div class="t">Personal: sign-in expires in 6d</div>
+            <div class="s">Valid until Aug 21, 11:49 am.</div>
+          </div>
+          <div class="r">1 ⌄</div>
+        </div>
+      </div>
+      <p class="note">
+        Status bar is <strong>correct again</strong>. But One UI collapses the app to the
+        <strong>newest child</strong> with a count — the meter row is one tap away, not on screen.
+        This is the trade to accept or reject.
+      </p>
+    </div>
+
+    <div class="col">
+      <p class="cap good">E · one alert, expanded</p>
+      <div class="phone">
+        <div class="statusbar">
+          <span>1:26</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" style="margin-left:2px">
+            <circle cx="12" cy="12" r="8" fill="none" stroke="#F2F2F4" stroke-opacity=".3" stroke-width="3.4"/>
+            <circle cx="12" cy="12" r="8" fill="none" stroke="#F2F2F4" stroke-width="3.4"
+                    stroke-linecap="round" stroke-dasharray="4.5 100" transform="rotate(-90 12 12)"/>
+          </svg>
+          <span class="spacer"></span>
+          <span class="sig">5G ▮▮▮ 59</span>
+        </div>
+        <div class="grouphdr">CCooldown ⌃</div>
+        <div class="notif child">
+          <div class="avatar">
+            <svg width="17" height="17" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="8" fill="none" stroke="#6E6660" stroke-width="3.4"/>
+              <circle cx="12" cy="12" r="8" fill="none" stroke="#E59980" stroke-width="3.4"
+                      stroke-linecap="round" stroke-dasharray="36.2 100" transform="rotate(-90 12 12)"/>
+            </svg>
+          </div>
+          <div class="body">
+            <div class="t">Personal · 5-hour window</div>
+            <div class="bar"><i style="width:9%"></i><u style="left:26%"></u></div>
+            <div class="s">Resets in 4h 43m · 6:09 pm</div>
+          </div>
+          <div class="pct">9%</div>
+        </div>
+        <div class="notif child">
+          <div class="avatar"></div>
+          <div class="body">
+            <div class="t">Personal: sign-in expires in 6d</div>
+            <div class="s">Valid until Aug 21, 11:49 am.</div>
+          </div>
+          <div class="r">12:49</div>
+        </div>
+      </div>
+      <p class="note">
+        Expanded, the meter row returns with its full custom view intact — bar, pace tick,
+        percentage. Nothing about the row itself changes.
+      </p>
+    </div>
+
+  </div>
+
+  <h3>Above pace, at 100%, and stale — inside the group</h3>
+  <p class="sub">
+    The pinned row's own states are unaffected by grouping; they render in the expanded group
+    exactly as they do standalone. Shown here so the claim is checkable rather than asserted.
+  </p>
+  <div class="row">
+    <div class="col">
+      <p class="cap">above pace · red past the tick</p>
+      <div class="phone" style="width:330px">
+        <div class="notif child">
+          <div class="avatar"></div>
+          <div class="body">
+            <div class="t">Personal · 5-hour window</div>
+            <div class="bar">
+              <i style="width:58%; background:linear-gradient(90deg,#E59980 0 45%, #C4553C 45% 100%)"></i>
+              <u style="left:26%"></u>
+            </div>
+            <div class="s">Resets in 1h 47m · 6:10 pm</div>
+          </div>
+          <div class="pct" style="color:#E0705A">58%</div>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <p class="cap">at 100%</p>
+      <div class="phone" style="width:330px">
+        <div class="notif child">
+          <div class="avatar"></div>
+          <div class="body">
+            <div class="t">Personal · 5-hour window</div>
+            <div class="bar"><i style="width:100%; background:#C4553C"></i></div>
+            <div class="s">Resets in 1h 47m · 6:10 pm</div>
+          </div>
+          <div class="pct" style="color:#E0705A">100%</div>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <p class="cap">no data yet</p>
+      <div class="phone" style="width:330px">
+        <div class="notif child">
+          <div class="avatar"></div>
+          <div class="body">
+            <div class="t">Personal · 5-hour window</div>
+            <div class="bar"></div>
+            <div class="s">Not started yet</div>
+          </div>
+          <div class="pct" style="color:#8E939A">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="hr">
+
+  <h2>The alternative, if the collapse is unacceptable</h2>
+  <p class="sub">
+    Don't group. Instead keep the app to one notification most of the time, so the swap has
+    no chance to happen: give alerts <code>setTimeoutAfter</code> so they clear themselves,
+    and fold the long-lived ones (sign-in expiry) into the pinned notification's expanded
+    panel rather than posting them separately.
+  </p>
+  <table>
+    <tr><th>&nbsp;</th><th>Grouping</th><th>One-notification</th></tr>
+    <tr><td>Status bar correct with an alert pending</td><td class="yes">Yes</td><td class="no">No — still swaps while the alert lives</td></tr>
+    <tr><td>Meter row always on screen</td><td class="no">No — collapsed while children exist</td><td class="yes">Yes</td></tr>
+    <tr><td>Alerts stay in the shade until dismissed</td><td class="yes">Yes</td><td class="no">No — they expire</td></tr>
+    <tr><td>Scope</td><td>Group plumbing in two files</td><td>Alert lifetime + panel redesign</td></tr>
+  </table>
+  <p class="sub" style="margin-top:16px">
+    The two combine: group <em>and</em> time out alerts, and the collapsed state becomes rare
+    rather than all-day.
+  </p>
+
+</div>

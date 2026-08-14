@@ -279,6 +279,8 @@ fun SettingsScreen(
                 cacheSettings.setHealthAlertsEnabled(it)
             }
             RowDivider()
+            AlertLifetimeRow(cacheSettings)
+            RowDivider()
             LinkRow("System notification settings") {
                 context.startActivity(
                     Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
@@ -2002,6 +2004,61 @@ private fun ThresholdChipsRow(
                     onChange(selected)
                 },
                 label = { Text("$pct%") },
+            )
+        }
+    }
+}
+
+/**
+ * CCBG-12 (Status Icon Swap): how long a one-off alert lingers before clearing itself.
+ *
+ * This is a status-bar fix wearing a shade setting's clothes. While any second
+ * notification from this app is posted, Android replaces our live meter in the status
+ * bar with the launcher icon, so an alert nobody dismissed keeps the meter off screen
+ * for as long as it sits there. Expiring the ones that have stopped being true is what
+ * gives it back.
+ *
+ * Sign-in and stale-data alerts are deliberately absent: they are conditions, not
+ * events, and they now live in the pinned notification's panel where they clear
+ * themselves when the condition resolves. The update notice is absent too — it posts
+ * once per version ever, so expiring it would lose it outright.
+ */
+@Composable
+private fun AlertLifetimeRow(cache: UsageCache) {
+    var value by remember { mutableStateOf(cache.alertLifetime()) }
+    Column(Modifier.fillMaxWidth()) {
+        Text("Keep alerts in the shade for", style = MaterialTheme.typography.bodyMedium)
+        Text(
+            "Resets, thresholds and pace warnings clear themselves after this",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(6.dp))
+        val options = listOf(
+            "15m" to "15m",
+            "30m" to "30m",
+            "1h" to "1h",
+            "auto" to "Auto",
+        )
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+            options.forEachIndexed { index, (stored, text) ->
+                SegmentedButton(
+                    selected = value == stored,
+                    onClick = {
+                        value = stored
+                        cache.setAlertLifetime(stored)
+                    },
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
+                ) { Text(text) }
+            }
+        }
+        if (value == "auto") {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "Auto: until the window the alert is about resets — so an alert never " +
+                    "expires while it's still true.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

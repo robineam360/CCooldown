@@ -11,6 +11,89 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
 
 ## Open
 
+### CCBG-12 · Status Icon Swap — a second notification replaces the live meter with the app icon
+- **Status:** In progress (built 2026-08-14) · **needs on-device verification**
+- **Severity:** Medium (misleading display — the status bar shows a percentage that
+  isn't the user's)
+- **Symptom:** Observed on the Fold 7, 2026-08-14, by the user. While the CCRM-17
+  (Window Pings) pinned notification is the app's *only* notification, the status bar
+  carries the live meter drawn by `UsageIcon`. The moment a second notification from
+  the app exists — a sign-in expiry warning, a pace alert, an update notice — the
+  status-bar icon becomes the launcher icon instead. That icon is the CCRM-42 (App Icon)
+  reset ring, whose arc sweeps 260° ≈ **72%**, so a user at 9% reads their status bar
+  as nearly three-quarters spent. The alert itself may be hours old and long since
+  irrelevant; the wrong reading persists for as long as it sits in the shade.
+- **Cause — the OS discards every small icon we set.** With two or more ungrouped
+  notifications from one package, the system creates its own summary record
+  (`flags=…GROUP_SUMMARY|AUTOGROUP_SUMMARY`) and gives it `mipmap/ic_launcher`; the
+  status-bar slot follows that summary, not any notification we posted. Confirmed on
+  device: the app's live record carries `icon=Icon(typ=RESOURCE pkg=com.robin.claudeusage
+  id=0x7f0b0000)`, which `aapt2` resolves to `mipmap/ic_launcher`. So neither the
+  `IconCompat.createWithBitmap` meter in
+  [PinnedNotification.kt](app/src/main/java/com/robin/claudeusage/notify/PinnedNotification.kt)
+  nor the `R.drawable.ic_stat_bars` on the alerts in
+  [Alerts.kt](app/src/main/java/com/robin/claudeusage/alerts/Alerts.kt) is consulted —
+  changing either one fixes nothing.
+- **It triggers at two notifications, not four.** AOSP's autogroup threshold is 4;
+  One UI 8 / Android 16 aggregates at 2. A single lingering sign-in-expiry alert is
+  therefore enough to hold the status bar wrong all day.
+- **Verified fix — post our own group summary.** Measured with a standalone probe app
+  built for this (`com.robin.iconprobe`, since a debug build of this app would have
+  replaced the user's install), using three shapes readable at 24 dp: launcher =
+  triangle, alert = square, ongoing = ring bitmap. Ongoing alone → ring. Ongoing + 1
+  alert → triangle. Ongoing + 3 alerts → triangle. Ongoing + 3 alerts **with our own
+  summary** → ring. A summary we post is `GROUP_SUMMARY` *without* `AUTOGROUP_SUMMARY`,
+  which suppresses the system's and hands the slot back to our bitmap.
+- **The cost, which is what needs deciding.** Grouping takes the pinned notification out
+  of the top-level shade. With children present, One UI collapses the app to one row
+  showing the *newest child* plus a count badge, and the meter row is only visible once
+  expanded — this held whether the summary was separate or the pinned notification
+  itself. A summary with no children renders as a normal row, so the cost lands only
+  while an alert is pending, which is exactly when today's behaviour is already wrong.
+  Pairing the fix with `setTimeoutAfter` on alerts shrinks that window.
+- **Built — the one-notification path, plus the icon.** Four parts:
+  1. **Icon** — `ic_launcher_foreground.xml` / `ic_launcher_monochrome.xml` go from a 260°
+     arc to a closed ring with a filled bore dot (option B). A closed ring has no origin
+     and the filled bore inverts the meter's empty one, so the mark can't be read as a
+     percentage at any fill. Revises CCRM-42 (App Icon).
+  2. **Conditions folded** — new `notify/Conditions.kt` derives the sign-in-expiry and
+     stale-data conditions as data. `Alerts` stops posting them *only* when the pinned
+     notification is on **and** showing that profile (`Conditions.foldedInto`); otherwise
+     they post exactly as before, since folding into a surface that isn't there would
+     delete them. The panel draws them as tinted strips above the bars; the collapsed row
+     shows the condition in place of the reset line; a stale reading fades its number and
+     bar in the `big` style.
+  3. **Event timeout** — `alertLifetime` preference (15m / 30m / 1h / auto, default auto)
+     plus `Alerts.eventTimeout`, applied to reset, threshold and pace alerts.
+  4. **Type scale** — alerts previously rendered at the platform's 14 sp beside the pinned
+     notification's 13/12 sp custom view. New `notif_alert.xml` /
+     `notif_alert_expanded.xml` match it, used only while the pinned notification is on
+     and set to `big` — the other styles use platform sizes, so alerts do too.
+- **Deliberately not done:** the update notice keeps no timeout. It posts "once per version,
+  ever", so expiring it would silently demote that to "once per version, for an hour, then
+  never". Giving it one needs the CCRM-28 (Update Check) gate to re-post on a later check.
+- **Residual, by design:** re-auth and window-not-started still post, so the swap still
+  happens while either is live. With the icon no longer reading as a gauge that is a
+  cosmetic swap rather than a misleading one.
+- **Wireframes** per working agreement 2 — approved before build:
+  `design/notification-grouping-wireframe.html` (own the group) and
+  `design/notification-one-surface-wireframe.html` (fold conditions into the pinned
+  panel, time out events — the approved one), and `design/app-icon-options-wireframe.html`
+  for the icon, where option B was chosen.
+- **Decided so far (2026-08-14), on the one-notification path:** the collapsed row drops the
+  reset line while a condition is live (reset stays in the expanded panel); the event timeout
+  becomes a setting — 15m / 30m / 1h / Auto, defaulting to Auto, where Auto means "until the
+  window the alert is about resets"; the condition strip borrows the panel's existing type
+  scale (13.5 dp label, 12 dp sub) and separates itself with a 13%-alpha tint rather than a
+  border.
+- **Why the icon change earns its blast radius:** it is what makes the swap *misleading*
+  rather than merely wrong, and it holds whichever notification approach is in play — so a
+  future OS change that reintroduces the swap costs a cosmetic icon, not a false reading.
+- **Note on the alternative's coverage:** folding cannot cover `auth_alerts` re-auth or
+  `ping_alerts`, both deliberately `IMPORTANCE_HIGH` — the ping's comment says finding
+  out late "is the failure this feature exists to avoid". Those keep posting, so that
+  path leaves the defect live in exactly those two cases.
+
 ### CCBG-3 · Credits Visibility — credits card ignores extra-usage being switched off
 - **Status:** Open
 - **Severity:** Low (misleading display, no data loss) — and possibly unreachable

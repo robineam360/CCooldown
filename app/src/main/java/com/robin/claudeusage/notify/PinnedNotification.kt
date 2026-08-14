@@ -125,7 +125,20 @@ object PinnedNotification {
         // its own graphic, so the title names the window and the text line resets.
         val progress = style == "progress"
         val title = if (progress) "$pctText · $resetShort" else "$label · 5-hour window"
-        val collapsedText = if (progress) "$label · 5-hour window" else resetLong
+
+        // CCBG-12 (Status Icon Swap): the sign-in and stale-data conditions used to be
+        // notifications of their own, which is what cost us the live status-bar meter. They
+        // are carried here now. The collapsed row has exactly one line to spare, so while a
+        // condition holds it takes the reset line's place — agreed as the right trade: a
+        // warning outranks a time that is still one tap away in the panel below. Faults sort
+        // first, so a stale reading is what you see if both are true.
+        val conditions = Conditions.forProfile(cache, profile)
+        val stale = conditions.any { it.error }
+        val collapsedText = when {
+            conditions.isNotEmpty() && !progress -> conditions.first().short
+            progress -> "$label · 5-hour window"
+            else -> resetLong
+        }
 
         val openApp = tapIntent(context, cache, profile)
         val refresh = PendingIntent.getBroadcast(
@@ -148,7 +161,9 @@ object PinnedNotification {
             .setColor(fill.toArgb())
             .addAction(0, "Refresh", refresh)
 
-        val panel = data?.let { drawPanel(context, label, it, theme, dark, use24h, showOverPace) }
+        // Not gated on data any more: a condition is worth showing even before the first
+        // successful fetch, which is exactly when a sign-in problem is most likely.
+        val panel = drawPanel(context, label, data, theme, dark, use24h, showOverPace, conditions)
 
         when (style) {
             // A — the number owns the large-icon slot instead of a ring around it.
@@ -166,14 +181,14 @@ object PinnedNotification {
                 builder.setCustomContentView(
                     bigNumberView(
                         context, R.layout.notif_big_number, pctText, title, collapsedText,
-                        pct, sessionElapsed, fill, theme, dark, showOverPace, null,
+                        pct, sessionElapsed, fill, theme, dark, showOverPace, null, stale,
                     )
                 )
                 builder.setCustomBigContentView(
                     bigNumberView(
                         context, R.layout.notif_big_number_expanded,
                         pctText, title, collapsedText,
-                        pct, sessionElapsed, fill, theme, dark, showOverPace, panel,
+                        pct, sessionElapsed, fill, theme, dark, showOverPace, panel, stale,
                     )
                 )
                 builder.setStyle(NotificationCompat.DecoratedCustomViewStyle())
@@ -244,6 +259,7 @@ object PinnedNotification {
         dark: Boolean,
         showOverPace: Boolean,
         panel: Bitmap?,
+        stale: Boolean,
     ): RemoteViews = RemoteViews(context.packageName, layout).apply {
         setTextViewText(R.id.pct, pctText)
         setTextColor(R.id.pct, fill.toArgb())
@@ -253,6 +269,14 @@ object PinnedNotification {
             R.id.bar, drawBarBitmap(context, pct, elapsed, theme, dark, showOverPace),
         )
         if (panel != null) setImageViewBitmap(R.id.panel, panel)
+        // CCBG-12 (Status Icon Swap): a stale reading drawn as crisply as a live one is the
+        // actual hazard — the old separate alert said "stale" somewhere else in the shade
+        // while the number here still looked authoritative. Fading the number and its bar
+        // puts the doubt on the figure itself. The strip below names the cause.
+        if (stale) {
+            setFloat(R.id.pct, "setAlpha", 0.5f)
+            setFloat(R.id.bar, "setAlpha", 0.45f)
+        }
     }
 
     // --- drawing ---
@@ -394,6 +418,51 @@ object PinnedNotification {
         IconCompat.createWithBitmap(UsageIcon.draw(context, pct, iconStyle))
 
     /**
+     * A fault gets a fixed red — it must not be themed away by an accent that happens to be
+     * green. A warning takes the user's own accent, which is what the rest of the panel is
+     * already drawn in.
+     */
+    private fun conditionHue(
+        condition: Conditions.Condition,
+        theme: Color,
+        dark: Boolean,
+    ): Int = when {
+        condition.error && dark -> AndroidColor.parseColor("#E0705A")
+        condition.error -> AndroidColor.parseColor("#B3402A")
+        else -> theme.toArgb()
+    }
+
+    /**
+     * Greedy word wrap for the condition detail. Bounded at three lines because the strip's
+     * height is what displaces a model-cap bar — an unbounded sentence could push every bar
+     * out of the panel. The last line is ellipsised rather than dropped silently; the full
+     * text is one tap away in the app.
+     */
+    private fun wrapText(text: String, paint: Paint, maxWidth: Float): List<String> {
+        if (maxWidth <= 0f) return listOf(text)
+        if (paint.measureText(text) <= maxWidth) return listOf(text)
+        val lines = mutableListOf<String>()
+        var line = ""
+        for (word in text.split(' ')) {
+            val candidate = if (line.isEmpty()) word else "$line $word"
+            if (paint.measureText(candidate) <= maxWidth) {
+                line = candidate
+            } else {
+                if (line.isNotEmpty()) lines.add(line)
+                line = word
+                if (lines.size == 3) break
+            }
+        }
+        if (lines.size < 3 && line.isNotEmpty()) lines.add(line)
+        return if (lines.size < 3) lines else lines.take(2) + listOf(
+            android.text.TextUtils.ellipsize(
+                lines[2], android.text.TextPaint(paint), maxWidth,
+                android.text.TextUtils.TruncateAt.END,
+            ).toString()
+        )
+    }
+
+    /**
      * The expanded panel: the 7-day window and any per-model caps, each drawn the
      * same way the collapsed row draws the 5-hour window — name on the left, bold
      * percentage on the right, full-width bar underneath, reset time below it.
@@ -405,24 +474,13 @@ object PinnedNotification {
     private fun drawPanel(
         context: Context,
         @Suppress("UNUSED_PARAMETER") profileLabel: String,
-        data: UsageData,
+        data: UsageData?,
         theme: Color,
         dark: Boolean,
         use24h: Boolean,
         showOverPace: Boolean,
+        conditions: List<Conditions.Condition>,
     ): Bitmap? {
-        data class Bar(val label: String, val window: UsageWindow?, val sub: String)
-        val bars = buildList {
-            add(
-                Bar(
-                    "7-day", data.weekly,
-                    data.weekly?.resetsAt?.let { "Resets ${Fmt.dayTime(it, use24h)}" } ?: "",
-                )
-            )
-            for (cap in data.modelCaps) add(Bar(cap.modelName, cap.window, ""))
-        }.take(4)
-        if (bars.isEmpty()) return null
-
         val width = dp(context, PANEL_WIDTH_DP).toInt()
         val left = dp(context, 2f)
         val right = width - dp(context, 2f)
@@ -430,13 +488,55 @@ object PinnedNotification {
         val labelH = dp(context, 19f)
         val subH = dp(context, 15f)
         val rowGap = dp(context, 14f)
+
+        val onSurface = if (dark) AndroidColor.parseColor("#ECECEC") else AndroidColor.parseColor("#1F1F1F")
+        val muted = if (dark) AndroidColor.parseColor("#9E9E9E") else AndroidColor.parseColor("#6B6B6B")
+
+        val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = onSurface; textSize = dp(context, 13.5f)
+        }
+        val subPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = muted; textSize = dp(context, 12f)
+        }
+
+        // CCBG-12 (Status Icon Swap): condition strips borrow the bar rows' own two type
+        // sizes rather than bringing a third — labelPaint for the title, subPaint for the
+        // detail — so the panel reads as one thing. Separation comes from a tint, not a
+        // rule: a rule made the strip look heavier than the bars it introduces.
+        val condPadH = dp(context, 9f)
+        val condPadV = dp(context, 7f)
+        val condRadius = dp(context, 8f)
+        val condDot = dp(context, 6f)
+        val condTextLeft = left + condPadH + condDot + dp(context, 7f)
+        val condTextWidth = right - condPadH - condTextLeft
+        val condTitlePaint = Paint(labelPaint).apply {
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
+        val wrapped = conditions.map { wrapText(it.detail, subPaint, condTextWidth) }
+        val condHeights = wrapped.map { condPadV * 2f + labelH + it.size * subH }
+
+        data class Bar(val label: String, val window: UsageWindow?, val sub: String)
+        // Conditions displace model caps, never the 7-day window — it is the only bar the
+        // expanded panel exists to carry, so it holds its place however many strips appear.
+        val barBudget = (4 - conditions.size).coerceAtLeast(1)
+        val bars = if (data == null) emptyList() else buildList {
+            add(
+                Bar(
+                    "7-day", data.weekly,
+                    data.weekly?.resetsAt?.let { "Resets ${Fmt.dayTime(it, use24h)}" } ?: "",
+                )
+            )
+            for (cap in data.modelCaps) add(Bar(cap.modelName, cap.window, ""))
+        }.take(barBudget)
+        if (bars.isEmpty() && conditions.isEmpty()) return null
+
         // Every row grows by the tick's overhang above and below, so a mark at the
         // top or bottom edge of the bar can't collide with the label or be cut off.
         // The 2 dp side inset is already wider than half a tick (1.55 dp at this
         // thickness), so a tick at 0% or 100% stays inside the bitmap horizontally.
         val over = BarGeometry.tickOverhang(barThick)
 
-        var height = 0f
+        var height = condHeights.sum() + condHeights.size * dp(context, 12f)
         for (b in bars) {
             height += labelH + dp(context, 7f) + 2f * over + barThick
             if (b.sub.isNotEmpty()) height += subH
@@ -446,22 +546,41 @@ object PinnedNotification {
         val bmp = Bitmap.createBitmap(width, height.toInt().coerceAtLeast(1), Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
 
-        val onSurface = if (dark) AndroidColor.parseColor("#ECECEC") else AndroidColor.parseColor("#1F1F1F")
-        val muted = if (dark) AndroidColor.parseColor("#9E9E9E") else AndroidColor.parseColor("#6B6B6B")
-
-        val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = onSurface; textSize = dp(context, 13.5f)
-        }
         // Bold and larger, mirroring the collapsed row's headline percentage.
         val valuePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = onSurface; textSize = dp(context, 16f); textAlign = Paint.Align.RIGHT
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         }
-        val subPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = muted; textSize = dp(context, 12f)
-        }
 
         var y = 0f
+        conditions.forEachIndexed { index, condition ->
+            val hue = conditionHue(condition, theme, dark)
+            val stripHeight = condHeights[index]
+            val tint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = (hue and 0x00FFFFFF) or (0x21 shl 24) // 13% alpha
+            }
+            c.drawRoundRect(
+                RectF(left, y, right, y + stripHeight), condRadius, condRadius, tint,
+            )
+            val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = hue }
+            c.drawCircle(
+                left + condPadH + condDot / 2f,
+                y + condPadV + labelH / 2f,
+                condDot / 2f,
+                dotPaint,
+            )
+            c.drawText(
+                condition.title, condTextLeft, y + condPadV + labelH - dp(context, 5f),
+                condTitlePaint,
+            )
+            var lineY = y + condPadV + labelH
+            for (line in wrapped[index]) {
+                c.drawText(line, condTextLeft, lineY + subH - dp(context, 4f), subPaint)
+                lineY += subH
+            }
+            y += stripHeight + dp(context, 12f)
+        }
+
         for (bar in bars) {
             val baseline = y + labelH - dp(context, 4f)
             c.drawText(bar.label, left, baseline, labelPaint)

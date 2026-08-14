@@ -179,6 +179,27 @@ class UsageCache(context: Context) {
         prefs.edit().putBoolean("healthAlertsEnabled", enabled).apply()
     }
 
+    /**
+     * CCBG-12 (Status Icon Swap): how long a one-off *event* alert — a reset, a
+     * threshold, a pace warning, an update notice — stays in the shade before clearing
+     * itself. One of "15m", "30m", "1h", "auto".
+     *
+     * The point is not tidiness. A second notification from this app makes Android
+     * replace our live status-bar meter with the launcher icon, so an alert nobody
+     * dismissed holds the status bar wrong for as long as it sits there. Expiring the
+     * ones that have stopped being true gives the meter back.
+     *
+     * "auto" — the default — means "until the window this alert is about resets", which
+     * is the only option that never expires an alert while it is still true.
+     * Condition alerts (sign-in, data freshness) are not covered: they fold into the
+     * pinned notification's panel and clear when the condition itself resolves.
+     */
+    fun alertLifetime(): String = prefs.getString("alertLifetime", "auto") ?: "auto"
+
+    fun setAlertLifetime(value: String) {
+        prefs.edit().putString("alertLifetime", value).apply()
+    }
+
     // --- pace alerts (CCRM-21): projection-based milestones -------------------------
 
     fun paceAlertsEnabled(): Boolean = prefs.getBoolean("paceAlertsEnabled", true)
