@@ -12,6 +12,9 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Typeface
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
 import android.util.TypedValue
 import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
@@ -128,17 +131,23 @@ object PinnedNotification {
 
         // CCBG-12 (Status Icon Swap): the sign-in and stale-data conditions used to be
         // notifications of their own, which is what cost us the live status-bar meter. They
-        // are carried here now. The collapsed row has exactly one line to spare, so while a
-        // condition holds it takes the reset line's place — agreed as the right trade: a
-        // warning outranks a time that is still one tap away in the panel below. Faults sort
-        // first, so a stale reading is what you see if both are true.
+        // are carried here now.
+        //
+        // The collapsed row signals a condition with a coloured dot and keeps its reset time,
+        // rather than spelling the condition out in the reset line's place. Spelling it out
+        // cost the row real information to say something the panel one tap below already says
+        // in full — and it read as an error message where a status line belongs. A dot is
+        // enough to make someone open it, which is all the collapsed row has to achieve.
+        // Faults sort first, so the dot takes the fault's colour if both are true.
         val conditions = Conditions.forProfile(cache, profile)
         val stale = conditions.any { it.error }
-        val collapsedText = when {
-            conditions.isNotEmpty() && !progress -> conditions.first().short
-            progress -> "$label · 5-hour window"
-            else -> resetLong
-        }
+        val baseText = if (progress) "$label · 5-hour window" else resetLong
+        val collapsedText = conditions.firstOrNull()
+            ?.let { withConditionDot(baseText, conditionHue(it, theme, dark)) }
+            ?: baseText
+        // Expanded has the room the collapsed row doesn't: the panel below carries every
+        // condition in full, so the header needs no marker at all.
+        val expandedText = baseText
 
         val openApp = tapIntent(context, cache, profile)
         val refresh = PendingIntent.getBroadcast(
@@ -169,12 +178,12 @@ object PinnedNotification {
             // A — the number owns the large-icon slot instead of a ring around it.
             "number" -> {
                 builder.setLargeIcon(drawNumberTile(context, pct, fill))
-                panel?.let { builder.setStyle(bigPicture(it, collapsedText)) }
+                panel?.let { builder.setStyle(bigPicture(it, expandedText)) }
             }
             // B — no bitmap at all: the system's own determinate bar, number in the title.
             "progress" -> {
                 builder.setProgress(100, (pct ?: 0.0).toInt().coerceIn(0, 100), false)
-                panel?.let { builder.setStyle(bigPicture(it, collapsedText)) }
+                panel?.let { builder.setStyle(bigPicture(it, expandedText)) }
             }
             // C — custom views: the largest number the collapsed row can hold.
             "big" -> {
@@ -187,7 +196,7 @@ object PinnedNotification {
                 builder.setCustomBigContentView(
                     bigNumberView(
                         context, R.layout.notif_big_number_expanded,
-                        pctText, title, collapsedText,
+                        pctText, title, expandedText,
                         pct, sessionElapsed, fill, theme, dark, showOverPace, panel, stale,
                     )
                 )
@@ -196,7 +205,7 @@ object PinnedNotification {
             // "gauge" — the original ring.
             else -> {
                 drawGauge(context, pct, fill)?.let { builder.setLargeIcon(it) }
-                panel?.let { builder.setStyle(bigPicture(it, collapsedText)) }
+                panel?.let { builder.setStyle(bigPicture(it, expandedText)) }
             }
         }
 
@@ -251,7 +260,7 @@ object PinnedNotification {
         layout: Int,
         pctText: String,
         title: String,
-        sub: String,
+        sub: CharSequence,
         pct: Double?,
         elapsed: Double?,
         fill: Color,
@@ -416,6 +425,24 @@ object PinnedNotification {
     /** Monochrome status-bar icon; the drawing itself is shared with the QS tile. */
     private fun drawStatusIcon(context: Context, pct: Double?, iconStyle: String): IconCompat =
         IconCompat.createWithBitmap(UsageIcon.draw(context, pct, iconStyle))
+
+    /**
+     * The collapsed row's condition marker: a coloured dot ahead of the reset line.
+     *
+     * A span rather than a second view, because the collapsed layout has no slot to spare and
+     * `setContentText` has to carry the same string for the styles that don't use a custom
+     * view.
+     *
+     * U+25CF BLACK CIRCLE at full text size, deliberately with no size span. The
+     * glyph is drawn centred about 0.3 em above the baseline, so it lines up with the text
+     * beside it on its own; scaling it to 60% to look "dot-sized" moved that centre to
+     * 0.18 em and visibly dropped it below the line — and made it small enough to miss.
+     * Unscaled it is roughly 7 dp across, matching the panel strip's own 6 dp dot.
+     */
+    private fun withConditionDot(text: String, hue: Int): CharSequence =
+        SpannableString("●  $text").apply {
+            setSpan(ForegroundColorSpan(hue), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
 
     /**
      * A fault gets a fixed red — it must not be themed away by an accent that happens to be
