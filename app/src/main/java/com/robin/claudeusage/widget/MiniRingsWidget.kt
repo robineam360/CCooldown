@@ -10,6 +10,7 @@ import androidx.glance.GlanceTheme
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
+import androidx.glance.LocalSize
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
@@ -59,11 +60,15 @@ class MiniRingsWidgetReceiver : GlanceAppWidgetReceiver() {
 
 /**
  * CCRM-40 (Mini-Rings Widget): every window of one profile as battery-style
- * mini-rings — session, weekly, then model caps, capped at four columns. Each
- * ring carries **its own** pace tick (each window has its own clock), which is
- * how 41% can read calm next to 84% reading hot in the same glance. Ignores
+ * mini-rings — session, weekly, then model caps, **capped at three columns**.
+ * Each ring carries **its own** pace tick (each window has its own clock), which
+ * is how 41% can read calm next to 84% reading hot in the same glance. Ignores
  * the configured window; binds the configured profile. Mac provenance:
  * CCRM-18 [Desktop] medium face + CCM-49 [Desktop].
+ *
+ * The ring's size comes from [miniRingsLayout], not a constant: a fixed 56 dp
+ * left two windows marooned in an empty card and overflowed the face at its own
+ * declared minimum — CCBG-10 (Mini-Rings Emptiness).
  */
 class MiniRingsWidget : GlanceAppWidget() {
 
@@ -76,7 +81,9 @@ class MiniRingsWidget : GlanceAppWidget() {
         val snapshot = cache.snapshot(profile)
         val use24h = cache.use24hTime()
         val themeName = cache.themeColorName()
-        val rows = snapshot.data?.let { windowRows(it) } ?: emptyList()
+        // Three, not four (CCBG-10 (Mini-Rings Emptiness)): fewer columns is what
+        // lets each ring be big enough to read as a gauge at a glance.
+        val rows = snapshot.data?.let { windowRows(it, max = 3) } ?: emptyList()
         rows.mapNotNull { it.window.resetsAt?.toEpochMilli() }.minOrNull()
             ?.let { Polling.armResetRedraw(context, it) }
         // Widgets read UsageCache directly; there is no composition to hoist into here.
@@ -103,6 +110,7 @@ private fun MiniRingsFace(
     showOverPace: Boolean = true,
 ) {
     val context = LocalContext.current
+    val size = LocalSize.current
     val state = faceState(snapshot, hasData = rows.isNotEmpty())
     val accent = widgetThemeColor(themeName)
     val dark = widgetIsDark()
@@ -163,53 +171,69 @@ private fun MiniRingsFace(
                     )
                 }
             }
-            else -> Row(
-                modifier = GlanceModifier.fillMaxWidth().defaultWeight(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                for (row in rows) {
-                    Column(
-                        modifier = GlanceModifier.defaultWeight(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        val percent = row.window.percent
-                        val elapsed = elapsedPercent(row.window, row.windowLengthMs)
-                        Box(contentAlignment = Alignment.Center) {
-                            Image(
-                                provider = ImageProvider(
-                                    ringBitmap(context, 56f, 5.5f, percent, elapsed, accent, dark, showOverPace)
-                                ),
-                                contentDescription = null,
-                                modifier = GlanceModifier.size(56.dp),
-                            )
-                            Text(
-                                if (percent == null) "—" else "${percent.toInt()}%",
-                                style = TextStyle(
-                                    color = if (percent == null) GlanceTheme.colors.onSurfaceVariant
-                                    else GlanceTheme.colors.onSurface,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Medium,
-                                ),
-                            )
+            else -> {
+                // The ring takes the room the face has instead of a hardcoded 56 dp,
+                // and the columns stop dividing the full width, so one or two rings
+                // centre as a group rather than sitting at the quarter points
+                // (CCBG-10 (Mini-Rings Emptiness)). On a short face the text stack
+                // gives way before the ring does.
+                val l = miniRingsLayout(size.width.value, size.height.value, rows.size)
+                Row(
+                    modifier = GlanceModifier.fillMaxWidth().defaultWeight(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    for (row in rows) {
+                        Column(
+                            modifier = GlanceModifier.width(l.columnDp.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            val percent = row.window.percent
+                            val elapsed = elapsedPercent(row.window, row.windowLengthMs)
+                            Box(contentAlignment = Alignment.Center) {
+                                Image(
+                                    provider = ImageProvider(
+                                        ringBitmap(
+                                            context, l.ringDp, l.strokeDp,
+                                            percent, elapsed, accent, dark, showOverPace,
+                                        )
+                                    ),
+                                    contentDescription = null,
+                                    modifier = GlanceModifier.size(l.ringDp.dp),
+                                )
+                                Text(
+                                    if (percent == null) "—" else "${percent.toInt()}%",
+                                    style = TextStyle(
+                                        color = if (percent == null) GlanceTheme.colors.onSurfaceVariant
+                                        else GlanceTheme.colors.onSurface,
+                                        fontSize = l.percentSp.sp,
+                                        fontWeight = FontWeight.Medium,
+                                    ),
+                                )
+                            }
+                            if (l.showTitle) {
+                                Spacer(GlanceModifier.height(3.dp))
+                                Text(
+                                    row.title,
+                                    style = TextStyle(
+                                        color = GlanceTheme.colors.onSurface,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                    ),
+                                    maxLines = 1,
+                                )
+                            }
+                            if (l.showCountdown) {
+                                Text(
+                                    if (percent == null) "no data" else widgetCountdown(row.window.resetsAt),
+                                    style = TextStyle(
+                                        color = GlanceTheme.colors.onSurfaceVariant,
+                                        fontSize = 9.sp,
+                                    ),
+                                    maxLines = 1,
+                                )
+                            }
                         }
-                        Spacer(GlanceModifier.height(3.dp))
-                        Text(
-                            row.title,
-                            style = TextStyle(
-                                color = GlanceTheme.colors.onSurface,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                            ),
-                            maxLines = 1,
-                        )
-                        Text(
-                            if (percent == null) "no data" else widgetCountdown(row.window.resetsAt),
-                            style = TextStyle(
-                                color = GlanceTheme.colors.onSurfaceVariant,
-                                fontSize = 9.sp,
-                            ),
-                            maxLines = 1,
-                        )
                     }
                 }
             }

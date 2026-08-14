@@ -135,13 +135,135 @@ data class WindowRow(
 
 /**
  * The medium face's columns in payload order — session, weekly, then model
- * caps — **capped at four** so the two fixed windows always survive a payload
+ * caps — **capped at [max]** so the two fixed windows always survive a payload
  * with many caps.
+ *
+ * The mini-rings face passes 3 (CCBG-10 (Mini-Rings Emptiness)): fewer columns
+ * is what lets each ring be big enough to read as a gauge rather than a dot.
  */
-fun windowRows(data: UsageData): List<WindowRow> {
+fun windowRows(data: UsageData, max: Int = 4): List<WindowRow> {
     val rows = mutableListOf<WindowRow>()
     data.session?.let { rows += WindowRow("5h", it, Projection.SESSION_MS) }
     data.weekly?.let { rows += WindowRow("7d", it, Projection.WEEKLY_MS) }
     for (cap in data.modelCaps) rows += WindowRow(cap.modelName, cap.window, Projection.WEEKLY_MS)
-    return rows.take(4)
+    return rows.take(max)
 }
+
+// --- face layout (CCBG-10 (Mini-Rings Emptiness) / CCBG-11 (Ring Face Clutter)) ---
+//
+// Both faces used to size their rings with a constant, which is how one ended up
+// marooned in an empty card and the other overflowed its own bore at the size the
+// provider actually declares. These two functions compute the ring from the room
+// the face has. They are pure so the wireframe's numbers are pinned by tests
+// rather than by looking at a launcher.
+
+/** How the mini-rings face lays out [count] columns in a [widthDp] × [heightDp] face. */
+data class MiniRingsLayout(
+    val ringDp: Float,
+    val strokeDp: Float,
+    val percentSp: Float,
+    /** Column width — capped, so one or two rings centre instead of spreading. */
+    val columnDp: Float,
+    val showTitle: Boolean,
+    val showCountdown: Boolean,
+)
+
+fun miniRingsLayout(widthDp: Float, heightDp: Float, count: Int): MiniRingsLayout {
+    val n = count.coerceAtLeast(1)
+    val contentW = widthDp - 2 * MINI_PAD_H
+    val rowH = heightDp - 2 * MINI_PAD_V - MINI_HEADER_H - MINI_HEADER_GAP
+    val perColumn = contentW / n - MINI_GUTTER
+
+    fun ring(stackH: Float) =
+        minOf(perColumn, rowH - stackH - MINI_AIR).coerceIn(MINI_RING_MIN, MINI_RING_MAX)
+
+    var d = ring(MINI_TITLE_H + MINI_COUNTDOWN_H)
+    val showCountdown = d >= MINI_COUNTDOWN_FLOOR
+    // Reclaim the countdown's height *before* judging the title, or the title drops
+    // on the strength of a diameter that no longer applies.
+    if (!showCountdown) d = ring(MINI_TITLE_H)
+    return MiniRingsLayout(
+        ringDp = d,
+        strokeDp = MINI_STROKE_RATIO * d,
+        percentSp = (13f * d / 56f).coerceIn(11f, 20f),
+        columnDp = minOf(contentW / n, d + MINI_COLUMN_SLACK),
+        showTitle = d >= MINI_TITLE_FLOOR,
+        showCountdown = showCountdown,
+    )
+}
+
+private const val MINI_PAD_H = 14f
+private const val MINI_PAD_V = 12f
+private const val MINI_HEADER_H = 16f
+private const val MINI_HEADER_GAP = 6f
+private const val MINI_GUTTER = 12f
+private const val MINI_AIR = 6f
+private const val MINI_TITLE_H = 16f          // 10sp line + its 3dp gap
+private const val MINI_COUNTDOWN_H = 12f      // 9sp line
+private const val MINI_COUNTDOWN_FLOOR = 44f  // below this the countdown goes
+private const val MINI_TITLE_FLOOR = 38f      // and below this the title follows
+private const val MINI_COLUMN_SLACK = 28f
+private const val MINI_RING_MIN = 36f
+private const val MINI_RING_MAX = 88f
+private const val MINI_STROKE_RATIO = 0.098f  // today's 5.5/56, kept
+
+/**
+ * How the single-ring face lays out a [widthDp] × [heightDp] placement.
+ *
+ * The rule that makes this work at the declared 110×110: **the bore holds the
+ * percentage and nothing else.** Everything else — profile, countdown, exact
+ * reset — lives outside the ring, which is what frees the ring to reach the edge
+ * of the face and stay legible when the face is small.
+ */
+data class RingFaceLayout(
+    val ringDp: Float,
+    val strokeDp: Float,
+    val percentSp: Float,
+    /** Wide and short: the lines sit in a column beside the ring, not under it. */
+    val landscape: Boolean,
+    /** Profile name above the ring; dropped when the face is too short for it. */
+    val showName: Boolean,
+    /** The exact reset moment, the first line to go. */
+    val showResetMoment: Boolean,
+)
+
+fun ringFaceLayout(widthDp: Float, heightDp: Float): RingFaceLayout {
+    if (widthDp >= heightDp * RING_LANDSCAPE_RATIO) {
+        val d = (heightDp - 2 * RING_INSET_LANDSCAPE).coerceIn(RING_MIN, RING_MAX)
+        return RingFaceLayout(
+            ringDp = d,
+            strokeDp = d / RING_STROKE_DIVISOR,
+            percentSp = (RING_PCT_RATIO * d).coerceIn(14f, 40f),
+            landscape = true,
+            showName = true,
+            showResetMoment = true,
+        )
+    }
+    val showMoment = heightDp >= RING_MOMENT_FLOOR
+    val showName = heightDp >= RING_NAME_FLOOR
+    val outside = RING_LINE_H + RING_LINE_GAP +
+        (if (showMoment) RING_LINE_H else 0f) +
+        (if (showName) RING_LINE_H else 0f)
+    val d = (minOf(widthDp, heightDp - outside) - RING_INSET).coerceIn(RING_MIN, RING_MAX)
+    return RingFaceLayout(
+        ringDp = d,
+        strokeDp = d / RING_STROKE_DIVISOR,
+        percentSp = (RING_PCT_RATIO * d).coerceIn(14f, 40f),
+        landscape = false,
+        showName = showName,
+        showResetMoment = showMoment,
+    )
+}
+
+private const val RING_LANDSCAPE_RATIO = 1.6f
+private const val RING_INSET = 12f
+private const val RING_INSET_LANDSCAPE = 12f
+private const val RING_LINE_H = 13f
+private const val RING_LINE_GAP = 4f
+private const val RING_NAME_FLOOR = 140f      // room above the ring for the account
+private const val RING_MOMENT_FLOOR = 200f    // room below it for the exact reset
+private const val RING_MIN = 48f
+/** Past this a solo ring stops being a gauge and becomes a poster. */
+private const val RING_MAX = 140f
+private const val RING_STROKE_DIVISOR = 16f   // today's 8/128, kept
+private const val RING_PCT_RATIO = 0.26f
