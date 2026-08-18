@@ -1,0 +1,314 @@
+<title>Tracker Icon — Material 3 Round — CCRM-45</title>
+<style>
+  :root {
+    --bg: #FAF8F6; --ink: #26211E; --muted: #6E6660; --accent: #C15F3C;
+    --hair: #E7E1DC; --card: #FFFFFF;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171513; --ink: #EDE8E4; --muted: #9B928B; --accent: #E59980;
+      --hair: #2C2825; --card: #201D1B;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171513; --ink: #EDE8E4; --muted: #9B928B; --accent: #E59980;
+    --hair: #2C2825; --card: #201D1B;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    margin: 0; padding: 48px 24px 96px; line-height: 1.5; }
+  .page { max-width: 1240px; margin: 0 auto; }
+  .eyebrow { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11px;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin: 0 0 10px; }
+  h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 8px; }
+  .lede { color: var(--muted); max-width: 70ch; margin: 0 0 12px; font-size: 14px; }
+  h2 { font-size: 19px; font-weight: 650; margin: 56px 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; max-width: 80ch; margin: 0 0 16px; }
+  .row { display: flex; flex-wrap: wrap; gap: 26px; align-items: flex-start; }
+  .opt { width: 280px; background: var(--card); border: 1px solid var(--hair);
+    border-radius: 16px; padding: 18px; }
+  .opt h3 { margin: 0 0 2px; font-size: 15px; }
+  .opt .why { font-size: 12.5px; color: var(--muted); margin: 0 0 14px; }
+  .tilerow { display: flex; gap: 14px; align-items: flex-end; margin-bottom: 12px; }
+  .tile { width: 100px; height: 100px; border-radius: 27px; overflow: hidden;
+    display: grid; place-items: center; }
+  .tile.small { width: 48px; height: 48px; border-radius: 14px; }
+  .tile.mono { background: #EFE7DA; }
+  .tile svg { display: block; }
+  .statusbar { background: #101114; border-radius: 10px; padding: 6px 12px;
+    display: flex; align-items: center; gap: 10px; color: #DADCE2; font-size: 12px; }
+  .verdict { font-size: 12px; margin-top: 10px; color: var(--muted); }
+  .sw { display: inline-block; width: 44px; height: 44px; border-radius: 12px; }
+  .swl { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 9px;
+    color: var(--muted); text-align: center; margin-top: 4px; }
+  .palette { display: flex; gap: 10px; flex-wrap: wrap; margin: 10px 0 4px; }
+  .hr { height: 1px; background: var(--hair); margin: 46px 0 0; border: 0; }
+</style>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <radialGradient id="bgGrad" cx="30%" cy="25%" r="95%">
+      <stop offset="0%" stop-color="#D96F42"/>
+      <stop offset="55%" stop-color="#B3521F"/>
+      <stop offset="100%" stop-color="#8A3A12"/>
+    </radialGradient>
+    <linearGradient id="barGrad" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%" stop-color="#FFDBCB"/>
+      <stop offset="100%" stop-color="#FFF6F1"/>
+    </linearGradient>
+    <linearGradient id="sandGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFE3D5"/>
+      <stop offset="100%" stop-color="#FFB98F"/>
+    </linearGradient>
+  </defs>
+</svg>
+
+<div class="page">
+  <p class="eyebrow">CCRM-45 · wireframe, round 3 — Material 3 treatment</p>
+  <h1>Tracker icon, the Material round</h1>
+  <p class="lede">
+    Round-2 feedback: too simple, too flat. This round is proper Material 3 —
+    a <b>tonal palette</b> built from Claude orange, a <b>radial-gradient background</b>
+    instead of a flat tile, M3-expressive <b>container shapes</b> (the scalloped
+    "cookie") behind the glyph, and <b>layered, multi-tone glyphs</b> instead of plain
+    white strokes. The CCBG-12 (Status Icon Swap) constraint still governs: nothing may
+    read as a percentage at 16&nbsp;px.
+  </p>
+
+  <h2>The palette — Claude orange, tonalised</h2>
+  <p class="sub">An M3-style tonal ladder seeded from the app's Claude Orange, plus the
+    cream the brand pairs with. The background gradient runs 60 → 30; glyphs use 95/90/80
+    over it; the espresso 20 anchors detail. (Themed/monochrome icons keep following the
+    system's dynamic tones as they do today.)</p>
+  <div class="palette">
+    <div><span class="sw" style="background:#3A1503"></span><div class="swl">10</div></div>
+    <div><span class="sw" style="background:#5C2408"></span><div class="swl">20</div></div>
+    <div><span class="sw" style="background:#8A3A12"></span><div class="swl">30</div></div>
+    <div><span class="sw" style="background:#B3521F"></span><div class="swl">40</div></div>
+    <div><span class="sw" style="background:#D96F42"></span><div class="swl">60</div></div>
+    <div><span class="sw" style="background:#FFB98F"></span><div class="swl">80</div></div>
+    <div><span class="sw" style="background:#FFDBCB"></span><div class="swl">90</div></div>
+    <div><span class="sw" style="background:#FFF6F1"></span><div class="swl">95 · cream</div></div>
+  </div>
+
+  <h2>The options, re-dressed</h2>
+  <div class="row">
+    <div class="opt">
+      <h3>A · Signal steps on a cookie</h3>
+      <p class="why">The three ascending bars, now tonal (90 → 95 gradient fills with an
+        espresso key bar) on an M3 scalloped-cookie container in tone 40, over the
+        gradient ground.</p>
+      <div class="tilerow">
+        <div class="tile">
+          <svg width="100" height="100" viewBox="0 0 64 64">
+            <rect width="64" height="64" fill="url(#bgGrad)"/>
+            <g fill="#C4622D">
+              <circle cx="32" cy="32" r="19"/>
+              <circle cx="32" cy="12" r="7"/><circle cx="32" cy="52" r="7"/>
+              <circle cx="12" cy="32" r="7"/><circle cx="52" cy="32" r="7"/>
+              <circle cx="18" cy="18" r="7"/><circle cx="46" cy="18" r="7"/>
+              <circle cx="18" cy="46" r="7"/><circle cx="46" cy="46" r="7"/>
+            </g>
+            <rect x="18" y="34" width="8" height="14" rx="4" fill="#FFDBCB"/>
+            <rect x="28" y="27" width="8" height="21" rx="4" fill="url(#barGrad)"/>
+            <rect x="38" y="19" width="8" height="29" rx="4" fill="#5C2408"/>
+          </svg>
+        </div>
+        <div class="tile small">
+          <svg width="48" height="48" viewBox="0 0 64 64">
+            <rect width="64" height="64" fill="url(#bgGrad)"/>
+            <circle cx="32" cy="32" r="24" fill="#C4622D"/>
+            <rect x="16" y="34" width="9" height="15" rx="4.5" fill="#FFDBCB"/>
+            <rect x="27.5" y="26" width="9" height="23" rx="4.5" fill="#FFF6F1"/>
+            <rect x="39" y="17" width="9" height="32" rx="4.5" fill="#5C2408"/>
+          </svg>
+        </div>
+        <div class="tile small mono">
+          <svg width="30" height="30" viewBox="0 0 64 64" fill="#6E6660">
+            <rect x="14" y="34" width="9" height="16" rx="4.5"/>
+            <rect x="27.5" y="24" width="9" height="26" rx="4.5"/>
+            <rect x="41" y="14" width="9" height="36" rx="4.5"/>
+          </svg>
+        </div>
+      </div>
+      <div class="statusbar">6:32
+        <svg width="16" height="16" viewBox="0 0 64 64" fill="#DADCE2">
+          <rect x="12" y="34" width="11" height="18" rx="5"/>
+          <rect x="26.5" y="22" width="11" height="30" rx="5"/>
+          <rect x="41" y="10" width="11" height="42" rx="5"/>
+        </svg>
+        · mono flattens to the trio — unchanged</div>
+      <p class="verdict"><b>Depth trick:</b> the tallest bar goes espresso-dark, not
+        light — the eye reads highest-usage as heaviest. Cookie spins 15° on the themed
+        layer for the M3 "shape morph" feel.</p>
+    </div>
+
+    <div class="opt">
+      <h3>B · Hourglass, tonal sand</h3>
+      <p class="why">Cream glass on a tone-40 circle container, sand in a 90→80
+        gradient mid-pour — a warm, dimensional object instead of a stroke drawing.</p>
+      <div class="tilerow">
+        <div class="tile">
+          <svg width="100" height="100" viewBox="0 0 64 64">
+            <rect width="64" height="64" fill="url(#bgGrad)"/>
+            <circle cx="32" cy="32" r="23" fill="#C4622D"/>
+            <path d="M20 13 h24 M20 51 h24" stroke="#FFF6F1" stroke-width="4.5" stroke-linecap="round"/>
+            <path d="M23 15 c0 9 7 12 9 17 c2 -5 9 -8 9 -17 z M23 49 c0 -9 7 -12 9 -17 c2 5 9 8 9 17 z"
+              fill="none" stroke="#FFF6F1" stroke-width="3.4" stroke-linejoin="round"/>
+            <path d="M26.5 19 c1 4 4 6 5.5 8.5 c1.5 -2.5 4.5 -4.5 5.5 -8.5 z" fill="url(#sandGrad)"/>
+            <path d="M26 47.5 h12 c-1 -4.5 -4.5 -6 -6 -8 c-1.5 2 -5 3.5 -6 8 z" fill="#FFB98F"/>
+            <rect x="31.2" y="36" width="1.6" height="9" rx="0.8" fill="#FFDBCB"/>
+          </svg>
+        </div>
+        <div class="tile small">
+          <svg width="48" height="48" viewBox="0 0 64 64">
+            <rect width="64" height="64" fill="url(#bgGrad)"/>
+            <circle cx="32" cy="32" r="26" fill="#C4622D"/>
+            <path d="M19 12 h26 M19 52 h26" stroke="#FFF6F1" stroke-width="6" stroke-linecap="round"/>
+            <path d="M22 14 c0 10 8 13 10 18 c2 -5 10 -8 10 -18 z" fill="url(#sandGrad)"/>
+            <path d="M22 50 c0 -10 8 -13 10 -18 c2 5 10 8 10 18 z" fill="#FFB98F"/>
+          </svg>
+        </div>
+        <div class="tile small mono">
+          <svg width="30" height="30" viewBox="0 0 64 64" fill="none" stroke="#6E6660" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 12 h28 M18 52 h28"/>
+            <path d="M21 14 c0 10 8 13 11 18 c3 -5 11 -8 11 -18 M21 50 c0 -10 8 -13 11 -18 c3 5 11 8 11 18"/>
+          </svg>
+        </div>
+      </div>
+      <div class="statusbar">6:32
+        <svg width="16" height="16" viewBox="0 0 64 64" fill="#DADCE2">
+          <path d="M16 10 h32 v3 c0 10 -9 13 -12 19 c3 6 12 9 12 19 v3 h-32 v-3 c0 -10 9 -13 12 -19 c-3 -6 -12 -9 -12 -19 z"/>
+        </svg>
+        · filled silhouette at 16 px, no strokes</div>
+      <p class="verdict"><b>Depth trick:</b> filled sand shapes + a falling grain line;
+        the mono/status version switches to one solid silhouette so nothing thins out.</p>
+    </div>
+
+    <div class="opt">
+      <h3>C · Tonal dial</h3>
+      <p class="why">The tick dial becomes an M3 gauge object: three arc segments in
+        tones 95 / 80 / 20 with round caps and gaps (complete and symmetric — an
+        instrument, not a reading), pivot dot in cream.</p>
+      <div class="tilerow">
+        <div class="tile">
+          <svg width="100" height="100" viewBox="0 0 64 64">
+            <rect width="64" height="64" fill="url(#bgGrad)"/>
+            <g fill="none" stroke-width="9" stroke-linecap="round" transform="translate(32 32)">
+              <path d="M -16.6 9.6 A 19.2 19.2 0 0 1 -16.6 -9.6" stroke="#FFDBCB"/>
+              <path d="M -9.6 -16.6 A 19.2 19.2 0 0 1 9.6 -16.6" stroke="#FFF6F1"/>
+              <path d="M 16.6 -9.6 A 19.2 19.2 0 0 1 16.6 9.6" stroke="#FFB98F"/>
+              <path d="M 9.6 16.6 A 19.2 19.2 0 0 1 -9.6 16.6" stroke="#5C2408"/>
+            </g>
+            <circle cx="32" cy="32" r="6" fill="#FFF6F1"/>
+            <circle cx="32" cy="32" r="2.6" fill="#5C2408"/>
+          </svg>
+        </div>
+        <div class="tile small">
+          <svg width="48" height="48" viewBox="0 0 64 64">
+            <rect width="64" height="64" fill="url(#bgGrad)"/>
+            <g fill="none" stroke-width="10" stroke-linecap="round" transform="translate(32 32)">
+              <path d="M -16.6 9.6 A 19.2 19.2 0 0 1 -16.6 -9.6" stroke="#FFDBCB"/>
+              <path d="M -9.6 -16.6 A 19.2 19.2 0 0 1 9.6 -16.6" stroke="#FFF6F1"/>
+              <path d="M 16.6 -9.6 A 19.2 19.2 0 0 1 16.6 9.6" stroke="#FFB98F"/>
+              <path d="M 9.6 16.6 A 19.2 19.2 0 0 1 -9.6 16.6" stroke="#5C2408"/>
+            </g>
+            <circle cx="32" cy="32" r="6.5" fill="#FFF6F1"/>
+          </svg>
+        </div>
+        <div class="tile small mono">
+          <svg width="30" height="30" viewBox="0 0 64 64" fill="none" stroke="#6E6660" stroke-width="10" stroke-linecap="round">
+            <g transform="translate(32 32)">
+              <path d="M -16.6 9.6 A 19.2 19.2 0 0 1 -16.6 -9.6"/>
+              <path d="M -9.6 -16.6 A 19.2 19.2 0 0 1 9.6 -16.6"/>
+              <path d="M 16.6 -9.6 A 19.2 19.2 0 0 1 16.6 9.6"/>
+              <path d="M 9.6 16.6 A 19.2 19.2 0 0 1 -9.6 16.6"/>
+            </g>
+          </svg>
+        </div>
+      </div>
+      <div class="statusbar">6:32
+        <svg width="16" height="16" viewBox="0 0 64 64" fill="none" stroke="#DADCE2" stroke-width="11" stroke-linecap="round">
+          <g transform="translate(32 32)">
+            <path d="M -16.6 9.6 A 19.2 19.2 0 0 1 -16.6 -9.6"/>
+            <path d="M -9.6 -16.6 A 19.2 19.2 0 0 1 9.6 -16.6"/>
+            <path d="M 16.6 -9.6 A 19.2 19.2 0 0 1 16.6 9.6"/>
+            <path d="M 9.6 16.6 A 19.2 19.2 0 0 1 -9.6 16.6"/>
+          </g>
+        </svg>
+        · four equal segments, tone lost, shape kept</div>
+      <p class="verdict"><b>Note:</b> the needle from round 2 is gone — tones carry the
+        "instrument" idea instead, which also deletes that option's residual gauge-ness.
+        This makes C and D siblings; C is the tonal one.</p>
+    </div>
+
+    <div class="opt">
+      <h3>D · Four windows, four tones</h3>
+      <p class="why">The four-window ring re-dressed: each 5-hour-window segment gets
+        its own tone (95 → 90 → 80 → espresso 20), turning the identity into a tonal
+        sweep around the day. Sits straight on the gradient, no container.</p>
+      <div class="tilerow">
+        <div class="tile">
+          <svg width="100" height="100" viewBox="0 0 64 64">
+            <rect width="64" height="64" fill="url(#bgGrad)"/>
+            <g fill="none" stroke-width="10" stroke-linecap="round" transform="translate(32 32) rotate(45)">
+              <path d="M 0 -18 A 18 18 0 0 1 18 0" transform="rotate(-32.5)" stroke="#FFF6F1"/>
+              <path d="M 0 -18 A 18 18 0 0 1 18 0" transform="rotate(57.5)" stroke="#FFDBCB"/>
+              <path d="M 0 -18 A 18 18 0 0 1 18 0" transform="rotate(147.5)" stroke="#FFB98F"/>
+              <path d="M 0 -18 A 18 18 0 0 1 18 0" transform="rotate(237.5)" stroke="#5C2408"/>
+            </g>
+          </svg>
+        </div>
+        <div class="tile small">
+          <svg width="48" height="48" viewBox="0 0 64 64">
+            <rect width="64" height="64" fill="url(#bgGrad)"/>
+            <g fill="none" stroke-width="11" stroke-linecap="round" transform="translate(32 32) rotate(45)">
+              <path d="M 0 -18 A 18 18 0 0 1 18 0" transform="rotate(-32.5)" stroke="#FFF6F1"/>
+              <path d="M 0 -18 A 18 18 0 0 1 18 0" transform="rotate(57.5)" stroke="#FFDBCB"/>
+              <path d="M 0 -18 A 18 18 0 0 1 18 0" transform="rotate(147.5)" stroke="#FFB98F"/>
+              <path d="M 0 -18 A 18 18 0 0 1 18 0" transform="rotate(237.5)" stroke="#5C2408"/>
+            </g>
+          </svg>
+        </div>
+        <div class="tile small mono">
+          <svg width="30" height="30" viewBox="0 0 64 64" fill="none" stroke="#6E6660" stroke-width="9" stroke-linecap="round">
+            <g transform="translate(32 32) rotate(45)">
+              <path d="M 0 -20 A 20 20 0 0 1 20 0" transform="rotate(-32.5)"/>
+              <path d="M 0 -20 A 20 20 0 0 1 20 0" transform="rotate(57.5)"/>
+              <path d="M 0 -20 A 20 20 0 0 1 20 0" transform="rotate(147.5)"/>
+              <path d="M 0 -20 A 20 20 0 0 1 20 0" transform="rotate(237.5)"/>
+            </g>
+          </svg>
+        </div>
+      </div>
+      <div class="statusbar">6:32
+        <svg width="16" height="16" viewBox="0 0 64 64" fill="none" stroke="#DADCE2" stroke-width="11" stroke-linecap="round">
+          <g transform="translate(32 32) rotate(45)">
+            <path d="M 0 -20 A 20 20 0 0 1 20 0" transform="rotate(-32.5)"/>
+            <path d="M 0 -20 A 20 20 0 0 1 20 0" transform="rotate(57.5)"/>
+            <path d="M 0 -20 A 20 20 0 0 1 20 0" transform="rotate(147.5)"/>
+            <path d="M 0 -20 A 20 20 0 0 1 20 0" transform="rotate(237.5)"/>
+          </g>
+        </svg>
+        · segments hold; tones flatten to one</div>
+      <p class="verdict"><b>Watch for:</b> the darkest (espresso) segment nearly merges
+        with a dark gradient corner at 48 px — if D wins, the espresso segment gets a
+        1&nbsp;dp cream keyline. Caveat: four *different* tones can whisper "pie chart";
+        the equal segment lengths are what keep it identity, not data.</p>
+    </div>
+  </div>
+
+  <h2>Implementation notes</h2>
+  <p class="sub">
+    · Adaptive icon: background layer = the radial gradient (60 → 40 → 30) as a vector
+    drawable; foreground layer = the chosen glyph cluster. Launchers mask their own
+    shape over both, so nothing here depends on the squircle.<br>
+    · The themed (Material You) icon stays a single-tone monochrome layer — the system
+    recolours it — which is why every option keeps a solid-shape mono variant.<br>
+    · Status bar at 16 px is monochrome by platform rule; the "status strip" rows above
+    show exactly that flattening.<br>
+    · Still true for all four: no state, no level, no percentage — CCBG-12's bar.
+  </p>
+  <div class="hr"></div>
+</div>

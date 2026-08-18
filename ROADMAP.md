@@ -758,8 +758,11 @@ keys) would still make this a different product. Not filed, not an open question
   pinned-off safety net.
 
 ### CCRM-45 · Tracker Icon — replace the ring identity (formerly Mascot Icon)
-- **Status:** Round-2 wireframe drawn (2026-08-18), four options, awaiting a pick —
-  `design/tracker-icon-wireframe.html`. Round 1 (mascot direction:
+- **Status:** Round-3 wireframe drawn (2026-08-18), Material 3 treatment, awaiting a
+  pick — `design/tracker-icon-m3-wireframe.html`: tonal palette seeded from Claude
+  Orange, radial-gradient background, cookie/circle containers, multi-tone glyphs.
+  Round 2 (flat marks, `design/tracker-icon-wireframe.html`) judged too plain by the
+  user. Round 1 (mascot direction:
   `design/mascot-icon-wireframe.html`) was dropped by the user on review; the request
   for Anthropic's actual mascot artwork was declined — a publicly distributed repo
   can't carry their trademarked mark while the About screen says "not affiliated".
