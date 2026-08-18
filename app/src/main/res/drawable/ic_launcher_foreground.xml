@@ -1,37 +1,54 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- CCRM-42 (App Icon), revised for CCBG-12 (Status Icon Swap): reset ring foreground.
-     Ring + dot live together in this layer (not split across background/foreground) so
-     launcher parallax keeps them concentric. Geometry maps the Mac master's 560/824
-     optical weight onto the 66dp safe circle: r=19, stroke=6.7, centre (54,54).
-
-     The ring is CLOSED and the bore carries a filled dot. It was a 260° arc, which is
-     a gauge reading 72% — and Android puts this icon in the status bar in place of the
-     live meter whenever the app has more than one notification, so that 72% was being
-     read as real usage. A closed ring has no origin and no endpoint, and the filled
-     bore is the inverse of the meter's empty one, so the mark cannot be mistaken for
-     a reading at any fill. Dot r=6.2 leaves a 9.45 annular gap — wider than the 6.7
-     stroke, which is what keeps ring and dot separate down to status-bar sizes. -->
+<!-- CCRM-45 (Tracker Icon): hourglass on a tone-40 circle container, per the approved
+     round-3 wireframe (design/tracker-icon-m3-wireframe.html, option B). Container and
+     glass live together in this layer so launcher parallax keeps them concentric.
+     Geometry: the wireframe's 64-grid shifted +22 into the 108 viewport — container
+     r=31 and every glyph extent stays inside the 66dp safe circle (r=33). Cream glass,
+     sand in the 90->80 tonal gradient mid-pour with a falling grain: an object, not a
+     level — the CCBG-12 (Status Icon Swap) no-percentage bar still holds because a
+     mid-pour hourglass has no readable fill state. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <!-- container: tone 40 -->
     <path
-        android:pathData="M35,54 a19,19 0 1 0 38,0 a19,19 0 1 0 -38,0"
-        android:strokeWidth="6.7">
-        <aapt:attr name="android:strokeColor">
+        android:pathData="M23,54 a31,31 0 1 0 62,0 a31,31 0 1 0 -62,0"
+        android:fillColor="#C4622D" />
+    <!-- top sand: 90 -> 80 gradient, mid-pour -->
+    <path android:pathData="M48.5,41 c1,4 4,6 5.5,8.5 c1.5,-2.5 4.5,-4.5 5.5,-8.5 z">
+        <aapt:attr name="android:fillColor">
             <gradient
                 android:type="linear"
-                android:startX="35"
-                android:startY="35"
-                android:endX="73"
-                android:endY="73"
-                android:startColor="#F2B25C"
-                android:endColor="#E8734D" />
+                android:startX="54"
+                android:startY="41"
+                android:endX="54"
+                android:endY="49.5"
+                android:startColor="#FFE3D5"
+                android:endColor="#FFB98F" />
         </aapt:attr>
     </path>
+    <!-- bottom mound: tone 80 -->
     <path
-        android:pathData="M47.8,54 a6.2,6.2 0 1 0 12.4,0 a6.2,6.2 0 1 0 -12.4,0"
-        android:fillColor="#F2B25C" />
+        android:pathData="M48,69.5 h12 c-1,-4.5 -4.5,-6 -6,-8 c-1.5,2 -5,3.5 -6,8 z"
+        android:fillColor="#FFB98F" />
+    <!-- falling grain: tone 90 -->
+    <path
+        android:pathData="M53.2,58.8 a0.8,0.8 0 0 1 1.6,0 v7.4 a0.8,0.8 0 0 1 -1.6,0 z"
+        android:fillColor="#FFDBCB" />
+    <!-- glass outline: cream -->
+    <path
+        android:pathData="M45,37 c0,9 7,12 9,17 c2,-5 9,-8 9,-17 M45,71 c0,-9 7,-12 9,-17 c2,5 9,8 9,17"
+        android:strokeColor="#FFF6F1"
+        android:strokeWidth="5.7"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <!-- caps: cream -->
+    <path
+        android:pathData="M42,35 h24 M42,73 h24"
+        android:strokeColor="#FFF6F1"
+        android:strokeWidth="7.6"
+        android:strokeLineCap="round" />
 </vector>

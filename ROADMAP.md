@@ -758,11 +758,16 @@ keys) would still make this a different product. Not filed, not an open question
   pinned-off safety net.
 
 ### CCRM-45 · Tracker Icon — replace the ring identity (formerly Mascot Icon)
-- **Status:** Round-3 wireframe drawn (2026-08-18), Material 3 treatment, awaiting a
-  pick — `design/tracker-icon-m3-wireframe.html`: tonal palette seeded from Claude
-  Orange, radial-gradient background, cookie/circle containers, multi-tone glyphs.
-  Round 2 (flat marks, `design/tracker-icon-wireframe.html`) judged too plain by the
-  user. Round 1 (mascot direction:
+- **Status:** **Done — hourglass (option B) built and verified on the Fold 7,
+  2026-08-18** (release-signed install: app-drawer tile and the Settings → About
+  rendition both match the wireframe). Ships in the next release; still unobserved:
+  the themed/monochrome icon under a Material You launcher theme, and the status-bar
+  16 px case (needs the pinned-off two-alert state). Wireframe history:
+  round 3 approved — `design/tracker-icon-m3-wireframe.html` (Material 3 tonal
+  treatment: palette seeded from Claude Orange, radial-gradient background,
+  circle container, multi-tone sand). Round 2 (flat marks,
+  `design/tracker-icon-wireframe.html`) judged too plain by the user. Round 1
+  (mascot direction:
   `design/mascot-icon-wireframe.html`) was dropped by the user on review; the request
   for Anthropic's actual mascot artwork was declined — a publicly distributed repo
   can't carry their trademarked mark while the About screen says "not affiliated".

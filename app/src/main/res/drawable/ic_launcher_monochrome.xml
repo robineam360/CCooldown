@@ -1,19 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- CCRM-42 (App Icon), revised for CCBG-12 (Status Icon Swap): themed-icon layer.
-     The launcher strips colour and tints this, so the mark has to survive as one flat
-     silhouette. The old track/arc alpha split is gone with the arc itself — a closed
-     ring plus a solid bore dot needs no hierarchy to read, and carrying both at full
-     alpha keeps the gap between them crisp once the launcher tints and downscales. -->
+<!-- CCRM-45 (Tracker Icon): themed-icon layer. The launcher strips colour and tints
+     this, so the hourglass ships as ONE solid silhouette (the wireframe's 16px
+     status-strip variant) — no strokes to thin out under tint + downscale. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
     <path
-        android:pathData="M35,54 a19,19 0 1 0 38,0 a19,19 0 1 0 -38,0"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="6.7" />
-    <path
-        android:pathData="M47.8,54 a6.2,6.2 0 1 0 12.4,0 a6.2,6.2 0 1 0 -12.4,0"
+        android:pathData="M38,32 h32 v3 c0,10 -9,13 -12,19 c3,6 12,9 12,19 v3 h-32 v-3 c0,-10 9,-13 12,-19 c-3,-6 -12,-9 -12,-19 z"
         android:fillColor="#FFFFFF" />
 </vector>
