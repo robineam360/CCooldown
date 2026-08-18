@@ -73,6 +73,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.glance.appwidget.updateAll
 import com.robin.claudeusage.data.Profile
+import com.robin.claudeusage.ping.PingScheduler
 import com.robin.claudeusage.data.Projection
 import com.robin.claudeusage.data.UsageRepository
 import com.robin.claudeusage.data.UsageWindow
@@ -105,6 +106,10 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Window pings (CCRM-17) are hard-disabled (ToS — see UsageCache.pingEnabled);
+        // reschedule here so an alarm armed by an older build is cancelled on first
+        // open instead of waiting for the next poll.
+        PingScheduler.rescheduleAll(this)
         val startProfile = Profile.fromKey(intent?.getStringExtra("profile"))
         // Measured at the root so every screen sees the same window width, and so
         // it re-measures on a fold/unfold without the activity being torn down.

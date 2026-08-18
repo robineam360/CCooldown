@@ -3,6 +3,9 @@ package com.robin.claudeusage
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.drawable.Drawable
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -62,6 +65,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -424,11 +429,9 @@ fun SettingsScreen(
         }
         Spacer(Modifier.height(24.dp))
 
-        SectionLabel("Window pings")
-        SectionCard {
-            WindowPingsSection(repo = repo, labels = labels, use24h = use24h)
-        }
-        Spacer(Modifier.height(24.dp))
+        // Window pings (CCRM-17) section deliberately not rendered: the feature is
+        // hard-disabled over Anthropic ToS risk — see UsageCache.pingEnabled.
+        // WindowPingsSection stays in the file, dormant, for if it's ever sanctioned.
 
         SectionLabel("Quick Settings tile")
         SectionCard {
@@ -631,7 +634,27 @@ fun SettingsScreen(
     Spacer(Modifier.height(8.dp))
 }
 
-private data class BrowserChoice(val label: String, val packageName: String)
+private data class BrowserChoice(
+    val label: String,
+    val packageName: String,
+    val icon: ImageBitmap?,
+)
+
+/**
+ * Launcher icons are adaptive drawables, not bitmaps, so render into one by hand
+ * (core-ktx's toBitmap() isn't a declared dependency). Null on any failure — the
+ * picker row then keeps its leading space so labels stay aligned.
+ */
+private fun Drawable.asIconBitmap(): ImageBitmap? = try {
+    val w = intrinsicWidth.coerceAtLeast(1)
+    val h = intrinsicHeight.coerceAtLeast(1)
+    val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    setBounds(0, 0, w, h)
+    draw(Canvas(bmp))
+    bmp.asImageBitmap()
+} catch (_: Exception) {
+    null
+}
 
 /**
  * Installed browsers, for the sign-in "open with" picker. Uses QUERY_ALL_PACKAGES
@@ -646,7 +669,12 @@ private fun installedBrowsers(context: android.content.Context): List<BrowserCho
     return pm.queryIntentActivities(probe, android.content.pm.PackageManager.MATCH_ALL)
         .mapNotNull { ri ->
             val pkg = ri.activityInfo?.packageName ?: return@mapNotNull null
-            BrowserChoice(ri.loadLabel(pm).toString(), pkg)
+            val icon = try {
+                ri.loadIcon(pm)?.asIconBitmap()
+            } catch (_: Exception) {
+                null
+            }
+            BrowserChoice(ri.loadLabel(pm).toString(), pkg, icon)
         }
         .distinctBy { it.packageName }
         .sortedBy { it.label.lowercase() }
@@ -1067,7 +1095,16 @@ private fun TokenCard(
                                     openInBrowser(context, pendingPickUrl ?: authUrl ?: return@clickable, b.packageName)
                                 }
                                 .padding(vertical = 12.dp, horizontal = 4.dp),
-                        ) { Text(b.label, style = MaterialTheme.typography.bodyLarge) }
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            if (b.icon != null) {
+                                Image(b.icon, contentDescription = null, Modifier.size(32.dp))
+                            } else {
+                                Spacer(Modifier.size(32.dp))
+                            }
+                            Spacer(Modifier.width(16.dp))
+                            Text(b.label, style = MaterialTheme.typography.bodyLarge)
+                        }
                     }
                 }
             },
@@ -2159,7 +2196,11 @@ private fun PingLogCard() {
  * Off by default, per profile. A ping spends the user's subscription quota on an
  * automated request, so the copy says exactly what it sends and on whose account
  * rather than burying it.
+ *
+ * Currently unreferenced: the feature is hard-disabled over Anthropic ToS risk
+ * (see UsageCache.pingEnabled) and the section is not rendered.
  */
+@Suppress("unused")
 @Composable
 private fun WindowPingsSection(
     repo: UsageRepository,

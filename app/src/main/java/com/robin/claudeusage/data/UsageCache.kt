@@ -521,11 +521,17 @@ class UsageCache(context: Context) {
     // --- window pings (CCRM-17): per profile, OFF unless the user turns it on ---
 
     /**
-     * Default **false**, deliberately. A ping spends the user's own subscription quota
-     * on an automated request, so it is never something the app starts doing on its own
-     * — and this being per-profile is what keeps a Team account out of it by default.
+     * Hard-disabled since 2026-08-18: an automated inference call from a third-party
+     * client sits on the wrong side of Anthropic's ToS (CCRM-17 (Window Pings), Posture
+     * paragraph in ROADMAP.md), and the downside is the user's account, not ours. The
+     * stored per-profile pref is kept — [setPingEnabled] still writes it — so a user's
+     * choice survives if the feature is ever sanctioned and re-enabled.
+     *
+     * (Original default was **false**, deliberately: a ping spends the user's own
+     * subscription quota on an automated request, per-profile so a Team account stays
+     * out of it by default.)
      */
-    fun pingEnabled(profile: Profile): Boolean = prefs.getBoolean(k(profile, "pingEnabled"), false)
+    fun pingEnabled(profile: Profile): Boolean = false
 
     fun setPingEnabled(profile: Profile, enabled: Boolean) {
         prefs.edit().putBoolean(k(profile, "pingEnabled"), enabled).apply()
