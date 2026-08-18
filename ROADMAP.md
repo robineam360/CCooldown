@@ -757,16 +757,20 @@ keys) would still make this a different product. Not filed, not an open question
   timeout tension for pinned-on users. The CCBG-12 group summary stays as the
   pinned-off safety net.
 
-### CCRM-45 · Mascot Icon — replace the ring identity with a mascot
-- **Status:** Wireframe drawn (2026-08-18), four options, awaiting a pick —
-  `design/mascot-icon-wireframe.html`
-- With CCRM-44 (One Surface) making a second notification impossible while the meter is
-  pinned, the launcher icon no longer needs to defend against being mistaken for a meter
-  in the status bar — so the identity can stop being a ring altogether. Options: crab
-  (claws up), snoozing blob with a "z", steaming mug, snowflake — each judged at 16 px
-  monochrome first, since that's the size that killed the CCRM-42 (App Icon) arc.
-  Constraint: nothing copying Anthropic's starburst or official assets. Second revision
-  of CCRM-42; foreground/monochrome layers only, orange squircle background stays.
+### CCRM-45 · Tracker Icon — replace the ring identity (formerly Mascot Icon)
+- **Status:** Round-2 wireframe drawn (2026-08-18), four options, awaiting a pick —
+  `design/tracker-icon-wireframe.html`. Round 1 (mascot direction:
+  `design/mascot-icon-wireframe.html`) was dropped by the user on review; the request
+  for Anthropic's actual mascot artwork was declined — a publicly distributed repo
+  can't carry their trademarked mark while the About screen says "not affiliated".
+- New direction: the icon says **usage tracker**, the colour says Claude — a darker
+  burnt orange (#A34A22) squircle so it stands apart from the Claude app's tile. Not a
+  plain line bar, and still never readable as a percentage at 16 px (the constraint
+  that killed the CCRM-42 (App Icon) arc). Options: signal steps (three ascending
+  rounded bars), hourglass, dial with ticks, four-window ring (four equal segments —
+  the four 5-hour windows a day holds). Foreground/monochrome layers plus the
+  background colour resource change; the pinned notification's live meter icon is
+  untouched. Third revision of CCRM-42.
 
 ### CCRM-17 · Window Pings — start a 5-hour window on a schedule
 - **Status:** **Disabled in-app** (2026-08-18) — ToS posture (see the Posture paragraph

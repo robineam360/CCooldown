@@ -1,0 +1,278 @@
+<title>Tracker Icon Options — CCRM-45</title>
+<style>
+  :root {
+    --bg: #FAF8F6; --ink: #26211E; --muted: #6E6660; --accent: #C15F3C;
+    --deep: #A34A22; --hair: #E7E1DC; --card: #FFFFFF;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171513; --ink: #EDE8E4; --muted: #9B928B; --accent: #E59980;
+      --deep: #B85427; --hair: #2C2825; --card: #201D1B;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171513; --ink: #EDE8E4; --muted: #9B928B; --accent: #E59980;
+    --deep: #B85427; --hair: #2C2825; --card: #201D1B;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    margin: 0; padding: 48px 24px 96px; line-height: 1.5; }
+  .page { max-width: 1240px; margin: 0 auto; }
+  .eyebrow { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11px;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin: 0 0 10px; }
+  h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 8px; }
+  .lede { color: var(--muted); max-width: 70ch; margin: 0 0 12px; font-size: 14px; }
+  h2 { font-size: 19px; font-weight: 650; margin: 56px 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; max-width: 80ch; margin: 0 0 16px; }
+  .row { display: flex; flex-wrap: wrap; gap: 26px; align-items: flex-start; }
+  .opt { width: 270px; background: var(--card); border: 1px solid var(--hair);
+    border-radius: 16px; padding: 18px; }
+  .opt h3 { margin: 0 0 2px; font-size: 15px; }
+  .opt .why { font-size: 12.5px; color: var(--muted); margin: 0 0 14px; }
+  .tilerow { display: flex; gap: 14px; align-items: flex-end; margin-bottom: 12px; }
+  .tile { width: 96px; height: 96px; border-radius: 26px; background: var(--deep);
+    display: grid; place-items: center; }
+  .tile.small { width: 48px; height: 48px; border-radius: 14px; }
+  .tile.mono { background: #EFE7DA; }
+  .tile.classic { background: var(--accent); }
+  .statusbar { background: #101114; border-radius: 10px; padding: 6px 12px;
+    display: flex; align-items: center; gap: 10px; color: #DADCE2; font-size: 12px; }
+  .statusbar svg { display: block; }
+  .verdict { font-size: 12px; margin-top: 10px; color: var(--muted); }
+  .caplabel { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 9px;
+    letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
+    text-align: center; margin-top: 5px; }
+  .hr { height: 1px; background: var(--hair); margin: 46px 0 0; border: 0; }
+</style>
+
+<div class="page">
+  <p class="eyebrow">CCRM-45 · wireframe, round 2 — usage-tracker direction</p>
+  <h1>Tracker icon options</h1>
+  <p class="lede">
+    Direction from review: drop the mascot; the icon should say <b>"usage tracker"</b>
+    while the colour says <b>Claude</b> — a darker, burnt Claude-orange so it stands out
+    from the Claude app's own tile. Not a plain line bar. One hard constraint carries
+    over from CCBG-12 (Status Icon Swap): whatever ships must <b>not read as a
+    percentage</b> at 16&nbsp;px in the status bar — so every option here is either
+    symmetric, complete, or an instrument rather than a level.
+  </p>
+
+  <h2>Background colour — burnt orange vs current</h2>
+  <p class="sub">Same glyph, two grounds. The darker <b>burnt orange</b> (left,
+    <code style="font-family:ui-monospace,monospace">#A34A22</code>) separates the app
+    from the Claude app's brighter tile at a glance; the current accent
+    (<code style="font-family:ui-monospace,monospace">#C15F3C</code>) is shown for
+    comparison. All options below sit on the burnt orange.</p>
+  <div class="tilerow">
+    <div>
+      <div class="tile">
+        <svg width="60" height="60" viewBox="0 0 64 64" fill="#fff">
+          <rect x="14" y="34" width="9" height="16" rx="4.5"/>
+          <rect x="27.5" y="24" width="9" height="26" rx="4.5"/>
+          <rect x="41" y="14" width="9" height="36" rx="4.5"/>
+        </svg>
+      </div>
+      <div class="caplabel">burnt · #A34A22</div>
+    </div>
+    <div>
+      <div class="tile classic">
+        <svg width="60" height="60" viewBox="0 0 64 64" fill="#fff">
+          <rect x="14" y="34" width="9" height="16" rx="4.5"/>
+          <rect x="27.5" y="24" width="9" height="26" rx="4.5"/>
+          <rect x="41" y="14" width="9" height="36" rx="4.5"/>
+        </svg>
+      </div>
+      <div class="caplabel">current · #C15F3C</div>
+    </div>
+  </div>
+
+  <h2>The options</h2>
+  <div class="row">
+    <div class="opt">
+      <h3>A · Signal steps</h3>
+      <p class="why">Three ascending rounded bars — the universal "levels" mark, read as
+        <i>signal</i>, never as one bar's fill. Not a line bar: it's a stepped trio.</p>
+      <div class="tilerow">
+        <div class="tile">
+          <svg width="60" height="60" viewBox="0 0 64 64" fill="#fff">
+            <rect x="14" y="34" width="9" height="16" rx="4.5"/>
+            <rect x="27.5" y="24" width="9" height="26" rx="4.5"/>
+            <rect x="41" y="14" width="9" height="36" rx="4.5"/>
+          </svg>
+        </div>
+        <div class="tile small">
+          <svg width="30" height="30" viewBox="0 0 64 64" fill="#fff">
+            <rect x="14" y="34" width="9" height="16" rx="4.5"/>
+            <rect x="27.5" y="24" width="9" height="26" rx="4.5"/>
+            <rect x="41" y="14" width="9" height="36" rx="4.5"/>
+          </svg>
+        </div>
+        <div class="tile small mono">
+          <svg width="30" height="30" viewBox="0 0 64 64" fill="#6E6660">
+            <rect x="14" y="34" width="9" height="16" rx="4.5"/>
+            <rect x="27.5" y="24" width="9" height="26" rx="4.5"/>
+            <rect x="41" y="14" width="9" height="36" rx="4.5"/>
+          </svg>
+        </div>
+      </div>
+      <div class="statusbar">6:32
+        <svg width="16" height="16" viewBox="0 0 64 64" fill="#DADCE2">
+          <rect x="12" y="34" width="11" height="18" rx="5"/>
+          <rect x="26.5" y="22" width="11" height="30" rx="5"/>
+          <rect x="41" y="10" width="11" height="42" rx="5"/>
+        </svg>
+        · three steps, instantly "levels"</div>
+      <p class="verdict"><b>At 16 px:</b> flawless — three solid steps. Risk: resembles
+        a cellular-signal glyph if drawn too thin; the fat rounded bars avoid that.</p>
+    </div>
+
+    <div class="opt">
+      <h3>B · Hourglass</h3>
+      <p class="why">The 5-hour window <i>is</i> a timer — an hourglass says "waiting
+        for the reset" (the literal cooldown) without any level to misread.</p>
+      <div class="tilerow">
+        <div class="tile">
+          <svg width="60" height="60" viewBox="0 0 64 64" fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 12 h28 M18 52 h28"/>
+            <path d="M21 14 c0 10 8 13 11 18 c3 -5 11 -8 11 -18 M21 50 c0 -10 8 -13 11 -18 c3 5 11 8 11 18"/>
+            <path d="M27 20 c1 4 4 6 5 8 c1 -2 4 -4 5 -8 z" fill="#fff" stroke="none"/>
+            <path d="M25 48 h14 c-1 -5 -5 -7 -7 -9 c-2 2 -6 4 -7 9 z" fill="#fff" stroke="none"/>
+          </svg>
+        </div>
+        <div class="tile small">
+          <svg width="30" height="30" viewBox="0 0 64 64" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 12 h28 M18 52 h28"/>
+            <path d="M21 14 c0 10 8 13 11 18 c3 -5 11 -8 11 -18 M21 50 c0 -10 8 -13 11 -18 c3 5 11 8 11 18"/>
+          </svg>
+        </div>
+        <div class="tile small mono">
+          <svg width="30" height="30" viewBox="0 0 64 64" fill="none" stroke="#6E6660" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 12 h28 M18 52 h28"/>
+            <path d="M21 14 c0 10 8 13 11 18 c3 -5 11 -8 11 -18 M21 50 c0 -10 8 -13 11 -18 c3 5 11 8 11 18"/>
+          </svg>
+        </div>
+      </div>
+      <div class="statusbar">6:32
+        <svg width="16" height="16" viewBox="0 0 64 64" fill="none" stroke="#DADCE2" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M16 10 h32 M16 54 h32"/>
+          <path d="M20 12 c0 11 9 14 12 20 c3 -6 12 -9 12 -20 M20 52 c0 -11 9 -14 12 -20 c3 6 12 9 12 20"/>
+        </svg>
+        · the X-with-caps silhouette holds</div>
+      <p class="verdict"><b>At 16 px:</b> the pinch silhouette survives; sand detail
+        drops. Risk: Android's own "app paused / digital wellbeing" hourglass lives in
+        the same neighbourhood.</p>
+    </div>
+
+    <div class="opt">
+      <h3>C · Dial with ticks</h3>
+      <p class="why">An instrument face — ring of tick marks and a centre pivot, needle
+        pointing straight up. Says "meter" as an <i>object</i>; a full symmetric tick
+        ring has no fill state to misread.</p>
+      <div class="tilerow">
+        <div class="tile">
+          <svg width="60" height="60" viewBox="0 0 64 64" fill="none" stroke="#fff" stroke-linecap="round">
+            <g stroke-width="4">
+              <path d="M32 8 v7 M49 15 l-5 5 M56 32 h-7 M49 49 l-5 -5 M32 56 v-7 M15 49 l5 -5 M8 32 h7 M15 15 l5 5"/>
+            </g>
+            <path d="M32 32 L32 16" stroke-width="5"/>
+            <circle cx="32" cy="32" r="5" fill="#fff" stroke="none"/>
+          </svg>
+        </div>
+        <div class="tile small">
+          <svg width="30" height="30" viewBox="0 0 64 64" fill="none" stroke="#fff" stroke-linecap="round">
+            <g stroke-width="5">
+              <path d="M32 8 v7 M49 15 l-5 5 M56 32 h-7 M49 49 l-5 -5 M32 56 v-7 M15 49 l5 -5 M8 32 h7 M15 15 l5 5"/>
+            </g>
+            <path d="M32 32 L32 16" stroke-width="6"/>
+            <circle cx="32" cy="32" r="6" fill="#fff" stroke="none"/>
+          </svg>
+        </div>
+        <div class="tile small mono">
+          <svg width="30" height="30" viewBox="0 0 64 64" fill="none" stroke="#6E6660" stroke-linecap="round">
+            <g stroke-width="5">
+              <path d="M32 8 v7 M49 15 l-5 5 M56 32 h-7 M49 49 l-5 -5 M32 56 v-7 M15 49 l5 -5 M8 32 h7 M15 15 l5 5"/>
+            </g>
+            <path d="M32 32 L32 16" stroke-width="6"/>
+            <circle cx="32" cy="32" r="6" fill="#6E6660" stroke="none"/>
+          </svg>
+        </div>
+      </div>
+      <div class="statusbar">6:32
+        <svg width="16" height="16" viewBox="0 0 64 64" fill="none" stroke="#DADCE2" stroke-linecap="round">
+          <g stroke-width="7">
+            <path d="M32 6 v8 M50 14 l-6 6 M58 32 h-8 M50 50 l-6 -6 M32 58 v-8 M14 50 l6 -6 M6 32 h8 M14 14 l6 6"/>
+          </g>
+          <circle cx="32" cy="32" r="8" fill="#DADCE2" stroke="none"/>
+        </svg>
+        · tick ring + pivot (needle drops)</div>
+      <p class="verdict"><b>At 16 px:</b> the needle merges with the 12-o'clock tick,
+        leaving a symmetric tick ring — safe. Caveat: at mid sizes the up-needle can
+        read as "a reading of 50%"; it's the only option with any residual gauge-ness.</p>
+    </div>
+
+    <div class="opt">
+      <h3>D · Four-window ring</h3>
+      <p class="why">Four equal arc segments — the four 5-hour windows a day holds
+        (the app's own scheduling arithmetic). Symmetric and complete, so it can't read
+        as progress; it reads as a shutter / segmented dial.</p>
+      <div class="tilerow">
+        <div class="tile">
+          <svg width="60" height="60" viewBox="0 0 64 64" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round">
+            <g transform="translate(32 32) rotate(45)">
+              <path d="M 0 -20 A 20 20 0 0 1 20 0" transform="rotate(-32.5)"/>
+              <path d="M 0 -20 A 20 20 0 0 1 20 0" transform="rotate(57.5)"/>
+              <path d="M 0 -20 A 20 20 0 0 1 20 0" transform="rotate(147.5)"/>
+              <path d="M 0 -20 A 20 20 0 0 1 20 0" transform="rotate(237.5)"/>
+            </g>
+          </svg>
+        </div>
+        <div class="tile small">
+          <svg width="30" height="30" viewBox="0 0 64 64" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round">
+            <g transform="translate(32 32) rotate(45)">
+              <path d="M 0 -20 A 20 20 0 0 1 20 0" transform="rotate(-32.5)"/>
+              <path d="M 0 -20 A 20 20 0 0 1 20 0" transform="rotate(57.5)"/>
+              <path d="M 0 -20 A 20 20 0 0 1 20 0" transform="rotate(147.5)"/>
+              <path d="M 0 -20 A 20 20 0 0 1 20 0" transform="rotate(237.5)"/>
+            </g>
+          </svg>
+        </div>
+        <div class="tile small mono">
+          <svg width="30" height="30" viewBox="0 0 64 64" fill="none" stroke="#6E6660" stroke-width="9" stroke-linecap="round">
+            <g transform="translate(32 32) rotate(45)">
+              <path d="M 0 -20 A 20 20 0 0 1 20 0" transform="rotate(-32.5)"/>
+              <path d="M 0 -20 A 20 20 0 0 1 20 0" transform="rotate(57.5)"/>
+              <path d="M 0 -20 A 20 20 0 0 1 20 0" transform="rotate(147.5)"/>
+              <path d="M 0 -20 A 20 20 0 0 1 20 0" transform="rotate(237.5)"/>
+            </g>
+          </svg>
+        </div>
+      </div>
+      <div class="statusbar">6:32
+        <svg width="16" height="16" viewBox="0 0 64 64" fill="none" stroke="#DADCE2" stroke-width="11" stroke-linecap="round">
+          <g transform="translate(32 32) rotate(45)">
+            <path d="M 0 -20 A 20 20 0 0 1 20 0" transform="rotate(-32.5)"/>
+            <path d="M 0 -20 A 20 20 0 0 1 20 0" transform="rotate(57.5)"/>
+            <path d="M 0 -20 A 20 20 0 0 1 20 0" transform="rotate(147.5)"/>
+            <path d="M 0 -20 A 20 20 0 0 1 20 0" transform="rotate(237.5)"/>
+          </g>
+        </svg>
+        · four segments, gaps hold at 16 px</div>
+      <p class="verdict"><b>At 16 px:</b> the four gaps survive as long as stroke and
+        gap widths stay matched — shown here at the widths that hold. Closest kin to
+        the current ring identity, so the update feels like an evolution.</p>
+    </div>
+  </div>
+
+  <h2>Notes for whichever wins</h2>
+  <p class="sub">
+    · Background: burnt orange <b>#A34A22</b> squircle (themed/monochrome layers follow
+    the system as today). Foreground pure white for contrast at the darker ground.<br>
+    · Only <code style="font-family:ui-monospace,monospace">ic_launcher_foreground.xml</code> /
+    <code style="font-family:ui-monospace,monospace">ic_launcher_monochrome.xml</code>
+    and the background colour resource change; the pinned notification's live meter
+    icon is untouched.<br>
+    · None of these reads as a fill level at any size — the CCBG-12 bar stays met.
+  </p>
+  <div class="hr"></div>
+</div>
