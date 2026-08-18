@@ -142,7 +142,7 @@ object Alerts {
             // pinned panel — no notification. The flag resets so that switching the
             // pinned notification off mid-episode posts the standalone alert once, just
             // as if the episode had started then.
-            if (Conditions.foldedInto(cache, profile)) {
+            if (Conditions.foldedInto(cache)) {
                 NotificationManagerCompat.from(context).cancel(notifId(profile, 3))
                 cache.setReauthNotified(profile, false)
             } else if (cache.authAlertsEnabled() && !cache.reauthNotified(profile)) {
@@ -248,7 +248,7 @@ object Alerts {
         // it draws the expiry as a condition strip instead, and a second notification here
         // would be the very thing that costs us the live status-bar meter. Any copy posted
         // before the fold — or before the pinned notification was switched on — is cleared.
-        if (Conditions.foldedInto(cache, profile)) {
+        if (Conditions.foldedInto(cache)) {
             NotificationManagerCompat.from(context).cancel(notifId(profile, 6))
             return
         }
@@ -286,7 +286,7 @@ object Alerts {
     ) {
         // CCBG-12 (Status Icon Swap): folded into the pinned notification's panel when it is
         // showing this profile — see [checkUpcomingExpiry] for why.
-        if (Conditions.foldedInto(cache, profile)) {
+        if (Conditions.foldedInto(cache)) {
             if (cache.staleNotified(profile)) {
                 NotificationManagerCompat.from(context).cancel(notifId(profile, 7))
                 cache.setStaleNotified(profile, false)
@@ -349,7 +349,7 @@ object Alerts {
                 val id = notifId(profile, if (windowName == "Session") 4 else 5)
                 val title = "${cache.profileLabel(profile)}: $windowLabel window reset"
                 val text = "Usage is back at ${pct.toInt()}%. Next reset ${Fmt.relIn(window.resetsAt)}."
-                if (Conditions.foldedInto(cache, profile)) {
+                if (Conditions.foldedInto(cache)) {
                     // CCRM-44 (One Surface): "you're back" is momentary, so the strip
                     // takes a fixed half hour rather than the alert-lifetime setting.
                     foldEvent(context, cache, profile, "reset.$windowName", id, title, text,
@@ -400,7 +400,7 @@ object Alerts {
         val alreadyNotified = cache.alertThreshold(profile, keyName)
         val crossed = thresholds.firstOrNull { pct >= it && alreadyNotified < it } ?: return
 
-        if (Conditions.foldedInto(cache, profile)) {
+        if (Conditions.foldedInto(cache)) {
             // CCRM-44 (One Surface): a strip instead of a notification. The dedup state
             // advances the same either way, so flipping the pinned notification off
             // later never replays a threshold this window already crossed.
@@ -457,7 +457,7 @@ object Alerts {
             val (title, text) = paceCopy(headline, label, windowLabel, window, usedPct, estimate, use24h)
             // CCRM-44 (One Surface): folding always "delivers" — the strip write is a
             // pref, it cannot fail the way a notification post can.
-            val posted = if (Conditions.foldedInto(cache, profile)) {
+            val posted = if (Conditions.foldedInto(cache)) {
                 foldEvent(context, cache, profile, "pace.$windowName", notificationId, title, text,
                     expiresAt = System.currentTimeMillis() + eventTimeout(cache, window.resetsAt))
                 true

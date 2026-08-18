@@ -45,14 +45,14 @@ object Conditions {
     )
 
     /**
-     * Whether the pinned notification is in a position to carry [profile]'s conditions.
+     * Whether the pinned notification is in a position to carry a profile's alerts.
      *
-     * False when it is switched off, or when it is showing the *other* profile — in either
-     * case folding would not move the condition somewhere quieter, it would delete it. Those
-     * cases keep posting a real notification exactly as before.
+     * Simply "is it on" (CCRM-44 (One Surface), revised 2026-08-18 on user feedback):
+     * the panel carries BOTH profiles — the one it isn't showing gets its strips
+     * prefixed with its name — so no profile ever posts a standalone notification
+     * while the panel exists. Off, everything posts exactly as before.
      */
-    fun foldedInto(cache: UsageCache, profile: Profile): Boolean =
-        cache.pinnedEnabled() && cache.pinnedProfile() == profile
+    fun foldedInto(cache: UsageCache): Boolean = cache.pinnedEnabled()
 
     /** Every condition currently true for [profile], faults first. */
     fun forProfile(cache: UsageCache, profile: Profile): List<Condition> =
@@ -75,19 +75,32 @@ object Conditions {
     data class Panel(val strips: List<Condition>, val overflow: Int, val stale: Boolean)
 
     fun panelFor(context: Context, cache: UsageCache, profile: Profile): Panel {
+        // The panel carries the other profile too (revised 2026-08-18): its strips are
+        // prefixed with its name, since the header only names the shown profile. Event
+        // titles already carry their profile's label from the alert copy.
+        val other = Profile.entries.first { it != profile }
+        val otherLabel = cache.profileLabel(other)
         val staleCondition = stale(cache, profile)
-        val events = cache.foldedEvents(profile).map {
-            Condition(short = it.title, title = it.title, detail = it.detail, error = false)
-        }
-        val all = listOfNotNull(reauth(cache, profile), staleCondition) +
-            events +
-            listOfNotNull(expiry(cache, profile), update(context, cache))
+        val events = (cache.foldedEvents(profile) + cache.foldedEvents(other))
+            .sortedByDescending { it.firedAt }
+            .map { Condition(short = it.title, title = it.title, detail = it.detail, error = false) }
+        val all = listOfNotNull(
+            reauth(cache, profile), staleCondition,
+            reauth(cache, other)?.labelled(otherLabel), stale(cache, other)?.labelled(otherLabel),
+        ) + events + listOfNotNull(
+            expiry(cache, profile), expiry(cache, other)?.labelled(otherLabel),
+            update(context, cache),
+        )
         return Panel(
             strips = all.take(MAX_STRIPS),
             overflow = (all.size - MAX_STRIPS).coerceAtLeast(0),
+            // Only the shown profile's staleness dims the shown number.
             stale = staleCondition != null,
         )
     }
+
+    private fun Condition.labelled(label: String): Condition =
+        copy(short = "$label: $short", title = "$label: $title")
 
     /**
      * Re-auth as a condition (CCRM-44). It is the textbook state — continuously true

@@ -749,6 +749,13 @@ keys) would still make this a different product. Not filed, not an open question
   notifications from the app. Still unobserved: event strips (threshold / pace / reset
   need a live crossing), the "+ n more" overflow line, and the update strip (needs a
   release ahead of the installed version). Ships in the next release.
+- **Revised same day, on device feedback:** the approved "other profile posts
+  standalone" rule survived first contact for about an hour — the Teams re-auth
+  posting beside a Pro panel was exactly the clutter the feature exists to remove.
+  Now `Conditions.foldedInto` is simply "pinned on", and the panel carries **both**
+  profiles: the unshown profile's condition strips are prefixed with its name (event
+  titles already carry it), merged newest-first with the rest. Only the shown
+  profile's staleness dims the headline number. Wireframe state 4 updated to match.
 - **How it landed:** `UsageCache.FoldedEvent` store (per-profile JSON pref, replace by
   kind, pruned on read); `Conditions.panelFor` orders faults · events newest-first ·
   warnings · update and caps at `MAX_STRIPS = 3` with an overflow count; new `reauth`
