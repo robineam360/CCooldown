@@ -806,6 +806,23 @@ keys) would still make this a different product. Not filed, not an open question
   background colour resource change; the pinned notification's live meter icon is
   untouched. Third revision of CCRM-42.
 
+### CCRM-47 · Crab Easter Egg — the mascot hiding in the app and the pinned panel
+- **Status:** Planned, for fun — filed 2026-08-18, deliberately not scheduled.
+- **What:** a crab mascot as an easter egg — somewhere in the app (candidate: the
+  About screen after the same 7-tap ritual that unlocks debug, or riding the empty
+  "Starts when a message is sent" state) and as a rare cameo on the always-on
+  notification's expanded panel (e.g. peeking over the 7-day bar when every window
+  sits at 0%). Needs a wireframe per working agreement 2 before building, including
+  where it appears, how rarely, and how it stays out of the way of real data.
+- **Constraint, settled during CCRM-45 (Tracker Icon):** not Anthropic's actual
+  mascot artwork — this repo is publicly distributed and the About screen says "not
+  affiliated", so shipping their trademarked asset is out. Same species, our own
+  drawing: the original **plush crab** already designed and kept in
+  `design/mascot-icon-wireframe.html` (option A2 — round body, mitten claws up,
+  happy face) is the ready-made candidate.
+- An easter egg is the right home for the mascot energy that lost the icon decision:
+  the launcher identity stayed a tracker (hourglass), the personality goes here.
+
 ### CCRM-17 · Window Pings — start a 5-hour window on a schedule
 - **Status:** **Disabled in-app** (2026-08-18) — ToS posture (see the Posture paragraph
   below): an automated inference call from a third-party client risks the *user's*
