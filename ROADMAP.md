@@ -141,6 +141,19 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
 - The notification's "gauge" style ring still has no pace mark: it predates
   `RingRenderer` and is the standing follow-up noted in `RingRenderer.kt`.
 
+### CCRM-46 · Picker Icons — browser icons in the sign-in "Open with" dialog
+- **Status:** Done and **verified on the Fold 7, 2026-08-18** (release-signed build —
+  Brave and Samsung Internet rows drew their launcher icons). Wireframe approved
+  2026-08-18 during the release-planning review; ID allocated retroactively the same day
+  so the commit has a name.
+- **What:** each row in the app's own browser picker (sign-in and the CCRM-26
+  (Quick Links) usage-dashboard button) shows the browser's launcher icon at 32 dp
+  before the label — recognition beats reading when several browsers are installed.
+  A browser whose icon fails to load keeps a 32 dp spacer so labels stay aligned.
+- **Where:** `SettingsScreen.kt` — `BrowserChoice` gains an `ImageBitmap?`, loaded in
+  `installedBrowsers()` via a hand-rolled `Drawable.asIconBitmap()` (core-ktx's
+  `toBitmap()` is not a declared dependency).
+
 ### CCRM-20 · Wide Chart — one profile at full width, and a chart you can touch
 - **Status:** Done (2026-08-04) · successor to CCRM-12
 - **Verified on the Fold 7's inner screen** (1968×2184 @ 420dpi = **750×832dp**, which
@@ -727,9 +740,43 @@ keys) would still make this a different product. Not filed, not an open question
 
 ## Needs design — decide the shape before building
 
+### CCRM-44 · One Surface — every alert folds into the pinned notification
+- **Status:** Wireframe **approved** (2026-08-18, incl. the 3-strip cap + overflow line) —
+  `design/fold-all-alerts-wireframe.html`. Build note: the user runs the **Huge number**
+  pinned style — specify and verify strips against that layout first.
+- While the always-on notification is on and showing a profile, that profile posts **no
+  other notification** — every alert becomes a strip in the pinned panel, on demand and
+  silent by the user's explicit choice (decided 2026-08-18: the silence is the point, not
+  a cost). Extends CCBG-12 (Status Icon Swap)'s `notify/Conditions.kt` from two conditions
+  to the full set: re-auth and update-available become conditions; usage warnings, pace
+  alerts and reset pings become timed event strips reusing `alertLifetime`. Pinned off, or
+  the panel not showing that profile → alerts post standalone exactly as today
+  (`Conditions.foldedInto` rule). Stack order red conditions · events newest-first · amber
+  conditions · update; 3 strips max plus a "+ n more" line. The update strip persists
+  until the installed version catches up, resolving CCBG-12's "once per version, ever"
+  timeout tension for pinned-on users. The CCBG-12 group summary stays as the
+  pinned-off safety net.
+
+### CCRM-45 · Mascot Icon — replace the ring identity with a mascot
+- **Status:** Wireframe drawn (2026-08-18), four options, awaiting a pick —
+  `design/mascot-icon-wireframe.html`
+- With CCRM-44 (One Surface) making a second notification impossible while the meter is
+  pinned, the launcher icon no longer needs to defend against being mistaken for a meter
+  in the status bar — so the identity can stop being a ring altogether. Options: crab
+  (claws up), snoozing blob with a "z", steaming mug, snowflake — each judged at 16 px
+  monochrome first, since that's the size that killed the CCRM-42 (App Icon) arc.
+  Constraint: nothing copying Anthropic's starburst or official assets. Second revision
+  of CCRM-42; foreground/monochrome layers only, orange squircle background stays.
+
 ### CCRM-17 · Window Pings — start a 5-hour window on a schedule
-- **Status:** **Built and the premise is confirmed** (2026-07-31) · opt-in, off by
-  default · one device test outstanding (a real 4am alarm in Doze)
+- **Status:** **Disabled in-app** (2026-08-18) — ToS posture (see the Posture paragraph
+  below): an automated inference call from a third-party client risks the *user's*
+  account, so `UsageCache.pingEnabled` is hard-wired to `false` and the Settings
+  section is hidden. Code retained dormant; a stored per-profile pref survives so a
+  user's choice is restored if Anthropic ever sanctions third-party clients. The
+  outstanding Doze test below is moot while disabled.
+  - Previously: **Built and the premise is confirmed** (2026-07-31) · opt-in, off by
+    default · one device test outstanding (a real 4am alarm in Doze)
 
 - **HOW THE SERVER PICKS A WINDOW — measured, and this is what the feature rests on.**
   Two on-device observations on Personal:

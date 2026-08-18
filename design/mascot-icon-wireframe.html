@@ -1,0 +1,235 @@
+<title>Mascot Icon Options — CCRM-45</title>
+<style>
+  :root {
+    --bg: #FAF8F6; --ink: #26211E; --muted: #6E6660; --accent: #C15F3C;
+    --hair: #E7E1DC; --card: #FFFFFF;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171513; --ink: #EDE8E4; --muted: #9B928B; --accent: #E59980;
+      --hair: #2C2825; --card: #201D1B;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171513; --ink: #EDE8E4; --muted: #9B928B; --accent: #E59980;
+    --hair: #2C2825; --card: #201D1B;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    margin: 0; padding: 48px 24px 96px; line-height: 1.5; }
+  .page { max-width: 1240px; margin: 0 auto; }
+  .eyebrow { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11px;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin: 0 0 10px; }
+  h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 8px; }
+  .lede { color: var(--muted); max-width: 70ch; margin: 0 0 12px; font-size: 14px; }
+  h2 { font-size: 19px; font-weight: 650; margin: 56px 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; max-width: 80ch; margin: 0 0 16px; }
+  .row { display: flex; flex-wrap: wrap; gap: 26px; align-items: flex-start; }
+  .cap { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 10px;
+    letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+  .opt { width: 270px; background: var(--card); border: 1px solid var(--hair);
+    border-radius: 16px; padding: 18px; }
+  .opt h3 { margin: 0 0 2px; font-size: 15px; }
+  .opt .why { font-size: 12.5px; color: var(--muted); margin: 0 0 14px; }
+  .tilerow { display: flex; gap: 14px; align-items: flex-end; margin-bottom: 12px; }
+  .tile { width: 96px; height: 96px; border-radius: 26px; background: var(--accent);
+    display: grid; place-items: center; }
+  .tile.small { width: 48px; height: 48px; border-radius: 14px; }
+  .tile.mono { background: #EFE7DA; }
+  .statusbar { background: #101114; border-radius: 10px; padding: 6px 12px;
+    display: flex; align-items: center; gap: 10px; color: #DADCE2; font-size: 12px; }
+  .statusbar svg { display: block; }
+  .verdict { font-size: 12px; margin-top: 10px; color: var(--muted); }
+  .hr { height: 1px; background: var(--hair); margin: 46px 0 0; border: 0; }
+</style>
+
+<div class="page">
+  <p class="eyebrow">CCRM-45 · wireframe for approval</p>
+  <h1>Mascot icon options</h1>
+  <p class="lede">
+    Replaces the closed-ring identity (CCBG-12 revision of CCRM-42 (App Icon)) with a
+    mascot that <b>cannot be read as a usage meter at any size</b> — the whole failure
+    mode CCBG-12 was about. Each option is shown as the launcher tile (96 + 48),
+    the themed/monochrome tile, and at 16&nbsp;px on a status-bar strip — the size that
+    actually decides. One constraint up front: nothing that copies Anthropic's starburst
+    mark or official assets — the About screen says "not affiliated" and the icon must
+    agree with it.
+  </p>
+
+  <h2>Option A · The crab</h2>
+  <div class="row">
+    <div class="opt">
+      <h3>Crab, claws up</h3>
+      <p class="why">A nod to the Claude Code community's crab without copying anything
+        official. Friendly, and claws-up reads as "hold on / cooling off".</p>
+      <div class="tilerow">
+        <div class="tile">
+          <svg width="64" height="64" viewBox="0 0 64 64" fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round">
+            <ellipse cx="32" cy="40" rx="15" ry="11" fill="#fff" stroke="none"/>
+            <circle cx="27" cy="38" r="2.2" fill="var(--accent)" stroke="none"/>
+            <circle cx="37" cy="38" r="2.2" fill="var(--accent)" stroke="none"/>
+            <path d="M20 32 Q12 26 13 17"/><path d="M13 17 a6 6 0 1 1 8 5" fill="none"/>
+            <path d="M44 32 Q52 26 51 17"/><path d="M51 17 a6 6 0 1 0 -8 5" fill="none"/>
+            <path d="M18 48 L12 53 M22 51 L18 57 M46 48 L52 53 M42 51 L46 57"/>
+          </svg>
+        </div>
+        <div class="tile small">
+          <svg width="32" height="32" viewBox="0 0 64 64" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round">
+            <ellipse cx="32" cy="40" rx="15" ry="11" fill="#fff" stroke="none"/>
+            <path d="M20 32 Q12 26 13 17"/><path d="M13 17 a6 6 0 1 1 8 5"/>
+            <path d="M44 32 Q52 26 51 17"/><path d="M51 17 a6 6 0 1 0 -8 5"/>
+          </svg>
+        </div>
+        <div class="tile small mono">
+          <svg width="32" height="32" viewBox="0 0 64 64" fill="none" stroke="#6E6660" stroke-width="6" stroke-linecap="round">
+            <ellipse cx="32" cy="40" rx="15" ry="11" fill="#6E6660" stroke="none"/>
+            <path d="M20 32 Q12 26 13 17"/><path d="M13 17 a6 6 0 1 1 8 5"/>
+            <path d="M44 32 Q52 26 51 17"/><path d="M51 17 a6 6 0 1 0 -8 5"/>
+          </svg>
+        </div>
+      </div>
+      <div class="statusbar">6:32
+        <svg width="16" height="16" viewBox="0 0 64 64" fill="none" stroke="#DADCE2" stroke-width="8" stroke-linecap="round">
+          <ellipse cx="32" cy="42" rx="15" ry="11" fill="#DADCE2" stroke="none"/>
+          <path d="M20 33 Q12 27 14 18"/><path d="M44 33 Q52 27 50 18"/>
+        </svg>
+        · claws survive, pincers don't</div>
+      <p class="verdict"><b>At 16 px:</b> body + two raised arms stay readable; the pincer
+        gaps close up, so the monochrome variant drops them and keeps plain arms.</p>
+    </div>
+
+    <div class="opt">
+      <h3>Option B · Snoozing blob</h3>
+      <p class="why">A round creature asleep with one "z" — the literal cooldown. Maximum
+        mascot energy; the "z" is the identity at small sizes.</p>
+      <div class="tilerow">
+        <div class="tile">
+          <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+            <circle cx="30" cy="38" r="18" fill="#fff"/>
+            <path d="M22 38 q3 3 6 0 M34 38 q3 3 6 0" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" fill="none"/>
+            <path d="M42 14 h10 l-10 10 h10" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+        </div>
+        <div class="tile small">
+          <svg width="32" height="32" viewBox="0 0 64 64" fill="none">
+            <circle cx="30" cy="38" r="18" fill="#fff"/>
+            <path d="M22 38 q3 3 6 0 M34 38 q3 3 6 0" stroke="var(--accent)" stroke-width="4" stroke-linecap="round" fill="none"/>
+            <path d="M42 14 h10 l-10 10 h10" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+        </div>
+        <div class="tile small mono">
+          <svg width="32" height="32" viewBox="0 0 64 64" fill="none">
+            <circle cx="30" cy="38" r="18" fill="#6E6660"/>
+            <path d="M42 14 h10 l-10 10 h10" stroke="#6E6660" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+        </div>
+      </div>
+      <div class="statusbar">6:32
+        <svg width="16" height="16" viewBox="0 0 64 64" fill="none">
+          <circle cx="28" cy="40" r="17" fill="#DADCE2"/>
+          <path d="M40 12 h12 l-12 12 h12" stroke="#DADCE2" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+        · disc + z — unambiguous</div>
+      <p class="verdict"><b>At 16 px:</b> a filled disc with a "z" — nothing else in a
+        status bar looks like it, and a solid disc cannot read as a fill level.</p>
+    </div>
+
+    <div class="opt">
+      <h3>Option C · Steaming mug</h3>
+      <p class="why">"Take a break while it cools." Calm, adult, still characterful —
+        the steam gives it life without being a face.</p>
+      <div class="tilerow">
+        <div class="tile">
+          <svg width="64" height="64" viewBox="0 0 64 64" fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round">
+            <rect x="16" y="28" width="26" height="22" rx="5" fill="#fff" stroke="none"/>
+            <path d="M42 33 h4 a6 6 0 0 1 0 12 h-4" fill="none"/>
+            <path d="M24 20 q-3 -4 0 -8 M34 20 q-3 -4 0 -8" fill="none"/>
+          </svg>
+        </div>
+        <div class="tile small">
+          <svg width="32" height="32" viewBox="0 0 64 64" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round">
+            <rect x="16" y="28" width="26" height="22" rx="5" fill="#fff" stroke="none"/>
+            <path d="M42 33 h4 a6 6 0 0 1 0 12 h-4" fill="none"/>
+            <path d="M24 20 q-3 -4 0 -8 M34 20 q-3 -4 0 -8" fill="none"/>
+          </svg>
+        </div>
+        <div class="tile small mono">
+          <svg width="32" height="32" viewBox="0 0 64 64" fill="none" stroke="#6E6660" stroke-width="6" stroke-linecap="round">
+            <rect x="16" y="28" width="26" height="22" rx="5" fill="#6E6660" stroke="none"/>
+            <path d="M42 33 h4 a6 6 0 0 1 0 12 h-4" fill="none"/>
+            <path d="M24 20 q-3 -4 0 -8 M34 20 q-3 -4 0 -8" fill="none"/>
+          </svg>
+        </div>
+      </div>
+      <div class="statusbar">6:32
+        <svg width="16" height="16" viewBox="0 0 64 64" fill="none" stroke="#DADCE2" stroke-width="8" stroke-linecap="round">
+          <rect x="14" y="28" width="28" height="24" rx="6" fill="#DADCE2" stroke="none"/>
+          <path d="M44 34 h4 a6 6 0 0 1 0 12 h-4" fill="none"/>
+        </svg>
+        · steam drops, handle stays</div>
+      <p class="verdict"><b>At 16 px:</b> mug + handle read instantly; steam disappears,
+        which is fine. Risk: a mug icon next to an actual coffee app's mug.</p>
+    </div>
+
+    <div class="opt">
+      <h3>Option D · Snowflake</h3>
+      <p class="why">Cooldown, literally. Geometric rather than mascot — included as the
+        control option: strongest at tiny sizes, least personality.</p>
+      <div class="tilerow">
+        <div class="tile">
+          <svg width="64" height="64" viewBox="0 0 64 64" stroke="#fff" stroke-width="4" stroke-linecap="round">
+            <g transform="translate(32 32)">
+              <g><path d="M0 -20 V20 M-5 -13 L0 -8 L5 -13 M-5 13 L0 8 L5 13"/></g>
+              <g transform="rotate(60)"><path d="M0 -20 V20 M-5 -13 L0 -8 L5 -13 M-5 13 L0 8 L5 13"/></g>
+              <g transform="rotate(120)"><path d="M0 -20 V20 M-5 -13 L0 -8 L5 -13 M-5 13 L0 8 L5 13"/></g>
+            </g>
+          </svg>
+        </div>
+        <div class="tile small">
+          <svg width="32" height="32" viewBox="0 0 64 64" stroke="#fff" stroke-width="5" stroke-linecap="round">
+            <g transform="translate(32 32)">
+              <g><path d="M0 -20 V20"/></g>
+              <g transform="rotate(60)"><path d="M0 -20 V20"/></g>
+              <g transform="rotate(120)"><path d="M0 -20 V20"/></g>
+            </g>
+          </svg>
+        </div>
+        <div class="tile small mono">
+          <svg width="32" height="32" viewBox="0 0 64 64" stroke="#6E6660" stroke-width="5" stroke-linecap="round">
+            <g transform="translate(32 32)">
+              <g><path d="M0 -20 V20"/></g>
+              <g transform="rotate(60)"><path d="M0 -20 V20"/></g>
+              <g transform="rotate(120)"><path d="M0 -20 V20"/></g>
+            </g>
+          </svg>
+        </div>
+      </div>
+      <div class="statusbar">6:32
+        <svg width="16" height="16" viewBox="0 0 64 64" stroke="#DADCE2" stroke-width="7" stroke-linecap="round">
+          <g transform="translate(32 32)">
+            <g><path d="M0 -20 V20"/></g>
+            <g transform="rotate(60)"><path d="M0 -20 V20"/></g>
+            <g transform="rotate(120)"><path d="M0 -20 V20"/></g>
+          </g>
+        </svg>
+        · six-arm star, crisp</div>
+      <p class="verdict"><b>At 16 px:</b> branches drop to a plain six-arm star — crisp,
+        but generic; every weather app owns this shape.</p>
+    </div>
+  </div>
+
+  <h2>Notes that apply to all four</h2>
+  <p class="sub">
+    · The launcher background stays the Claude-orange squircle; only the foreground and
+    monochrome layers change (<code>ic_launcher_foreground.xml</code>,
+    <code>ic_launcher_monochrome.xml</code>).<br>
+    · The pinned notification's live meter icon is untouched — this is only what appears
+    when the launcher icon shows: home screen, app info, and the status bar in the
+    pinned-off two-alert case.<br>
+    · The About screen's large icon and the README/store shots update with it; the
+    brochure PDF only if its cover uses the icon.<br>
+    · None of these can be misread as a fill level — the CCBG-12 bar for any successor.
+  </p>
+  <div class="hr"></div>
+</div>

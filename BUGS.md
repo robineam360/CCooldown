@@ -11,8 +11,43 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
 
 ## Open
 
+### CCBG-13 · Light Status Bar — status-bar icons stay white on the light theme's pale background
+- **Status:** Open
+- **Severity:** Low (poor contrast, nothing wrong with the data)
+- **Symptom:** Observed on the Fold 7 (outer screen), 2026-08-18, during the release
+  device pass. With the device in light theme, the app's screens draw their pale
+  background edge-to-edge but the system status bar keeps **white** clock and icons,
+  so the top row is white-on-pink and barely legible. Dark theme is fine (white on
+  dark). The launcher and other apps flip to dark status-bar icons in light mode,
+  so this is ours: the activity never sets `isAppearanceLightStatusBars` (or the
+  windowLightStatusBar theme attribute) for the light palette.
+- **Where:** every in-app screen — main, Settings, guide (screenshots from the
+  2026-08-18 pass: main and Settings both show it).
+
+### CCBG-3 · Credits Visibility — credits card ignores extra-usage being switched off
+- **Status:** Open
+- **Severity:** Low (misleading display, no data loss) — and possibly unreachable
+- **Symptom:** Suspected, not observed. The credits card renders whenever
+  `limit > 0`, so an account that has *switched extra usage off* while keeping a
+  non-zero monthly limit would still be shown a credits bar as though it were live.
+- **Detail:** the payload carries `spend.enabled` and `extra_usage.is_enabled`, and
+  `UsageParser` reads neither — see `creditsFrom()` in
+  [Models.kt](app/src/main/java/com/robin/claudeusage/data/Models.kt). The render gate is
+  the `limitMinor > 0` check in `MainActivity`, `UsageWidget` and `BarWidget`.
+- **Why it's still open rather than fixed:** both flags read `true` on every account we
+  can see, so the disabled-with-a-limit state has never been observed. Gating on a flag
+  whose behaviour we can't verify risks hiding the card from people who should see it —
+  the worse failure. Fix it when someone can actually produce the state.
+- **Fix when confirmed:** treat `enabled == false` as "no credits" in `SpendCredits`, and
+  add a `UsageParserTest` case with the real payload for that state.
+
+---
+
+## Fixed
+
 ### CCBG-12 · Status Icon Swap — a second notification replaces the live meter with the app icon
-- **Status:** In progress (built 2026-08-14) · **needs on-device verification**
+- **Status:** Fixed (built 2026-08-14 · verified on the Fold 7 by the user, 2026-08-18,
+  release-signed build, two-notification state exercised)
 - **Severity:** Medium (misleading display — the status bar shows a percentage that
   isn't the user's)
 - **Symptom:** Observed on the Fold 7, 2026-08-14, by the user. While the CCRM-17
@@ -93,27 +128,6 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
   `ping_alerts`, both deliberately `IMPORTANCE_HIGH` — the ping's comment says finding
   out late "is the failure this feature exists to avoid". Those keep posting, so that
   path leaves the defect live in exactly those two cases.
-
-### CCBG-3 · Credits Visibility — credits card ignores extra-usage being switched off
-- **Status:** Open
-- **Severity:** Low (misleading display, no data loss) — and possibly unreachable
-- **Symptom:** Suspected, not observed. The credits card renders whenever
-  `limit > 0`, so an account that has *switched extra usage off* while keeping a
-  non-zero monthly limit would still be shown a credits bar as though it were live.
-- **Detail:** the payload carries `spend.enabled` and `extra_usage.is_enabled`, and
-  `UsageParser` reads neither — see `creditsFrom()` in
-  [Models.kt](app/src/main/java/com/robin/claudeusage/data/Models.kt). The render gate is
-  the `limitMinor > 0` check in `MainActivity`, `UsageWidget` and `BarWidget`.
-- **Why it's still open rather than fixed:** both flags read `true` on every account we
-  can see, so the disabled-with-a-limit state has never been observed. Gating on a flag
-  whose behaviour we can't verify risks hiding the card from people who should see it —
-  the worse failure. Fix it when someone can actually produce the state.
-- **Fix when confirmed:** treat `enabled == false` as "no credits" in `SpendCredits`, and
-  add a `UsageParserTest` case with the real payload for that state.
-
----
-
-## Fixed
 
 ### CCBG-11 · Ring Face Clutter — four stacked lines crowd the small ring's bore
 - **Status:** Fixed (2026-08-13) · needs on-device verification

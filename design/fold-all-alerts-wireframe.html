@@ -1,0 +1,214 @@
+<title>One Surface for Everything — CCRM-44</title>
+<style>
+  :root {
+    --bg: #FAF8F6; --ink: #26211E; --muted: #6E6660; --accent: #C15F3C;
+    --hair: #E7E1DC; --card: #FFFFFF; --bad: #B3402A; --good: #2F6D44; --warn: #9A6B1E;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171513; --ink: #EDE8E4; --muted: #9B928B; --accent: #E59980;
+      --hair: #2C2825; --card: #201D1B; --bad: #E08268; --good: #7FC08F; --warn: #D8AC63;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171513; --ink: #EDE8E4; --muted: #9B928B; --accent: #E59980;
+    --hair: #2C2825; --card: #201D1B; --bad: #E08268; --good: #7FC08F; --warn: #D8AC63;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    margin: 0; padding: 48px 24px 96px; line-height: 1.5; }
+  .page { max-width: 1240px; margin: 0 auto; }
+  .eyebrow { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11px;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin: 0 0 10px; }
+  h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 8px; }
+  .lede { color: var(--muted); max-width: 68ch; margin: 0 0 12px; font-size: 14px; }
+  h2 { font-size: 19px; font-weight: 650; margin: 56px 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; max-width: 80ch; margin: 0 0 16px; }
+  code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px;
+    background: color-mix(in srgb, var(--hair) 55%, transparent); padding: 1px 5px; border-radius: 4px; }
+  .row { display: flex; flex-wrap: wrap; gap: 22px; align-items: flex-start; }
+  .cap { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 10px;
+    letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+  .cap.bad { color: var(--bad); } .cap.good { color: var(--good); } .cap.warn { color: var(--warn); }
+
+  /* One UI-ish notification card */
+  .notif { width: 340px; border-radius: 22px; background: #232529; color: #E9E9EC;
+    padding: 14px 16px; border: 1px solid #33363C; font-size: 13.5px; }
+  .notif .hdr { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: #A6A9B0; margin-bottom: 8px; }
+  .notif .dotico { width: 14px; height: 14px; border-radius: 50%; border: 2.5px solid #E59980; display: inline-block; }
+  .notif .title { font-size: 13.5px; font-weight: 600; color: #E9E9EC; }
+  .notif .line { font-size: 12px; color: #A6A9B0; }
+  .bar { height: 8px; border-radius: 4px; background: #3A3D44; margin: 6px 0 2px; position: relative; overflow: hidden; }
+  .bar > i { position: absolute; inset: 0 auto 0 0; background: #E59980; border-radius: 4px; }
+  .bar > s { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #9B9EA6; }
+  .strip { border-radius: 10px; padding: 7px 10px; margin: 0 0 7px; font-size: 13.5px; }
+  .strip .s2 { font-size: 12px; opacity: .75; display: block; }
+  .strip.cond { background: color-mix(in srgb, #D8AC63 13%, transparent); color: #E6C88C; }
+  .strip.evt  { background: color-mix(in srgb, #E59980 13%, transparent); color: #EFB49C; }
+  .strip.bad  { background: color-mix(in srgb, #E08268 13%, transparent); color: #ECA890; }
+  .strip.more { background: transparent; color: #A6A9B0; font-size: 12px; padding: 2px 10px 0; }
+  .note { font-size: 12.5px; color: var(--muted); max-width: 340px; margin-top: 8px; }
+  .hr { height: 1px; background: var(--hair); margin: 46px 0 0; border: 0; }
+  table.rules { border-collapse: collapse; font-size: 13px; margin: 12px 0; }
+  table.rules th, table.rules td { border: 1px solid var(--hair); padding: 7px 12px; text-align: left; vertical-align: top; }
+  table.rules th { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+</style>
+
+<div class="page">
+  <p class="eyebrow">CCRM-44 · wireframe for approval</p>
+  <h1>One surface for everything</h1>
+  <p class="lede">
+    When the always-on notification is on and showing a profile, that profile posts
+    <b>no other notification, ever</b> — silent by choice. Every alert becomes a strip
+    inside the pinned panel, readable on demand. When the pinned notification is off
+    (or not showing that profile), nothing changes from today: alerts post standalone.
+    Extends the CCBG-12 (Status Icon Swap) conditions mechanism from two conditions to
+    the full alert set.
+  </p>
+
+  <h2>1 · The routing rule</h2>
+  <table class="rules">
+    <tr><th>Alert</th><th>Kind</th><th>Folded form (pinned on)</th><th>Clears when</th></tr>
+    <tr><td>Sign-in expiry <i>(existing)</i></td><td>condition</td><td>amber strip</td><td>re-signed in</td></tr>
+    <tr><td>Stale data <i>(existing)</i></td><td>condition</td><td>amber strip + dimmed bars</td><td>a poll succeeds</td></tr>
+    <tr><td>Re-auth needed <span style="color:var(--accent)">(new)</span></td><td>condition</td><td>red strip, top of stack</td><td>re-signed in</td></tr>
+    <tr><td>Update available <span style="color:var(--accent)">(new)</span></td><td>condition</td><td>amber strip, bottom of stack</td><td>installed version catches up — solves the "once per version, ever" tension from CCBG-12</td></tr>
+    <tr><td>Usage warning 80/90/95% <span style="color:var(--accent)">(new)</span></td><td>event</td><td>orange strip</td><td><code>alertLifetime</code> (Auto = that window's reset)</td></tr>
+    <tr><td>Pace alerts <span style="color:var(--accent)">(new)</span></td><td>event</td><td>orange strip</td><td><code>alertLifetime</code></td></tr>
+    <tr><td>Reset pings <span style="color:var(--accent)">(new)</span></td><td>event</td><td>orange strip</td><td>30 min fixed — "you're back" is momentary</td></tr>
+  </table>
+  <p class="sub">
+    Stack order, top to bottom: red conditions · events (newest first) · amber conditions ·
+    update. At most <b>3 strips</b> render; a fourth shows as "+ n more" (expanded panel
+    height is finite). Strips use the panel's existing type scale — 13.5&nbsp;dp label,
+    12&nbsp;dp sub, 13% alpha tint, no borders.
+  </p>
+
+  <h2>2 · Collapsed row</h2>
+  <p class="sub">Same rule as CCBG-12: a live strip replaces the reset line; the reset
+    line stays in the expanded panel. Highest-priority strip wins the collapsed slot.
+    Nothing new drops out at One UI's short collapsed height.</p>
+  <div class="row">
+    <div>
+      <p class="cap good">quiet — today's look, unchanged</p>
+      <div class="notif">
+        <div class="hdr"><span class="dotico"></span> Claude Cooldown · Pro</div>
+        <div class="title">5-hour window · 48%</div>
+        <div class="line">Resets 9:41 pm · 7-day 48%</div>
+      </div>
+    </div>
+    <div>
+      <p class="cap warn">one event live</p>
+      <div class="notif">
+        <div class="hdr"><span class="dotico"></span> Claude Cooldown · Pro</div>
+        <div class="title">5-hour window · 92%</div>
+        <div class="line" style="color:#EFB49C;">Crossed 90% · 7-day 48%</div>
+      </div>
+    </div>
+    <div>
+      <p class="cap bad">condition outranks event</p>
+      <div class="notif">
+        <div class="hdr"><span class="dotico"></span> Claude Cooldown · Pro</div>
+        <div class="title">5-hour window · 92%</div>
+        <div class="line" style="color:#ECA890;">Sign-in stopped working · tap to fix</div>
+      </div>
+    </div>
+  </div>
+
+  <h2>3 · Expanded panel</h2>
+  <div class="row">
+    <div>
+      <p class="cap">one event</p>
+      <div class="notif">
+        <div class="hdr"><span class="dotico"></span> Claude Cooldown · Pro</div>
+        <div class="strip evt">Crossed 90% of the 5-hour window
+          <span class="s2">6:12 pm · clears at reset (Auto)</span></div>
+        <div class="title">5-hour window · 92%</div>
+        <div class="bar"><i style="width:92%"></i><s style="left:64%"></s></div>
+        <div class="line">Resets 9:41 pm</div>
+        <div class="title" style="margin-top:8px;">7-day window · 48%</div>
+        <div class="bar"><i style="width:48%"></i><s style="left:66%"></s></div>
+        <div class="line">Resets Fri 12:29 am</div>
+      </div>
+    </div>
+    <div>
+      <p class="cap warn">full stack — 3 strips + overflow</p>
+      <div class="notif">
+        <div class="hdr"><span class="dotico"></span> Claude Cooldown · Pro</div>
+        <div class="strip bad">Sign-in stopped working
+          <span class="s2">renewal failed · tap Re-sign in</span></div>
+        <div class="strip evt">Will run out before reset
+          <span class="s2">6:12 pm · at this pace, 100% by 8:50 pm</span></div>
+        <div class="strip cond">Data is 40 min old
+          <span class="s2">last poll failed · retrying</span></div>
+        <div class="strip more">+ 1 more · Update v1.2 available</div>
+        <div class="title">5-hour window · 92%</div>
+        <div class="bar"><i style="width:92%"></i><s style="left:64%"></s></div>
+        <div class="line">Resets 9:41 pm</div>
+      </div>
+      <p class="note">Red condition first, then events newest-first, then amber
+        conditions; update always last, first into the overflow line.</p>
+    </div>
+    <div>
+      <p class="cap">update strip alone</p>
+      <div class="notif">
+        <div class="hdr"><span class="dotico"></span> Claude Cooldown · Pro</div>
+        <div class="strip cond">Update available — v1.2
+          <span class="s2">tap to open the release page</span></div>
+        <div class="title">5-hour window · 48%</div>
+        <div class="bar"><i style="width:48%"></i><s style="left:64%"></s></div>
+        <div class="line">Resets 9:41 pm · 7-day 48%</div>
+      </div>
+      <p class="note">Persists until the installed version catches up, so the standalone
+        update notice keeps its "once per version" post only for pinned-off users.</p>
+    </div>
+  </div>
+
+  <h2>4 · When there is no surface to fold into</h2>
+  <p class="sub">Unchanged from today — this wireframe adds nothing here.</p>
+  <div class="row">
+    <div>
+      <p class="cap">pinned off → standalone alerts, as today</p>
+      <div class="notif" style="opacity:.85">
+        <div class="hdr"><span style="width:12px;height:12px;background:#E59980;border-radius:3px;display:inline-block"></span> Claude Cooldown</div>
+        <div class="title">Crossed 90% of the 5-hour window</div>
+        <div class="line">Pro · resets 9:41 pm</div>
+      </div>
+      <p class="note">Alerts sound and heads-up exactly as they do now, with their
+        existing <code>alertLifetime</code> timeout.</p>
+    </div>
+    <div>
+      <p class="cap">pinned shows Pro only → Teams alert posts standalone</p>
+      <div class="notif" style="opacity:.85">
+        <div class="hdr"><span style="width:12px;height:12px;background:#E59980;border-radius:3px;display:inline-block"></span> Claude Cooldown</div>
+        <div class="title">Teams: sign-in stopped working</div>
+        <div class="line">Tap to re-sign in</div>
+      </div>
+      <p class="note">Folding a Teams alert into a Pro-only panel would delete it —
+        same rule <code>Conditions.foldedInto</code> already applies.</p>
+    </div>
+  </div>
+
+  <h2>5 · Settings copy change</h2>
+  <p class="sub">The always-on toggle's subtitle gains one sentence so silence is a
+    stated contract, not a surprise:</p>
+  <div class="notif" style="background:var(--card);color:var(--ink);border-color:var(--hair);">
+    <div class="title" style="color:inherit">Always-on usage notification</div>
+    <div class="line" style="color:var(--muted)">A silent, ongoing notification with a status-bar
+      icon that fills as you use your 5-hour window. <b>While it's on, all alerts fold into
+      this panel instead of posting separately — no sounds, no pop-ups.</b></div>
+  </div>
+
+  <h2>6 · Consequences accepted with this design</h2>
+  <p class="sub">
+    · No alert ever makes a sound or heads-up while the pinned notification shows that
+    profile — missing a "will run out" until the shade is opened is the accepted trade.<br>
+    · The app can no longer produce two simultaneous notifications per profile while
+    pinned is on, so the CCBG-12 group summary becomes a pinned-off-only safety net —
+    it stays in the code.<br>
+    · <code>alertLifetime</code>'s meaning shifts from "when the standalone alert expires"
+    to "when the strip clears"; same setting, same values, same Auto.
+  </p>
+  <div class="hr"></div>
+</div>
