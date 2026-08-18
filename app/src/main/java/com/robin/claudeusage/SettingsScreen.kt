@@ -308,7 +308,8 @@ fun SettingsScreen(
             }
             ToggleRow(
                 title = "Always-on usage notification",
-                subtitle = "A silent, ongoing notification with a status-bar icon that fills as you use your 5-hour window",
+                subtitle = "A silent, ongoing notification with a status-bar icon that fills as you use your 5-hour window. " +
+                    "While it's on, all alerts for its profile fold into this panel instead of posting separately — no sounds, no pop-ups",
                 checked = pinned,
             ) {
                 pinned = it
@@ -1360,6 +1361,7 @@ private fun UpdatesCard(cache: UsageCache) {
                         cache.recordUpdateCheckSuccess(
                             System.currentTimeMillis(),
                             UpdateGate.successOutcome(info.latestVersion, info.updateAvailable),
+                            info.latestVersion,
                         )
                         UpdateUi.Ok(info)
                     } catch (_: Exception) {

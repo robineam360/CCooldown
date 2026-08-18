@@ -45,12 +45,22 @@ object UpdateNotification {
         cache.recordUpdateCheckSuccess(
             System.currentTimeMillis(),
             UpdateGate.successOutcome(info.latestVersion, info.updateAvailable),
+            info.latestVersion,
         )
         maybePost(context, cache, info)
     }
 
     /** Once per version, ever: newer than installed, not yet notified, not skipped. */
     private fun maybePost(context: Context, cache: UsageCache, info: UpdateInfo) {
+        // CCRM-44 (One Surface): with the pinned notification on, the update rides its
+        // panel as a strip (Conditions.update, from latestKnownVersion) instead of
+        // posting — and the strip persists while the version lags, which the
+        // once-per-version notification never could. lastNotifiedVersion stays unset,
+        // so switching the pinned notification off later still gets the one post.
+        if (cache.pinnedEnabled()) {
+            NotificationManagerCompat.from(context).cancel(NOTIFICATION_ID)
+            return
+        }
         if (!UpdateGate.shouldNotify(
                 info.latestVersion, info.currentVersion,
                 cache.lastNotifiedVersion(), cache.dismissedUpdateVersion(),

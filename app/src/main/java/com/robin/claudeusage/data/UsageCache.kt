@@ -376,14 +376,22 @@ class UsageCache(context: Context) {
     /** The settings line's outcome half, e.g. "up to date (v0.14)" / "v0.15 available". */
     fun lastUpdateCheckOutcome(): String? = prefs.getString("lastUpdateCheckOutcome", null)
 
-    fun recordUpdateCheckSuccess(at: Long, outcome: String) {
+    fun recordUpdateCheckSuccess(at: Long, outcome: String, latestVersion: String) {
         prefs.edit()
             .putLong("lastUpdateCheckAt", at)
             .putString("lastUpdateCheckOutcome", outcome)
+            .putString("latestKnownVersion", latestVersion)
             .remove("lastUpdateFailAt")
             .remove("lastUpdateFailReason")
             .apply()
     }
+
+    /**
+     * The newest release version any check has seen, for the CCRM-44 (One Surface)
+     * update strip — which persists while this is ahead of the installed version,
+     * instead of the once-per-version notification.
+     */
+    fun latestKnownVersion(): String? = prefs.getString("latestKnownVersion", null)
 
     fun lastUpdateFailAt(): Long = prefs.getLong("lastUpdateFailAt", 0L)
 
@@ -409,6 +417,72 @@ class UsageCache(context: Context) {
 
     fun setDismissedUpdateVersion(version: String) {
         prefs.edit().putString("dismissedUpdateVersion", version).apply()
+    }
+
+    // --- folded event strips (CCRM-44): alerts carried by the pinned panel ---
+
+    /**
+     * One alert *event* folded into the pinned notification instead of posted
+     * (CCRM-44 (One Surface)). Conditions are derived live; events are moments, so
+     * they need this small persisted record to outlive the poll that fired them.
+     * [kind] is the alert's dedup key (e.g. "sessionAlert", "pace.Session") — a new
+     * event of the same kind replaces the old one, mirroring how the notification
+     * ids replaced in place.
+     */
+    data class FoldedEvent(
+        val kind: String,
+        val title: String,
+        val detail: String,
+        val firedAt: Long,
+        val expiresAt: Long,
+    )
+
+    /** Current (unexpired) folded events, newest first. Prunes expired ones on read. */
+    fun foldedEvents(profile: Profile): List<FoldedEvent> {
+        val now = System.currentTimeMillis()
+        val stored = readFoldedEvents(profile)
+        val live = stored.filter { it.expiresAt > now }
+        if (live.size != stored.size) writeFoldedEvents(profile, live)
+        return live.sortedByDescending { it.firedAt }
+    }
+
+    /** Adds an event, replacing any existing one of the same [FoldedEvent.kind]. */
+    fun addFoldedEvent(profile: Profile, event: FoldedEvent) {
+        val kept = readFoldedEvents(profile).filter {
+            it.kind != event.kind && it.expiresAt > event.firedAt
+        }
+        writeFoldedEvents(profile, kept + event)
+    }
+
+    private fun readFoldedEvents(profile: Profile): List<FoldedEvent> = try {
+        val arr = org.json.JSONArray(prefs.getString(k(profile, "foldedEvents"), "[]") ?: "[]")
+        (0 until arr.length()).mapNotNull { i ->
+            val o = arr.optJSONObject(i) ?: return@mapNotNull null
+            FoldedEvent(
+                kind = o.optString("kind"),
+                title = o.optString("title"),
+                detail = o.optString("detail"),
+                firedAt = o.optLong("firedAt"),
+                expiresAt = o.optLong("expiresAt"),
+            )
+        }
+    } catch (_: Exception) {
+        emptyList()
+    }
+
+    private fun writeFoldedEvents(profile: Profile, events: List<FoldedEvent>) {
+        val arr = org.json.JSONArray()
+        for (e in events) {
+            arr.put(
+                org.json.JSONObject()
+                    .put("kind", e.kind)
+                    .put("title", e.title)
+                    .put("detail", e.detail)
+                    .put("firedAt", e.firedAt)
+                    .put("expiresAt", e.expiresAt)
+            )
+        }
+        prefs.edit().putString(k(profile, "foldedEvents"), arr.toString()).apply()
     }
 
     // --- alert dedupe state: one alert per threshold per window instance ---

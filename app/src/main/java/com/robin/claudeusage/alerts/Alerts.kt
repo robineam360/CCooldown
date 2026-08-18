@@ -138,7 +138,14 @@ object Alerts {
         // Re-auth alert: once per failure episode, cleared (and the notification
         // dismissed) when auth recovers.
         if (snapshot.authState == AuthState.REAUTH_NEEDED) {
-            if (cache.authAlertsEnabled() && !cache.reauthNotified(profile)) {
+            // CCRM-44 (One Surface): folded, re-auth is a derived condition strip on the
+            // pinned panel — no notification. The flag resets so that switching the
+            // pinned notification off mid-episode posts the standalone alert once, just
+            // as if the episode had started then.
+            if (Conditions.foldedInto(cache, profile)) {
+                NotificationManagerCompat.from(context).cancel(notifId(profile, 3))
+                cache.setReauthNotified(profile, false)
+            } else if (cache.authAlertsEnabled() && !cache.reauthNotified(profile)) {
                 notify(
                     context, profile, notifId(profile, 3), CHANNEL_AUTH,
                     "$label: Claude Cooldown needs re-auth",
@@ -339,14 +346,22 @@ object Alerts {
             val wanted = mode == UsageCache.RESET_ALWAYS ||
                 (mode == UsageCache.RESET_SMART && peak >= UsageCache.SMART_RESET_MIN_PCT)
             if (wanted && cache.profileAlertsEnabled(profile)) {
-                notify(
-                    context, profile, notifId(profile, if (windowName == "Session") 4 else 5), CHANNEL_RESET,
-                    "${cache.profileLabel(profile)}: $windowLabel window reset",
-                    "Usage is back at ${pct.toInt()}%. Next reset ${Fmt.relIn(window.resetsAt)}.",
-                    // Under "auto", lives until the fresh window resets in turn — after
-                    // which "your window reset" is about a window two generations old.
-                    timeoutMs = eventTimeout(cache, window.resetsAt),
-                )
+                val id = notifId(profile, if (windowName == "Session") 4 else 5)
+                val title = "${cache.profileLabel(profile)}: $windowLabel window reset"
+                val text = "Usage is back at ${pct.toInt()}%. Next reset ${Fmt.relIn(window.resetsAt)}."
+                if (Conditions.foldedInto(cache, profile)) {
+                    // CCRM-44 (One Surface): "you're back" is momentary, so the strip
+                    // takes a fixed half hour rather than the alert-lifetime setting.
+                    foldEvent(context, cache, profile, "reset.$windowName", id, title, text,
+                        expiresAt = System.currentTimeMillis() + RESET_STRIP_MS)
+                } else {
+                    notify(
+                        context, profile, id, CHANNEL_RESET, title, text,
+                        // Under "auto", lives until the fresh window resets in turn — after
+                        // which "your window reset" is about a window two generations old.
+                        timeoutMs = eventTimeout(cache, window.resetsAt),
+                    )
+                }
             }
             cache.setWindowPeak(profile, windowName, pct)
         } else {
@@ -385,11 +400,20 @@ object Alerts {
         val alreadyNotified = cache.alertThreshold(profile, keyName)
         val crossed = thresholds.firstOrNull { pct >= it && alreadyNotified < it } ?: return
 
-        notify(
-            context, profile, notificationId, CHANNEL_USAGE,
-            title(pct), resetLine(window.resetsAt, use24h),
-            timeoutMs = eventTimeout(cache, window.resetsAt),
-        )
+        if (Conditions.foldedInto(cache, profile)) {
+            // CCRM-44 (One Surface): a strip instead of a notification. The dedup state
+            // advances the same either way, so flipping the pinned notification off
+            // later never replays a threshold this window already crossed.
+            foldEvent(context, cache, profile, keyName, notificationId,
+                title(pct), resetLine(window.resetsAt, use24h),
+                expiresAt = System.currentTimeMillis() + eventTimeout(cache, window.resetsAt))
+        } else {
+            notify(
+                context, profile, notificationId, CHANNEL_USAGE,
+                title(pct), resetLine(window.resetsAt, use24h),
+                timeoutMs = eventTimeout(cache, window.resetsAt),
+            )
+        }
         cache.setAlertState(profile, keyName, windowKey, crossed)
     }
 
@@ -431,7 +455,13 @@ object Alerts {
         step.fire.firstOrNull()?.let { headline ->
             val label = cache.profileLabel(profile)
             val (title, text) = paceCopy(headline, label, windowLabel, window, usedPct, estimate, use24h)
-            val posted = notify(
+            // CCRM-44 (One Surface): folding always "delivers" — the strip write is a
+            // pref, it cannot fail the way a notification post can.
+            val posted = if (Conditions.foldedInto(cache, profile)) {
+                foldEvent(context, cache, profile, "pace.$windowName", notificationId, title, text,
+                    expiresAt = System.currentTimeMillis() + eventTimeout(cache, window.resetsAt))
+                true
+            } else notify(
                 context, profile, notificationId, CHANNEL_PACE, title, text,
                 timeoutMs = eventTimeout(cache, window.resetsAt),
             )
@@ -483,6 +513,35 @@ object Alerts {
 
     /** Passed as [notify]'s timeout when an alert must stay until resolved or dismissed. */
     const val NO_TIMEOUT = -1L
+
+    /** How long a folded "window reset" strip lives — the moment passes quickly. */
+    private const val RESET_STRIP_MS = 30 * 60_000L
+
+    /**
+     * CCRM-44 (One Surface): records an event as a pinned-panel strip instead of a
+     * notification, and clears any standalone copy of the same alert left over from
+     * before the pinned notification was switched on. The panel re-renders at the
+     * end of [evaluate], so the strip is visible on the same poll that fired it.
+     */
+    private fun foldEvent(
+        context: Context,
+        cache: UsageCache,
+        profile: Profile,
+        kind: String,
+        notificationId: Int,
+        title: String,
+        text: String,
+        expiresAt: Long,
+    ) {
+        cache.addFoldedEvent(
+            profile,
+            UsageCache.FoldedEvent(
+                kind = kind, title = title, detail = text,
+                firedAt = System.currentTimeMillis(), expiresAt = expiresAt,
+            ),
+        )
+        NotificationManagerCompat.from(context).cancel(notificationId)
+    }
 
     /**
      * CCBG-12 (Status Icon Swap): how long a one-off event alert should live, honouring

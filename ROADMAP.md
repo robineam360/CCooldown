@@ -741,9 +741,28 @@ keys) would still make this a different product. Not filed, not an open question
 ## Needs design — decide the shape before building
 
 ### CCRM-44 · One Surface — every alert folds into the pinned notification
-- **Status:** Wireframe **approved** (2026-08-18, incl. the 3-strip cap + overflow line) —
-  `design/fold-all-alerts-wireframe.html`. Build note: the user runs the **Huge number**
-  pinned style — specify and verify strips against that layout first.
+- **Status:** **Built (2026-08-18), partially verified on the Fold 7 the same day**
+  (release-signed build, Huge number style — the user's own): with the panel switched
+  to Teams (live re-auth state), the collapsed row showed "● Sign-in stopped working"
+  in place of the reset line and the expanded panel stacked all three condition strips
+  (re-auth red, stale red, expiry accent) above the 7-day bar, with **zero** standalone
+  notifications from the app. Still unobserved: event strips (threshold / pace / reset
+  need a live crossing), the "+ n more" overflow line, and the update strip (needs a
+  release ahead of the installed version). Ships in the next release.
+- **How it landed:** `UsageCache.FoldedEvent` store (per-profile JSON pref, replace by
+  kind, pruned on read); `Conditions.panelFor` orders faults · events newest-first ·
+  warnings · update and caps at `MAX_STRIPS = 3` with an overflow count; new `reauth`
+  and `update` conditions (update reads the new `latestKnownVersion`, persists until
+  the installed version catches up — resolving CCBG-12 (Status Icon Swap)'s
+  once-per-version timeout tension — and respects "skip this version", though skip
+  itself is only reachable on the pinned-off standalone notice); every `Alerts` post
+  site branches on `Conditions.foldedInto` (dedup state advances identically either
+  way, so unfolding never replays); `UpdateNotification.maybePost` early-outs when
+  pinned is on without setting `lastNotifiedVersion`, so unfolding still gets the one
+  post; reset strips live a fixed 30 min, other events follow `alertLifetime`; the
+  always-on toggle's subtitle states the silence contract. Wireframe:
+  `design/fold-all-alerts-wireframe.html` (approved 2026-08-18), kept until the
+  event-strip states are seen on device.
 - While the always-on notification is on and showing a profile, that profile posts **no
   other notification** — every alert becomes a strip in the pinned panel, on demand and
   silent by the user's explicit choice (decided 2026-08-18: the silence is the point, not

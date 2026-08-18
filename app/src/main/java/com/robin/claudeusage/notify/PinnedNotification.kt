@@ -129,21 +129,20 @@ object PinnedNotification {
         val progress = style == "progress"
         val title = if (progress) "$pctText · $resetShort" else "$label · 5-hour window"
 
-        // CCBG-12 (Status Icon Swap): the sign-in and stale-data conditions used to be
-        // notifications of their own, which is what cost us the live status-bar meter. They
-        // are carried here now.
+        // CCRM-44 (One Surface): with the pinned notification on, this panel carries
+        // *every* alert for its profile — the CCBG-12 (Status Icon Swap) conditions,
+        // plus folded events and the update strip — silent by the user's explicit
+        // choice, readable on demand.
         //
-        // The collapsed row signals a condition with a coloured dot and keeps its reset time,
-        // rather than spelling the condition out in the reset line's place. Spelling it out
-        // cost the row real information to say something the panel one tap below already says
-        // in full — and it read as an error message where a status line belongs. A dot is
-        // enough to make someone open it, which is all the collapsed row has to achieve.
-        // Faults sort first, so the dot takes the fault's colour if both are true.
-        val conditions = Conditions.forProfile(cache, profile)
-        val stale = conditions.any { it.error }
+        // The collapsed row gives its one line to the highest-priority strip (the
+        // reset time stays in the expanded header, per the approved CCRM-44
+        // wireframe); quiet, it keeps the reset line as always. The dot marks the
+        // line as a strip, in the strip's own hue.
+        val panelState = Conditions.panelFor(context, cache, profile)
+        val stale = panelState.stale
         val baseText = if (progress) "$label · 5-hour window" else resetLong
-        val collapsedText = conditions.firstOrNull()
-            ?.let { withConditionDot(baseText, conditionHue(it, theme, dark)) }
+        val collapsedText = panelState.strips.firstOrNull()
+            ?.let { withConditionDot(it.short, conditionHue(it, theme, dark)) }
             ?: baseText
         // Expanded has the room the collapsed row doesn't: the panel below carries every
         // condition in full, so the header needs no marker at all.
@@ -172,7 +171,10 @@ object PinnedNotification {
 
         // Not gated on data any more: a condition is worth showing even before the first
         // successful fetch, which is exactly when a sign-in problem is most likely.
-        val panel = drawPanel(context, label, data, theme, dark, use24h, showOverPace, conditions)
+        val panel = drawPanel(
+            context, label, data, theme, dark, use24h, showOverPace,
+            panelState.strips, panelState.overflow,
+        )
 
         when (style) {
             // A — the number owns the large-icon slot instead of a ring around it.
@@ -507,6 +509,7 @@ object PinnedNotification {
         use24h: Boolean,
         showOverPace: Boolean,
         conditions: List<Conditions.Condition>,
+        overflow: Int = 0,
     ): Bitmap? {
         val width = dp(context, PANEL_WIDTH_DP).toInt()
         val left = dp(context, 2f)
@@ -555,7 +558,7 @@ object PinnedNotification {
             )
             for (cap in data.modelCaps) add(Bar(cap.modelName, cap.window, ""))
         }.take(barBudget)
-        if (bars.isEmpty() && conditions.isEmpty()) return null
+        if (bars.isEmpty() && conditions.isEmpty() && overflow == 0) return null
 
         // Every row grows by the tick's overhang above and below, so a mark at the
         // top or bottom edge of the bar can't collide with the label or be cut off.
@@ -564,6 +567,8 @@ object PinnedNotification {
         val over = BarGeometry.tickOverhang(barThick)
 
         var height = condHeights.sum() + condHeights.size * dp(context, 12f)
+        // CCRM-44 (One Surface): the "+ n more" line when strips overflowed the cap.
+        if (overflow > 0) height += subH + dp(context, 12f)
         for (b in bars) {
             height += labelH + dp(context, 7f) + 2f * over + barThick
             if (b.sub.isNotEmpty()) height += subH
@@ -606,6 +611,14 @@ object PinnedNotification {
                 lineY += subH
             }
             y += stripHeight + dp(context, 12f)
+        }
+
+        if (overflow > 0) {
+            c.drawText(
+                "+ $overflow more — open the app for the rest",
+                left + condPadH, y + subH - dp(context, 4f), subPaint,
+            )
+            y += subH + dp(context, 12f)
         }
 
         for (bar in bars) {
