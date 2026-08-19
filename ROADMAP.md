@@ -506,7 +506,27 @@ keys) would still make this a different product. Not filed, not an open question
   visual channels. Don't replace one with the other.
 
 ### CCRM-22 · Used or Left — one global "consumed vs remaining" preference
-- **Status:** Planned · small
+- **Status:** Done (2026-08-19) · wireframe rev B approved same day
+  (`design/display-tokens-wireframe.html`, kept until the on-device pass) · needs
+  on-device verification
+- **Shipped:** `usageDisplay` pref ("used" default / "left") in `UsageCache`;
+  `Fmt.usageInt`/`usageShort`/`usageWorded` in `ui/Palette.kt` as the one place a
+  percentage becomes text — used truncates, left **floors the exact remainder**
+  (99.7% used reads 0% left, never the 1% you don't have), over-limit clamps left
+  at 0. **Rev B rule, decided at review: every numeric readout flips — nothing is
+  exempt.** Cards and SubBars ("53% left"), widget bar labels, the QS tile, the
+  Pace widget stat line and the chart callout flip worded; ring/mini-ring bores,
+  the gauge ring text, the number-tile plate and the status-bar "number" digits
+  flip bare (the ring face's countdown line gains a "left ·" prefix as its
+  disambiguator; the `big` notification style gains a 10sp "LEFT" caption under
+  the number, GONE in Used mode). Fills, `setProgress`, pace ticks, the ≥100% "!!"
+  glyph and `Palette.barColor` stay keyed on used everywhere. Chart axis, guide,
+  "now" and projection labels stay used — absolute positions. Credits complement
+  the **rounded** display percent (6% used ↔ 94% left; CCRM-3's rounding split
+  preserved). Chips under Settings → Appearance re-post the pinned notification
+  and refresh widgets on flip. 9 cases in `UsageDisplayTest` (198 total, 0
+  failures) pin the floor rule, both boundaries, the clamp, and the copy.
+- **Was:** Planned · small
 - **Why:** The app only ever says "47% used". Half the people who look at this want "53%
   left", and it's the same number. OpenQuota ships `UsageDisplay::{Used, Left}` and
   defaults to **Left**, which is worth noting — they think remaining is the more natural

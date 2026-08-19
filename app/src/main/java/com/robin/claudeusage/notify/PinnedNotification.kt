@@ -99,6 +99,10 @@ object PinnedNotification {
         val session = data?.session
         val pct = session?.percent
         val use24h = cache.use24hTime()
+        // CCRM-22 (Used or Left), rev B: every numeric readout flips — the big
+        // digits, the gauge text, the number plate, the panel rows. The bars,
+        // setProgress() and the status-icon fill keep drawing the spend.
+        val left = cache.usageLeft()
 
         val style = cache.pinnedStyle()
         val fill = Palette.barColor(pct, theme, dark)
@@ -106,8 +110,10 @@ object PinnedNotification {
         // draws regardless; only the colour past it is optional.
         val showOverPace = cache.paceOverOnNotification()
         val sessionElapsed = elapsedPercent(session, Projection.SESSION_MS)
-        val smallIcon = drawStatusIcon(context, pct, cache.pinnedIconStyle())
-        val pctText = if (pct == null) "—" else "${pct.toInt()}%"
+        val smallIcon = drawStatusIcon(context, pct, cache.pinnedIconStyle(), left)
+        val pctText = if (pct == null) "—" else "${Fmt.usageInt(pct, left)}%"
+        // The worded form for text slots that have room for the word.
+        val pctShort = if (pct == null) "—" else Fmt.usageShort(pct, left)
 
         val resetShort =
             if (session?.resetsAt != null) "resets ${Fmt.relIn(session.resetsAt)}"
@@ -127,7 +133,7 @@ object PinnedNotification {
         // the profile identity instead. Every other style keeps the percentage in
         // its own graphic, so the title names the window and the text line resets.
         val progress = style == "progress"
-        val title = if (progress) "$pctText · $resetShort" else "$label · 5-hour window"
+        val title = if (progress) "$pctShort · $resetShort" else "$label · 5-hour window"
 
         // CCRM-44 (One Surface): with the pinned notification on, this panel carries
         // *every* alert for its profile — the CCBG-12 (Status Icon Swap) conditions,
@@ -172,14 +178,14 @@ object PinnedNotification {
         // Not gated on data any more: a condition is worth showing even before the first
         // successful fetch, which is exactly when a sign-in problem is most likely.
         val panel = drawPanel(
-            context, label, data, theme, dark, use24h, showOverPace,
+            context, label, data, theme, dark, use24h, left, showOverPace,
             panelState.strips, panelState.overflow,
         )
 
         when (style) {
             // A — the number owns the large-icon slot instead of a ring around it.
             "number" -> {
-                builder.setLargeIcon(drawNumberTile(context, pct, fill))
+                builder.setLargeIcon(drawNumberTile(context, pct, fill, left))
                 panel?.let { builder.setStyle(bigPicture(it, expandedText)) }
             }
             // B — no bitmap at all: the system's own determinate bar, number in the title.
@@ -193,6 +199,7 @@ object PinnedNotification {
                     bigNumberView(
                         context, R.layout.notif_big_number, pctText, title, collapsedText,
                         pct, sessionElapsed, fill, theme, dark, showOverPace, null, stale,
+                        leftCaption = left && pct != null,
                     )
                 )
                 builder.setCustomBigContentView(
@@ -200,13 +207,14 @@ object PinnedNotification {
                         context, R.layout.notif_big_number_expanded,
                         pctText, title, expandedText,
                         pct, sessionElapsed, fill, theme, dark, showOverPace, panel, stale,
+                        leftCaption = left && pct != null,
                     )
                 )
                 builder.setStyle(NotificationCompat.DecoratedCustomViewStyle())
             }
             // "gauge" — the original ring.
             else -> {
-                drawGauge(context, pct, fill)?.let { builder.setLargeIcon(it) }
+                drawGauge(context, pct, fill, left)?.let { builder.setLargeIcon(it) }
                 panel?.let { builder.setStyle(bigPicture(it, expandedText)) }
             }
         }
@@ -271,9 +279,15 @@ object PinnedNotification {
         showOverPace: Boolean,
         panel: Bitmap?,
         stale: Boolean,
+        /** CCRM-22: the small "LEFT" caption under the number in Left mode. */
+        leftCaption: Boolean = false,
     ): RemoteViews = RemoteViews(context.packageName, layout).apply {
         setTextViewText(R.id.pct, pctText)
         setTextColor(R.id.pct, fill.toArgb())
+        setViewVisibility(
+            R.id.pct_caption,
+            if (leftCaption) android.view.View.VISIBLE else android.view.View.GONE,
+        )
         setTextViewText(R.id.title, title)
         setTextViewText(R.id.sub, sub)
         setImageViewBitmap(
@@ -324,14 +338,16 @@ object PinnedNotification {
      * Layout A: the large-icon slot as a solid tile with the number filling it.
      * The ring is gone on purpose — dropping it is what buys the digits their size.
      */
-    private fun drawNumberTile(context: Context, pct: Double?, fill: Color): Bitmap {
+    private fun drawNumberTile(context: Context, pct: Double?, fill: Color, left: Boolean): Bitmap {
         val size = dp(context, 72f).toInt().coerceAtLeast(64)
         val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
         val plate = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = fill.toArgb() }
         c.drawRoundRect(RectF(0f, 0f, size.toFloat(), size.toFloat()), size * 0.22f, size * 0.22f, plate)
 
-        val label = if (pct == null) "—" else pct.toInt().toString()
+        // CCRM-22 rev B: the plate digits flip too; three digits (Left's possible
+        // 100) already step down below.
+        val label = if (pct == null) "—" else Fmt.usageInt(pct, left).toString()
         val digits = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = AndroidColor.WHITE
             textAlign = Paint.Align.LEFT
@@ -379,7 +395,7 @@ object PinnedNotification {
      * the white percentage always reads — even on OEMs that draw a pale backplate
      * behind large icons.
      */
-    private fun drawGauge(context: Context, pct: Double?, fill: Color): Bitmap? {
+    private fun drawGauge(context: Context, pct: Double?, fill: Color, left: Boolean): Bitmap? {
         val size = dp(context, 72f).toInt().coerceAtLeast(64)
         val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
@@ -411,22 +427,28 @@ object PinnedNotification {
         // No centre disc: it was the same colour as the arc, so the ring read as a
         // solid blob. The number is drawn in the usage colour on the bare shade
         // instead, which keeps the ring legible as a ring.
+        // CCRM-22 rev B: the ring's text flips too — the arc still draws the spend.
+        val label = if (pct == null) "—" else "${Fmt.usageInt(pct, left)}%"
         val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = fillArgb
             textAlign = Paint.Align.CENTER
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            // Slightly larger now that it isn't boxed into the disc.
-            textSize = size * (if (pct != null && pct >= 100.0) 0.26f else 0.30f)
+            // Slightly larger now that it isn't boxed into the disc; four glyphs
+            // ("100%" either way) step back down.
+            textSize = size * (if (label.length >= 4) 0.26f else 0.30f)
         }
-        val label = if (pct == null) "—" else "${pct.toInt()}%"
         val baseline = cx - (text.descent() + text.ascent()) / 2f
         c.drawText(label, cx, baseline, text)
         return bmp
     }
 
     /** Monochrome status-bar icon; the drawing itself is shared with the QS tile. */
-    private fun drawStatusIcon(context: Context, pct: Double?, iconStyle: String): IconCompat =
-        IconCompat.createWithBitmap(UsageIcon.draw(context, pct, iconStyle))
+    private fun drawStatusIcon(
+        context: Context,
+        pct: Double?,
+        iconStyle: String,
+        left: Boolean,
+    ): IconCompat = IconCompat.createWithBitmap(UsageIcon.draw(context, pct, iconStyle, left))
 
     /**
      * The collapsed row's condition marker: a coloured dot ahead of the reset line.
@@ -507,6 +529,8 @@ object PinnedNotification {
         theme: Color,
         dark: Boolean,
         use24h: Boolean,
+        /** CCRM-22 (Used or Left) — flips the row readouts; the bars draw the spend. */
+        usageLeft: Boolean,
         showOverPace: Boolean,
         conditions: List<Conditions.Condition>,
         overflow: Int = 0,
@@ -624,7 +648,10 @@ object PinnedNotification {
         for (bar in bars) {
             val baseline = y + labelH - dp(context, 4f)
             c.drawText(bar.label, left, baseline, labelPaint)
-            c.drawText(bar.window?.percent?.let { "${it.toInt()}%" } ?: "—", right, baseline, valuePaint)
+            c.drawText(
+                bar.window?.percent?.let { "${Fmt.usageInt(it, usageLeft)}%" } ?: "—",
+                right, baseline, valuePaint,
+            )
             y += labelH + dp(context, 7f) + over
 
             val pct = bar.window?.percent

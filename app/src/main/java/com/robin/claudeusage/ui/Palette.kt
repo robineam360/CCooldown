@@ -288,6 +288,30 @@ object Fmt {
         return "${dayTime(Instant.ofEpochMilli(epochMs), use24h)} (${ago(epochMs)})"
     }
 
+    // --- CCRM-22 (Used or Left) ---
+    //
+    // The one place a usage percentage becomes a number for display. Every numeric
+    // readout follows the token — worded labels, ring bores, status-bar digits, the
+    // number-tile plate alike (rev B: nothing is exempt) — while fills, pace ticks
+    // and the 80/90/100 warning ladder always key on the used percent.
+
+    /**
+     * Used truncates (99.7 → 99 — the never-overstate rule); Left floors the exact
+     * remainder (99.7 used → 0 left), so neither mode ever promises headroom that
+     * isn't there. Over-limit clamps Left at 0 rather than going negative.
+     */
+    fun usageInt(percent: Double, left: Boolean): Int =
+        if (left) (100.0 - percent).toInt().coerceAtLeast(0) else percent.toInt()
+
+    /** "47%" in Used mode; "53% left" in Left mode — the word carries the flip. */
+    fun usageShort(percent: Double?, left: Boolean): String =
+        if (left) "${usageInt(percent ?: 0.0, true)}% left"
+        else "${(percent ?: 0.0).toInt()}%"
+
+    /** "47% used" / "53% left" — the worded card headline. */
+    fun usageWorded(percent: Double?, left: Boolean): String =
+        if (left) usageShort(percent, true) else "${(percent ?: 0.0).toInt()}% used"
+
     /**
      * "default_5x" → "5x" — the rate-limit multiplier out of a tier string
      * (CCRM-38). Split on non-alphanumerics, take the first part that ends in a

@@ -30,7 +30,8 @@ abstract class BaseUsageTileService(private val profile: Profile) : TileService(
             when {
                 session?.percent != null -> {
                     state = Tile.STATE_ACTIVE
-                    label = "$profileLabel ${session.percent.toInt()}%"
+                    // CCRM-22 (Used or Left): room for the word, so it flips worded.
+                    label = "$profileLabel ${Fmt.usageShort(session.percent, cache.usageLeft())}"
                     // The 5-hour reset earns the subtitle over the 7-day number:
                     // it's the one that changes what you do next.
                     subtitle = when {
@@ -43,7 +44,10 @@ abstract class BaseUsageTileService(private val profile: Profile) : TileService(
                     // The system tints tile icons like status-bar icons, so this is
                     // an alpha mask — level shows through fill, never through colour.
                     icon = Icon.createWithBitmap(
-                        UsageIcon.draw(this@BaseUsageTileService, session.percent, cache.pinnedIconStyle())
+                        UsageIcon.draw(
+                            this@BaseUsageTileService, session.percent,
+                            cache.pinnedIconStyle(), cache.usageLeft(),
+                        )
                     )
                 }
                 else -> {

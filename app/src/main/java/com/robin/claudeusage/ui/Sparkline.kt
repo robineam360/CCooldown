@@ -138,6 +138,11 @@ fun UsageSparkline(
     projectedEnd: Pair<Long, Double>?,
     color: Color,
     use24h: Boolean,
+    /**
+     * CCRM-22 (Used or Left): flips only the callout's readout. The axis, guide,
+     * "now" and projection labels stay on used — they mark absolute chart positions.
+     */
+    usageLeft: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     if (samples.size < 2 || windowEndMs <= windowStartMs) return
@@ -274,7 +279,10 @@ fun UsageSparkline(
             )
             val delta = pct - geo.paceAt(t)
             val body = measurer.measure(
-                "${pct.roundToInt()}% · ${paceLabel(delta)}",
+                // Left floors the remainder (never overstates); Used keeps the
+                // callout's rounding, since it reads a recorded sample.
+                (if (usageLeft) "${Fmt.usageInt(pct, true)}% left"
+                else "${pct.roundToInt()}%") + " · ${paceLabel(delta)}",
                 TextStyle(
                     fontSize = 11.sp,
                     color = if (delta > PACE_DEAD_ZONE) warn90 else onSurface,

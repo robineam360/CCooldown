@@ -139,6 +139,9 @@ private fun App(startProfile: Profile) {
     var debugUnlocked by remember { mutableStateOf(false) }
     var themeName by remember { mutableStateOf(cache.themeColorName()) }
     var use24h by remember { mutableStateOf(cache.use24hTime()) }
+    // CCRM-22 (Used or Left): hoisted like use24h so flipping the chips in
+    // Settings recomposes every readout behind them.
+    var usageLeft by remember { mutableStateOf(cache.usageLeft()) }
     // Hoisted like use24h so flipping the toggle in Settings recomposes the bars
     // behind it — CCRM-43 (Bar Pace Marks) gates the in-app red separately from the
     // widgets' and the notification's.
@@ -244,7 +247,7 @@ private fun App(startProfile: Profile) {
                 when (screen) {
                     Screen.MAIN ->
                         ProfileTabs(
-                            repo, use24h, paceOverInApp, tick, startProfile,
+                            repo, use24h, usageLeft, paceOverInApp, tick, startProfile,
                             Modifier.padding(innerPadding),
                         )
                     else -> ContentColumn(
@@ -259,6 +262,8 @@ private fun App(startProfile: Profile) {
                                 repo = repo,
                                 use24h = use24h,
                                 onUse24h = { use24h = it },
+                                usageLeft = usageLeft,
+                                onUsageLeft = { usageLeft = it },
                                 paceOverInApp = paceOverInApp,
                                 onPaceOverInApp = { paceOverInApp = it },
                                 themeName = themeName,
@@ -294,6 +299,7 @@ private fun App(startProfile: Profile) {
 private fun ProfileTabs(
     repo: UsageRepository,
     use24h: Boolean,
+    usageLeft: Boolean,
     showOverPace: Boolean,
     tick: Int,
     startProfile: Profile,
@@ -344,7 +350,7 @@ private fun ProfileTabs(
         ) { page ->
             ContentColumn(maxWidth = ChartColumnMaxWidth) {
                 Spacer(Modifier.height(16.dp))
-                ProfileScreen(repo, profiles[page], use24h, showOverPace, tick)
+                ProfileScreen(repo, profiles[page], use24h, usageLeft, showOverPace, tick)
                 Spacer(Modifier.height(24.dp))
             }
         }
@@ -468,6 +474,7 @@ private fun ProfileScreen(
     repo: UsageRepository,
     profile: Profile,
     use24h: Boolean,
+    usageLeft: Boolean,
     showOverPace: Boolean,
     tick: Int,
 ) {
@@ -507,7 +514,7 @@ private fun ProfileScreen(
                     Text("5-hour window", style = MaterialTheme.typography.titleSmall)
                     Spacer(Modifier.weight(1f))
                     Text(
-                        "${(data.session?.percent ?: 0.0).toInt()}% used",
+                        Fmt.usageWorded(data.session?.percent, usageLeft),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
@@ -528,6 +535,7 @@ private fun ProfileScreen(
                         } ?: emptyList(),
                         windowLengthMs = SESSION_MS,
                         use24h = use24h,
+                        usageLeft = usageLeft,
                     )
                 }
                 Spacer(Modifier.height(8.dp))
@@ -540,9 +548,9 @@ private fun ProfileScreen(
             Column(Modifier.padding(16.dp)) {
                 Text("7-day window", style = MaterialTheme.typography.titleSmall)
                 Spacer(Modifier.height(10.dp))
-                SubBar("All models", data.weekly, "% used", showOverPace)
+                SubBar("All models", data.weekly, usageLeft, showOverPace)
                 for (cap in data.modelCaps) {
-                    SubBar(cap.modelName, cap.window, "% used", showOverPace)
+                    SubBar(cap.modelName, cap.window, usageLeft, showOverPace)
                 }
                 data.weekly?.let { w ->
                     TrendBlock(
@@ -552,6 +560,7 @@ private fun ProfileScreen(
                         } ?: emptyList(),
                         windowLengthMs = WEEKLY_MS,
                         use24h = use24h,
+                        usageLeft = usageLeft,
                     )
                 }
                 Spacer(Modifier.height(2.dp))
@@ -596,7 +605,11 @@ private fun ProfileScreen(
                             modifier = Modifier.weight(1f),
                         )
                         Text(
-                            if (pct != null) "${credits.percentDisplay}% used" else "No cap",
+                            // The rounded display percent, not the exact one — credits
+                            // round where windows truncate (CCRM-3, deliberate).
+                            if (pct != null) {
+                                Fmt.usageWorded(credits.percentDisplay?.toDouble(), usageLeft)
+                            } else "No cap",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface,
@@ -704,6 +717,7 @@ private fun TrendBlock(
     samples: List<Pair<Long, Double>>,
     windowLengthMs: Long,
     use24h: Boolean,
+    usageLeft: Boolean,
 ) {
     val resetMs = window.resetsAt?.toEpochMilli() ?: return
     if (samples.size < 2) {
@@ -732,6 +746,7 @@ private fun TrendBlock(
             },
             color = barFill(window.percent),
             use24h = use24h,
+            usageLeft = usageLeft,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(chartHeight(maxWidth, windowHeight)),
@@ -790,7 +805,7 @@ private fun TrendBlock(
 private fun SubBar(
     label: String,
     window: UsageWindow?,
-    suffix: String,
+    usageLeft: Boolean,
     showOverPace: Boolean = true,
 ) {
     val percent = window?.percent
@@ -802,7 +817,7 @@ private fun SubBar(
         )
         Spacer(Modifier.weight(1f))
         Text(
-            "${(percent ?: 0.0).toInt()}$suffix",
+            Fmt.usageWorded(percent, usageLeft),
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,

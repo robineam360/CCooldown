@@ -356,6 +356,19 @@ class UsageCache(context: Context) {
         prefs.edit().putBoolean("use24hTime", enabled).apply()
     }
 
+    // CCRM-22 (Used or Left): one app-wide display token. Every numeric usage
+    // readout follows it (rev B — nothing is exempt); fills, pace ticks and the
+    // warning-colour ladder never do, so a red bar can't sit beside "8% left"
+    // and read as backwards.
+    fun usageDisplay(): String = prefs.getString("usageDisplay", "used") ?: "used"
+
+    fun setUsageDisplay(mode: String) {
+        prefs.edit().putString("usageDisplay", mode).apply()
+    }
+
+    /** The flag render sites actually branch on. */
+    fun usageLeft(): Boolean = usageDisplay() == "left"
+
     fun themeColorName(): String = prefs.getString("themeColor", "Claude Orange") ?: "Claude Orange"
 
     fun setThemeColorName(name: String) {

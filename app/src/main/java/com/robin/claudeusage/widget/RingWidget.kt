@@ -41,6 +41,7 @@ import com.robin.claudeusage.data.Snapshot
 import com.robin.claudeusage.data.UsageCache
 import com.robin.claudeusage.data.UsageWindow
 import com.robin.claudeusage.data.WidgetPrefs
+import com.robin.claudeusage.ui.Fmt
 import com.robin.claudeusage.ui.elapsedPercent
 import com.robin.claudeusage.work.Polling
 
@@ -78,6 +79,7 @@ class RingWidget : GlanceAppWidget() {
         val cache = UsageCache(context)
         val snapshot = cache.snapshot(profile)
         val use24h = cache.use24hTime()
+        val usageLeft = cache.usageLeft()
         val themeName = cache.themeColorName()
         // Single-account users don't need to be told which account.
         val multiProfile = Profile.entries.count {
@@ -98,6 +100,7 @@ class RingWidget : GlanceAppWidget() {
                     window = window,
                     windowLengthMs = windowLengthMs,
                     use24h = use24h,
+                    usageLeft = usageLeft,
                     themeName = themeName,
                     showOverPace = showOverPace,
                 )
@@ -114,6 +117,7 @@ private fun RingFace(
     window: UsageWindow?,
     windowLengthMs: Long,
     use24h: Boolean,
+    usageLeft: Boolean,
     themeName: String,
     showOverPace: Boolean = true,
 ) {
@@ -155,9 +159,10 @@ private fun RingFace(
                         modifier = GlanceModifier.size(l.ringDp.dp),
                     )
                     Text(
-                        // Truncates — never overstates. An em dash for no data,
-                        // never a fake 0%.
-                        if (percent == null) "—" else "${percent.toInt()}%",
+                        // Used truncates, Left floors — neither overstates (CCRM-22,
+                        // rev B: the bore flips too; the stroke still draws the
+                        // spend). An em dash for no data, never a fake 0%.
+                        if (percent == null) "—" else "${Fmt.usageInt(percent, usageLeft)}%",
                         style = TextStyle(
                             color = if (percent == null) GlanceTheme.colors.onSurfaceVariant
                             else GlanceTheme.colors.onSurface,
@@ -181,7 +186,13 @@ private fun RingFace(
             }
             val countdownLine: @Composable () -> Unit = {
                 Text(
-                    if (percent == null) "Waiting" else widgetCountdown(window?.resetsAt),
+                    // The "left ·" prefix disambiguates the flipped bore number
+                    // (CCRM-22 rev B) — the one spare line this face has.
+                    when {
+                        percent == null -> "Waiting"
+                        usageLeft -> "left · ${widgetCountdown(window?.resetsAt)}"
+                        else -> widgetCountdown(window?.resetsAt)
+                    },
                     style = TextStyle(
                         color = GlanceTheme.colors.onSurfaceVariant,
                         fontSize = 11.sp,

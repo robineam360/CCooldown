@@ -107,6 +107,7 @@ class PaceWidget : GlanceAppWidget() {
         val cache = UsageCache(context)
         val snapshot = cache.snapshot(profile)
         val use24h = cache.use24hTime()
+        val usageLeft = cache.usageLeft()
         val themeName = cache.themeColorName()
         val weekly = windowKey == "weekly"
         val window = snapshot.data?.let { if (weekly) it.weekly else it.session }
@@ -120,7 +121,10 @@ class PaceWidget : GlanceAppWidget() {
         resetMs?.let { Polling.armResetRedraw(context, it) }
         provideContent {
             GlanceTheme {
-                PaceFace(profile, snapshot, window, windowKey, windowLengthMs, samples, use24h, themeName)
+                PaceFace(
+                    profile, snapshot, window, windowKey, windowLengthMs, samples,
+                    use24h, usageLeft, themeName,
+                )
             }
         }
     }
@@ -135,6 +139,7 @@ private fun PaceFace(
     windowLengthMs: Long,
     samples: List<Pair<Long, Double>>,
     use24h: Boolean,
+    usageLeft: Boolean,
     themeName: String,
 ) {
     val context = LocalContext.current
@@ -192,7 +197,8 @@ private fun PaceFace(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                if (percent == null) "—" else "${percent.toInt()}%",
+                // CCRM-22 (Used or Left): room for the word here, so it flips worded.
+                if (percent == null) "—" else Fmt.usageShort(percent, usageLeft),
                 style = TextStyle(
                     color = GlanceTheme.colors.onSurface,
                     fontSize = 34.sp,

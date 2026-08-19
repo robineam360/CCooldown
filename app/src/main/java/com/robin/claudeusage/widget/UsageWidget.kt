@@ -100,6 +100,7 @@ class UsageWidget : GlanceAppWidget() {
         val cache = UsageCache(context)
         val snapshot = cache.snapshot(profile)
         val use24h = cache.use24hTime()
+        val usageLeft = cache.usageLeft()
         val themeName = cache.themeColorName()
         // Both gates: the per-profile switch decides whether credits exist for this
         // account at all, the widget switch whether they're worth the height here.
@@ -113,8 +114,8 @@ class UsageWidget : GlanceAppWidget() {
         provideContent {
             GlanceTheme {
                 WidgetContent(
-                    profile, cache.profileLabel(profile), snapshot, use24h, themeName,
-                    showCredits, showOverPace, widthDp,
+                    profile, cache.profileLabel(profile), snapshot, use24h, usageLeft,
+                    themeName, showCredits, showOverPace, widthDp,
                 )
             }
         }
@@ -169,6 +170,7 @@ private fun WidgetContent(
     profileLabel: String,
     snapshot: Snapshot,
     use24h: Boolean,
+    usageLeft: Boolean,
     themeName: String,
     showCredits: Boolean,
     showOverPace: Boolean = true,
@@ -207,7 +209,7 @@ private fun WidgetContent(
                 // Only the large bucket has the height for a fourth bar.
                 val credits = data.credits?.takeIf { showCredits && it.isReportable }
                 SessionBlock(
-                    profile, data.session, use24h, theme, dark,
+                    profile, data.session, use24h, usageLeft, theme, dark,
                     label = "5-hour · $profileLabel", barHeight = 14.dp,
                     showOverPace = showOverPace, contentPadding = pad,
                     widgetWidthDp = widgetWidthDp,
@@ -227,6 +229,7 @@ private fun WidgetContent(
                     // model cap alike — so all of them measure pace against 7 days.
                     LabeledBar(
                         "All models", data.weekly?.percent, "%", theme, dark,
+                        left = usageLeft,
                         elapsedPercent = elapsedPercent(data.weekly, Projection.WEEKLY_MS),
                         showOverPace = showOverPace, contentPadding = pad,
                         widgetWidthDp = widgetWidthDp,
@@ -234,6 +237,7 @@ private fun WidgetContent(
                     for (cap in data.modelCaps) {
                         LabeledBar(
                             cap.modelName, cap.window.percent, "%", theme, dark,
+                            left = usageLeft,
                             elapsedPercent = elapsedPercent(cap.window, Projection.WEEKLY_MS),
                             showOverPace = showOverPace, contentPadding = pad,
                             widgetWidthDp = widgetWidthDp,
@@ -265,7 +269,8 @@ private fun WidgetContent(
                                 "Credits · ${Fmt.money(it.usedMinor, it.exponent, it.currency)} / " +
                                     Fmt.money(limit, it.exponent, it.currency),
                                 pct, "%", theme, dark,
-                                valueText = "${it.percentDisplay}%",
+                                // Rounded display percent either way (CCRM-3).
+                                valueText = Fmt.usageShort(it.percentDisplay?.toDouble(), usageLeft),
                                 contentPadding = pad,
                                 widgetWidthDp = widgetWidthDp,
                             )
@@ -278,14 +283,17 @@ private fun WidgetContent(
             medium -> {
                 val data = snapshot.data!!
                 SessionBlock(
-                    profile, data.session, use24h, theme, dark,
+                    profile, data.session, use24h, usageLeft, theme, dark,
                     label = "5-hour · $profileLabel", barHeight = 12.dp,
                     showOverPace = showOverPace, contentPadding = pad,
                     widgetWidthDp = widgetWidthDp,
                 )
                 Spacer(GlanceModifier.height(8.dp))
                 Column(modifier = GlanceModifier.fillMaxWidth()) {
-                    HeaderRow(profile, "7-day", data.weekly?.percent, "% used", showRefresh = false)
+                    HeaderRow(
+                        profile, "7-day", data.weekly?.percent, "% used",
+                        showRefresh = false, left = usageLeft,
+                    )
                     WidgetBar(
                         percent = data.weekly?.percent,
                         theme = theme,
@@ -303,7 +311,7 @@ private fun WidgetContent(
             else -> {
                 val data = snapshot.data!!
                 SessionBlock(
-                    profile, data.session, use24h, theme, dark,
+                    profile, data.session, use24h, usageLeft, theme, dark,
                     label = "5h · $profileLabel", barHeight = 12.dp,
                     showOverPace = showOverPace, contentPadding = pad,
                     widgetWidthDp = widgetWidthDp,
@@ -318,6 +326,7 @@ internal fun SessionBlock(
     profile: Profile,
     session: UsageWindow?,
     use24h: Boolean,
+    usageLeft: Boolean,
     theme: Color,
     dark: Boolean,
     label: String,
@@ -327,7 +336,7 @@ internal fun SessionBlock(
     widgetWidthDp: Float? = null,
 ) {
     Column(modifier = GlanceModifier.fillMaxWidth()) {
-        HeaderRow(profile, label, session?.percent, "% used", showRefresh = true)
+        HeaderRow(profile, label, session?.percent, "% used", showRefresh = true, left = usageLeft)
         // Trimmed from 5.dp: the bar image now carries 0.3 h of transparent overhang
         // above the bar for the tick, so the visible gap is unchanged.
         Spacer(GlanceModifier.height(1.dp))
@@ -362,6 +371,8 @@ internal fun HeaderRow(
     suffix: String,
     showRefresh: Boolean,
     valueText: String? = null,
+    /** CCRM-22 (Used or Left): Left overrides [suffix] — the word carries the flip. */
+    left: Boolean = false,
 ) {
     Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         // Weighted label: it truncates on narrow widgets so the percentage and
@@ -377,7 +388,9 @@ internal fun HeaderRow(
             maxLines = 1,
         )
         Text(
-            valueText ?: "${(percent ?: 0.0).toInt()}$suffix",
+            valueText
+                ?: if (left) Fmt.usageShort(percent, true)
+                else "${(percent ?: 0.0).toInt()}$suffix",
             style = TextStyle(
                 color = GlanceTheme.colors.onSurface,
                 fontSize = 15.sp,
@@ -467,6 +480,8 @@ internal fun LabeledBar(
     theme: Color,
     dark: Boolean,
     valueText: String? = null,
+    /** CCRM-22 (Used or Left): Left overrides [suffix] — the word carries the flip. */
+    left: Boolean = false,
     /** Null for a credits row: money has no clock, so it never carries a mark. */
     elapsedPercent: Double? = null,
     showOverPace: Boolean = true,
@@ -482,7 +497,9 @@ internal fun LabeledBar(
                 maxLines = 1,
             )
             Text(
-                valueText ?: "${(percent ?: 0.0).toInt()}$suffix",
+                valueText
+                    ?: if (left) Fmt.usageShort(percent, true)
+                    else "${(percent ?: 0.0).toInt()}$suffix",
                 style = TextStyle(
                     color = GlanceTheme.colors.onSurface,
                     fontSize = 13.sp,

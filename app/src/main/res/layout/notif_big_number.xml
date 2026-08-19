@@ -56,14 +56,34 @@
             android:ellipsize="end" />
     </LinearLayout>
 
-    <TextView
-        android:id="@+id/pct"
-        style="@android:style/TextAppearance.Material.Notification.Title"
+    <!-- CCRM-22 (Used or Left): in Left mode the number is the remainder and the
+         small caption below says so; Used mode keeps the caption gone. -->
+    <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="14dp"
-        android:textSize="32sp"
-        android:textStyle="bold"
-        android:includeFontPadding="false"
-        android:maxLines="1" />
+        android:orientation="vertical"
+        android:gravity="center_horizontal">
+
+        <TextView
+            android:id="@+id/pct"
+            style="@android:style/TextAppearance.Material.Notification.Title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="32sp"
+            android:textStyle="bold"
+            android:includeFontPadding="false"
+            android:maxLines="1" />
+
+        <TextView
+            android:id="@+id/pct_caption"
+            style="@android:style/TextAppearance.Material.Notification.Info"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="10sp"
+            android:letterSpacing="0.08"
+            android:text="LEFT"
+            android:visibility="gone"
+            android:maxLines="1" />
+    </LinearLayout>
 </LinearLayout>

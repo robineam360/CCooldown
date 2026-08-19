@@ -66,6 +66,7 @@ class BarWidget : GlanceAppWidget() {
         val cache = UsageCache(context)
         val snapshot = cache.snapshot(profile)
         val use24h = cache.use24hTime()
+        val usageLeft = cache.usageLeft()
         val themeName = cache.themeColorName()
         val profileLabel = cache.profileLabel(profile)
         val showOverPace = cache.paceOverOnWidgets()
@@ -75,8 +76,8 @@ class BarWidget : GlanceAppWidget() {
         provideContent {
             GlanceTheme {
                 BarContent(
-                    profile, profileLabel, bar, snapshot, use24h, themeName, showOverPace,
-                    widthDp,
+                    profile, profileLabel, bar, snapshot, use24h, usageLeft, themeName,
+                    showOverPace, widthDp,
                 )
             }
         }
@@ -90,6 +91,7 @@ private fun BarContent(
     bar: String,
     snapshot: com.robin.claudeusage.data.Snapshot,
     use24h: Boolean,
+    usageLeft: Boolean,
     themeName: String,
     showOverPace: Boolean = true,
     widgetWidthDp: Float? = null,
@@ -151,7 +153,8 @@ private fun BarContent(
                     // Uncapped: the headline becomes the amount, since there is no
                     // percentage to report (CCBG-9).
                     valueText = if (pct != null) {
-                        "${credits.percentDisplay}%"
+                        // Rounded display percent either way (CCRM-3).
+                        Fmt.usageShort(credits.percentDisplay?.toDouble(), usageLeft)
                     } else {
                         Fmt.money(credits.usedMinor, credits.exponent, credits.currency)
                     },
@@ -180,7 +183,10 @@ private fun BarContent(
                 )
             }
             else -> {
-                HeaderRow(profile, "$label · $profileLabel", window?.percent, suffix, showRefresh = true)
+                HeaderRow(
+                    profile, "$label · $profileLabel", window?.percent, suffix,
+                    showRefresh = true, left = usageLeft,
+                )
                 // Trimmed from 5.dp/4.dp: the bar image carries 0.3 h of transparent
                 // overhang for the tick on each side, so the visible gaps are unchanged.
                 Spacer(GlanceModifier.height(1.dp))

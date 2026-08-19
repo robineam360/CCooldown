@@ -118,6 +118,9 @@ fun SettingsScreen(
     repo: UsageRepository,
     use24h: Boolean,
     onUse24h: (Boolean) -> Unit,
+    /** CCRM-22 (Used or Left) — hoisted like use24h so the main screen recomposes. */
+    usageLeft: Boolean,
+    onUsageLeft: (Boolean) -> Unit,
     /** Hoisted so flipping it recomposes the usage screen's bars behind this one. */
     paceOverInApp: Boolean,
     onPaceOverInApp: (Boolean) -> Unit,
@@ -526,6 +529,45 @@ fun SettingsScreen(
                 repo.cacheSettings().setUse24hTime(it)
                 refreshWidgets()
             }
+            RowDivider()
+            // CCRM-22 (Used or Left): one global token; every numeric readout follows
+            // it (rev B). Bars, ring fills and the warning colours always show the
+            // spend, so a red bar can't sit beside "8% left" and read as backwards.
+            Text(
+                "Usage display",
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                "How percentages read on every surface. Bars and colours always show " +
+                    "what's spent.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                for ((value, text) in listOf("used" to "Used", "left" to "Left")) {
+                    FilterChip(
+                        selected = if (value == "left") usageLeft else !usageLeft,
+                        onClick = {
+                            onUsageLeft(value == "left")
+                            cacheSettings.setUsageDisplay(value)
+                            refreshWidgets()
+                            // Re-post so the change lands without waiting for a poll.
+                            com.robin.claudeusage.notify.PinnedNotification
+                                .update(context, cacheSettings)
+                        },
+                        label = { Text(text) },
+                    )
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                if (usageLeft) "Shows \"53% left\" — what remains of each window."
+                else "Shows \"47% used\" — what each window has consumed.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             RowDivider()
             // CCRM-43 (Bar Pace Marks). One group, three switches: the surfaces are
             // read at very different distances, so the appetite for red differs. Each

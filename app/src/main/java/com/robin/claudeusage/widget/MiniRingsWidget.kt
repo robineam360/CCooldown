@@ -80,6 +80,7 @@ class MiniRingsWidget : GlanceAppWidget() {
         val cache = UsageCache(context)
         val snapshot = cache.snapshot(profile)
         val use24h = cache.use24hTime()
+        val usageLeft = cache.usageLeft()
         val themeName = cache.themeColorName()
         // Three, not four (CCBG-10 (Mini-Rings Emptiness)): fewer columns is what
         // lets each ring be big enough to read as a gauge at a glance.
@@ -91,8 +92,8 @@ class MiniRingsWidget : GlanceAppWidget() {
         provideContent {
             GlanceTheme {
                 MiniRingsFace(
-                    profile, cache.profileLabel(profile), snapshot, rows, use24h, themeName,
-                    showOverPace,
+                    profile, cache.profileLabel(profile), snapshot, rows, use24h, usageLeft,
+                    themeName, showOverPace,
                 )
             }
         }
@@ -106,6 +107,7 @@ private fun MiniRingsFace(
     snapshot: Snapshot,
     rows: List<WindowRow>,
     @Suppress("UNUSED_PARAMETER") use24h: Boolean, // no prose reset line on this face
+    usageLeft: Boolean,
     themeName: String,
     showOverPace: Boolean = true,
 ) {
@@ -202,7 +204,10 @@ private fun MiniRingsFace(
                                     modifier = GlanceModifier.size(l.ringDp.dp),
                                 )
                                 Text(
-                                    if (percent == null) "—" else "${percent.toInt()}%",
+                                    // CCRM-22 rev B: the bore flips too; no spare line
+                                    // here, so the bare number carries it.
+                                    if (percent == null) "—"
+                                    else "${Fmt.usageInt(percent, usageLeft)}%",
                                     style = TextStyle(
                                         color = if (percent == null) GlanceTheme.colors.onSurfaceVariant
                                         else GlanceTheme.colors.onSurface,

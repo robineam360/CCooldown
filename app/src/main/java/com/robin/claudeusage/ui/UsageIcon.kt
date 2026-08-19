@@ -21,7 +21,13 @@ object UsageIcon {
     /** Styles offered in settings. */
     const val RING = "ring"
 
-    fun draw(context: Context, pct: Double?, style: String): Bitmap {
+    /**
+     * [left] is CCRM-22 (Used or Left): it flips only the "number" style's digits
+     * (rev B — every numeric readout follows the token). The fills — ring arc, pie
+     * slice, battery liquid — always draw the used fraction, and the ≥100% "!!"
+     * overflow glyph keys on used in both modes.
+     */
+    fun draw(context: Context, pct: Double?, style: String, left: Boolean = false): Bitmap {
         val size = dp(context, 24f).toInt().coerceAtLeast(24)
         val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
@@ -61,16 +67,17 @@ object UsageIcon {
                 c.drawRect(left + inset, fillTop, right - inset, bottom - inset, liquid)
             }
             "number" -> {
+                val label = when {
+                    pct == null -> "–"
+                    pct >= 100.0 -> "!!"
+                    else -> Fmt.usageInt(pct, left).toString()
+                }
                 val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     color = white
                     textAlign = Paint.Align.CENTER
                     typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-                    textSize = if (pct != null && pct >= 100.0) size * 0.5f else size * 0.62f
-                }
-                val label = when {
-                    pct == null -> "–"
-                    pct >= 100.0 -> "!!"
-                    else -> pct.toInt().toString()
+                    // "!!" and Left mode's possible "100" both need the step-down.
+                    textSize = if (label == "!!" || label.length >= 3) size * 0.5f else size * 0.62f
                 }
                 val baseline = size / 2f - (text.descent() + text.ascent()) / 2f
                 c.drawText(label, size / 2f, baseline, text)
