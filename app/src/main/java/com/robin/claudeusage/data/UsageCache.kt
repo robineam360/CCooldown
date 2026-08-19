@@ -33,8 +33,10 @@ class UsageCache(context: Context) {
         const val SMART_RESET_MIN_PCT = 80.0
     }
 
+    private val appContext = context.applicationContext
+
     private val prefs: SharedPreferences =
-        context.applicationContext.getSharedPreferences("usage_cache", Context.MODE_PRIVATE)
+        appContext.getSharedPreferences("usage_cache", Context.MODE_PRIVATE)
 
     private fun k(profile: Profile, name: String): String =
         if (profile == Profile.PERSONAL) name else "${profile.key}.$name"
@@ -359,10 +361,38 @@ class UsageCache(context: Context) {
         prefs.edit().putBoolean("paceOverOnNotification", enabled).apply()
     }
 
-    fun use24hTime(): Boolean = prefs.getBoolean("use24hTime", false)
+    // --- CCRM-29 (Display Mode) ---
 
-    fun setUse24hTime(enabled: Boolean) {
-        prefs.edit().putBoolean("use24hTime", enabled).apply()
+    /**
+     * "system" (default) / "light" / "dark". In-app screens only — widgets and
+     * the notification follow the system, since their backdrop isn't ours.
+     */
+    fun themeMode(): String = prefs.getString("themeMode", "system") ?: "system"
+
+    fun setThemeMode(mode: String) {
+        prefs.edit().putString("themeMode", mode).apply()
+    }
+
+    /**
+     * "system" / "12" / "24". Migration: an install that ever touched the old
+     * `use24hTime` boolean keeps that explicit choice; only installs without the
+     * old key get "system" — nobody's clock format flips on upgrade.
+     */
+    fun timeFormat(): String =
+        prefs.getString("timeFormat", null)
+            ?: if (prefs.contains("use24hTime")) {
+                if (prefs.getBoolean("use24hTime", false)) "24" else "12"
+            } else "system"
+
+    fun setTimeFormat(mode: String) {
+        prefs.edit().putString("timeFormat", mode).apply()
+    }
+
+    /** The resolved boolean every render site still reads, unchanged in shape. */
+    fun use24hTime(): Boolean = when (timeFormat()) {
+        "12" -> false
+        "24" -> true
+        else -> android.text.format.DateFormat.is24HourFormat(appContext)
     }
 
     // CCRM-22 (Used or Left): one app-wide display token. Every numeric usage

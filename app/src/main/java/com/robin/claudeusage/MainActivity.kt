@@ -52,7 +52,9 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -68,10 +70,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
 import androidx.glance.appwidget.updateAll
+import android.text.format.DateFormat
 import com.robin.claudeusage.data.Profile
 import com.robin.claudeusage.ping.PingScheduler
 import com.robin.claudeusage.data.Projection
@@ -93,6 +98,10 @@ import com.robin.claudeusage.ui.hasTwoColumns
 import com.robin.claudeusage.ui.PACE_DEAD_ZONE
 import com.robin.claudeusage.ui.elapsedPercent
 import com.robin.claudeusage.ui.Motion
+import com.robin.claudeusage.ui.LocalAppDark
+import com.robin.claudeusage.ui.appDark
+import com.robin.claudeusage.ui.resolve24h
+import com.robin.claudeusage.ui.resolveDark
 import com.robin.claudeusage.ui.twoPane
 import com.robin.claudeusage.widget.BarWidget
 import com.robin.claudeusage.widget.UsageWidget
@@ -138,7 +147,12 @@ private fun App(startProfile: Profile) {
     // Deliberately not persisted: the debug easter egg re-locks on every launch.
     var debugUnlocked by remember { mutableStateOf(false) }
     var themeName by remember { mutableStateOf(cache.themeColorName()) }
-    var use24h by remember { mutableStateOf(cache.use24hTime()) }
+    // CCRM-29 (Display Mode): the two three-way modes, hoisted so the Settings
+    // chips recompose the whole app; the booleans every render site reads are
+    // derived below.
+    var themeMode by remember { mutableStateOf(cache.themeMode()) }
+    var timeFormat by remember { mutableStateOf(cache.timeFormat()) }
+    val use24h = resolve24h(timeFormat, DateFormat.is24HourFormat(context))
     // CCRM-22 (Used or Left): hoisted like use24h so flipping the chips in
     // Settings recomposes every readout behind them.
     var usageLeft by remember { mutableStateOf(cache.usageLeft()) }
@@ -188,7 +202,19 @@ private fun App(startProfile: Profile) {
     // System back walks the screen stack instead of exiting the app.
     BackHandler(enabled = screen != Screen.MAIN) { goBack() }
 
-    val dark = isSystemInDarkTheme()
+    val dark = resolveDark(themeMode, isSystemInDarkTheme())
+    // A forced theme diverges from the system theme that the manifest's
+    // windowLightStatusBar attribute follows (CCBG-13), so the icons are set
+    // programmatically from the resolved mode.
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            (view.context as? android.app.Activity)?.window?.let { window ->
+                WindowCompat.getInsetsController(window, view)
+                    .isAppearanceLightStatusBars = !dark
+            }
+        }
+    }
     val scheme = when {
         themeName == Palette.DYNAMIC && dark -> dynamicDarkColorScheme(context)
         themeName == Palette.DYNAMIC -> dynamicLightColorScheme(context)
@@ -202,6 +228,7 @@ private fun App(startProfile: Profile) {
         )
     }
 
+    CompositionLocalProvider(LocalAppDark provides dark) {
     MaterialTheme(colorScheme = scheme) {
         Surface(modifier = Modifier.fillMaxSize()) {
             Scaffold(
@@ -263,7 +290,10 @@ private fun App(startProfile: Profile) {
                             SettingsScreen(
                                 repo = repo,
                                 use24h = use24h,
-                                onUse24h = { use24h = it },
+                                themeMode = themeMode,
+                                onThemeMode = { themeMode = it },
+                                timeFormat = timeFormat,
+                                onTimeFormat = { timeFormat = it },
                                 usageLeft = usageLeft,
                                 onUsageLeft = { usageLeft = it },
                                 resetClock = resetClock,
@@ -296,6 +326,7 @@ private fun App(startProfile: Profile) {
                 }
             }
         }
+    }
     }
 }
 
@@ -389,9 +420,9 @@ private fun UsageBarLine(
     val segment = BarGeometry.redSegment(percent, elapsedPercent, showOverPace)
     val tick = BarGeometry.showTick(percent, elapsedPercent)
     val tickColor = MaterialTheme.colorScheme.onSurface.copy(
-        alpha = if (isSystemInDarkTheme()) 0.60f else 0.48f,
+        alpha = if (appDark()) 0.60f else 0.48f,
     )
-    val redColor = Palette.barColor(100.0, fillColor, isSystemInDarkTheme())
+    val redColor = Palette.barColor(100.0, fillColor, appDark())
 
     Box(
         modifier = Modifier
@@ -476,7 +507,7 @@ private fun ResetRow(window: UsageWindow?, use24h: Boolean, resetClock: Boolean)
 
 @Composable
 private fun barFill(percent: Double?): Color =
-    Palette.barColor(percent, MaterialTheme.colorScheme.primary, isSystemInDarkTheme())
+    Palette.barColor(percent, MaterialTheme.colorScheme.primary, appDark())
 
 @Composable
 private fun ProfileScreen(

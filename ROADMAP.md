@@ -617,7 +617,27 @@ keys) would still make this a different product. Not filed, not an open question
   label, and fall back to the bare plan when it's absent.
 
 ### CCRM-29 · Display Mode — light/dark override, and a "follow system" time format
-- **Status:** Planned · small
+- **Status:** Done (2026-08-19) · wireframe approved same day
+  (`design/display-tokens-wireframe.html`) · needs on-device verification
+- **Shipped:** two three-way prefs in `UsageCache` — `themeMode`
+  ("system"/"light"/"dark") and `timeFormat` ("system"/"12"/"24") — as chip rows
+  leading Settings → Appearance, replacing the 24-hour switch. **Theme:** the
+  resolved dark flag rides a new `LocalAppDark` (`ui/ThemeMode.kt`, pure
+  `resolveDark`/`resolve24h` pinned by `ThemeModeTest` — garbage values fail
+  towards the system, per the tolerant-decode house rule); every in-app dark read
+  (`barFill`, the bar tick alphas, `Sparkline`'s 0.07/0.10 · 0.18/0.20 · 0.30/0.34
+  opacity pairs, History bars, the theme swatches, note cards) goes through
+  `appDark()`, so a forced mode drives the chart opacities the roadmap warned
+  about — and a `SideEffect` sets `isAppearanceLightStatusBars` from the resolved
+  mode, keeping CCBG-13 (Light Status Bar) correct when forced.
+  `WidgetConfigActivity` resolves identically; **widgets and the notification
+  deliberately keep following the system** — their backdrop isn't ours.
+  **Time format:** `use24hTime()` keeps its Boolean shape and resolves internally
+  (system → `DateFormat.is24HourFormat`), so its ~40 read sites are untouched.
+  Migration per the entry's own rule: an install that ever touched the old
+  boolean keeps that explicit choice via a read-time fallback; only installs
+  without the old key get System. 203 tests, 0 failures.
+- **Was:** Planned · small
 - **Two independent gaps, both one-liners:**
   - **Theme mode.** We read `isSystemInDarkTheme()` with no override
     ([MainActivity.kt:170](app/src/main/java/com/robin/claudeusage/MainActivity.kt#L170)).

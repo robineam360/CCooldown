@@ -40,7 +40,9 @@ import androidx.glance.appwidget.updateAll
 import com.robin.claudeusage.data.Profile
 import com.robin.claudeusage.data.UsageCache
 import com.robin.claudeusage.data.WidgetPrefs
+import com.robin.claudeusage.ui.LocalAppDark
 import com.robin.claudeusage.ui.Palette
+import com.robin.claudeusage.ui.resolveDark
 import kotlinx.coroutines.launch
 
 /**
@@ -99,14 +101,26 @@ class WidgetConfigActivity : ComponentActivity() {
         }
 
         setContent {
-            val dark = isSystemInDarkTheme()
-            val themeName = remember { UsageCache(this@WidgetConfigActivity).themeColorName() }
+            // CCRM-29 (Display Mode): same resolution as MainActivity — this is an
+            // in-app screen, so it obeys the override; the widgets it configures
+            // keep following the system.
+            val cache = remember { UsageCache(this@WidgetConfigActivity) }
+            val dark = resolveDark(remember { cache.themeMode() }, isSystemInDarkTheme())
+            val view = androidx.compose.ui.platform.LocalView.current
+            if (!view.isInEditMode) {
+                androidx.compose.runtime.SideEffect {
+                    androidx.core.view.WindowCompat.getInsetsController(window, view)
+                        .isAppearanceLightStatusBars = !dark
+                }
+            }
+            val themeName = remember { cache.themeColorName() }
             val scheme = when {
                 themeName == Palette.DYNAMIC && dark -> dynamicDarkColorScheme(this@WidgetConfigActivity)
                 themeName == Palette.DYNAMIC -> dynamicLightColorScheme(this@WidgetConfigActivity)
                 dark -> darkColorScheme(primary = Palette.color(themeName, true), onPrimary = Color(0xFF1F1F1F))
                 else -> lightColorScheme(primary = Palette.color(themeName, false), onPrimary = Color.White)
             }
+            androidx.compose.runtime.CompositionLocalProvider(LocalAppDark provides dark) {
             MaterialTheme(colorScheme = scheme) {
                 Surface(Modifier.fillMaxSize()) {
                     ConfigScreen(
@@ -127,6 +141,7 @@ class WidgetConfigActivity : ComponentActivity() {
                         },
                     )
                 }
+            }
             }
         }
     }

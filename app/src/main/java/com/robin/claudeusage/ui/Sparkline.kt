@@ -147,7 +147,10 @@ fun UsageSparkline(
 ) {
     if (samples.size < 2 || windowEndMs <= windowStartMs) return
 
-    val dark = isSystemInDarkTheme()
+    // The resolved app theme, not the bare system flag: the per-mode opacities
+    // below must follow a CCRM-29 (Display Mode) override, or a light-mode 7%
+    // wash over a forced-dark background is invisible.
+    val dark = appDark()
     val onSurface = MaterialTheme.colorScheme.onSurface
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
     val surface = MaterialTheme.colorScheme.surface

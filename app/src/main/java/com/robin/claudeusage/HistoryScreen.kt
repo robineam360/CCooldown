@@ -1,7 +1,7 @@
 package com.robin.claudeusage
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
+import com.robin.claudeusage.ui.appDark
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -214,7 +214,7 @@ private fun WeeklyView(bars: List<HistoryStats.Bar>, zone: ZoneId, use24h: Boole
 
 @Composable
 private fun BarRow(label: String, bar: HistoryStats.Bar) {
-    val dark = isSystemInDarkTheme()
+    val dark = appDark()
     val fill = Palette.barColor(bar.peakPct, MaterialTheme.colorScheme.primary, dark)
     val valueColor =
         if (bar.hitLimit) fill else MaterialTheme.colorScheme.onSurfaceVariant

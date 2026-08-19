@@ -10,7 +10,7 @@ import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
+import com.robin.claudeusage.ui.appDark
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -116,8 +116,14 @@ private const val USAGE_DASHBOARD_URL = "https://claude.ai/settings/usage"
 @Composable
 fun SettingsScreen(
     repo: UsageRepository,
+    /** The resolved 24-hour flag, for rendering examples — the mode is [timeFormat]. */
     use24h: Boolean,
-    onUse24h: (Boolean) -> Unit,
+    /** CCRM-29 (Display Mode): "system" / "light" / "dark", hoisted to the App root. */
+    themeMode: String,
+    onThemeMode: (String) -> Unit,
+    /** CCRM-29 (Display Mode): "system" / "12" / "24", hoisted likewise. */
+    timeFormat: String,
+    onTimeFormat: (String) -> Unit,
     /** CCRM-22 (Used or Left) — hoisted like use24h so the main screen recomposes. */
     usageLeft: Boolean,
     onUsageLeft: (Boolean) -> Unit,
@@ -499,14 +505,59 @@ fun SettingsScreen(
 
         SectionLabel("Appearance")
         SectionCard {
-            ToggleRow(
-                title = "24-hour time",
-                subtitle = if (use24h) "Times shown like Thu 23:45" else "Times shown like Thu 11:45 PM",
-                checked = use24h,
-            ) {
-                onUse24h(it)
-                repo.cacheSettings().setUse24hTime(it)
-                refreshWidgets()
+            // CCRM-29 (Display Mode): a forced theme drives the Material scheme, the
+            // chart's per-mode opacities and the status-bar icons together (via
+            // LocalAppDark). Widgets and the notification keep following the system —
+            // their backdrop is the launcher's and the shade's, not ours.
+            Text(
+                "Theme",
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                for ((value, text) in listOf(
+                    "system" to "System", "light" to "Light", "dark" to "Dark",
+                )) {
+                    FilterChip(
+                        selected = themeMode == value,
+                        onClick = {
+                            onThemeMode(value)
+                            cacheSettings.setThemeMode(value)
+                        },
+                        label = { Text(text) },
+                    )
+                }
+            }
+            RowDivider()
+            // CCRM-29 (Display Mode): grown from the old 24-hour switch. An install
+            // that ever touched that switch keeps its explicit choice (see
+            // UsageCache.timeFormat); only fresh installs land on System.
+            Text(
+                "Time format",
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                if (use24h) "Times shown like Thu 23:45" else "Times shown like Thu 11:45 PM",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                for ((value, text) in listOf(
+                    "system" to "System", "12" to "12-hour", "24" to "24-hour",
+                )) {
+                    FilterChip(
+                        selected = timeFormat == value,
+                        onClick = {
+                            onTimeFormat(value)
+                            cacheSettings.setTimeFormat(value)
+                            refreshWidgets()
+                        },
+                        label = { Text(text) },
+                    )
+                }
             }
             RowDivider()
             // CCRM-22 (Used or Left): one global token; every numeric readout follows
@@ -1278,7 +1329,7 @@ private fun PlanChip(plan: String, tier: String?) {
 
 @Composable
 private fun StatusChip(authState: AuthState) {
-    val dark = isSystemInDarkTheme()
+    val dark = appDark()
     val (label, color) = when (authState) {
         AuthState.REAUTH_NEEDED -> "Needs re-auth" to MaterialTheme.colorScheme.error
         else -> "Active" to if (dark) Color(0xFF81C995) else Color(0xFF188038)
@@ -1339,7 +1390,7 @@ private fun PollingSection(repo: UsageRepository) {
 @Composable
 private fun ThemeColorPicker(themeName: String, onTheme: (String) -> Unit) {
     val context = LocalContext.current
-    val dark = isSystemInDarkTheme()
+    val dark = appDark()
     val allOptions = listOf(Palette.DYNAMIC) + Palette.options.map { it.name }
     for (rowNames in allOptions.chunked(6)) {
         Row(
@@ -2066,7 +2117,7 @@ private fun CodeBlock(code: String) {
 
 @Composable
 private fun NoteCard(text: String, positive: Boolean) {
-    val dark = isSystemInDarkTheme()
+    val dark = appDark()
     val tint = if (positive) {
         if (dark) Color(0xFF81C995) else Color(0xFF188038)
     } else {
