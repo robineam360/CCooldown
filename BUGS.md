@@ -11,19 +11,6 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
 
 ## Open
 
-### CCBG-13 · Light Status Bar — status-bar icons stay white on the light theme's pale background
-- **Status:** Open
-- **Severity:** Low (poor contrast, nothing wrong with the data)
-- **Symptom:** Observed on the Fold 7 (outer screen), 2026-08-18, during the release
-  device pass. With the device in light theme, the app's screens draw their pale
-  background edge-to-edge but the system status bar keeps **white** clock and icons,
-  so the top row is white-on-pink and barely legible. Dark theme is fine (white on
-  dark). The launcher and other apps flip to dark status-bar icons in light mode,
-  so this is ours: the activity never sets `isAppearanceLightStatusBars` (or the
-  windowLightStatusBar theme attribute) for the light palette.
-- **Where:** every in-app screen — main, Settings, guide (screenshots from the
-  2026-08-18 pass: main and Settings both show it).
-
 ### CCBG-3 · Credits Visibility — credits card ignores extra-usage being switched off
 - **Status:** Open
 - **Severity:** Low (misleading display, no data loss) — and possibly unreachable
@@ -44,6 +31,27 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
 ---
 
 ## Fixed
+
+### CCBG-13 · Light Status Bar — status-bar icons stay white on the light theme's pale background
+- **Status:** Fixed (2026-08-19) · needs on-device verification (light theme, any screen)
+- **Severity:** Low (poor contrast, nothing wrong with the data)
+- **Symptom:** Observed on the Fold 7 (outer screen), 2026-08-18, during the release
+  device pass. With the device in light theme, the app's screens draw their pale
+  background edge-to-edge but the system status bar keeps **white** clock and icons,
+  so the top row is white-on-pink and barely legible. Dark theme is fine (white on
+  dark). The launcher and other apps flip to dark status-bar icons in light mode,
+  so this is ours: the activity never sets `isAppearanceLightStatusBars` (or the
+  windowLightStatusBar theme attribute) for the light palette.
+- **Where:** every in-app screen — main, Settings, guide (screenshots from the
+  2026-08-18 pass: main and Settings both show it).
+- **Fix — one theme attribute, not code.** `android:windowLightStatusBar = true` in
+  `values/themes.xml`; `values-night` keeps the platform default (light icons on
+  dark). Both activities inherit `Theme.ClaudeUsage` from the manifest's application
+  entry, so MainActivity and WidgetConfigActivity are covered in one place, with no
+  per-activity code and nothing for a future activity to forget. When CCRM-29
+  (Display Mode) adds the in-app light/dark override it must also set
+  `isAppearanceLightStatusBars` programmatically from the *resolved* mode — a forced
+  theme diverges from the system theme the XML attribute follows.
 
 ### CCBG-12 · Status Icon Swap — a second notification replaces the live meter with the app icon
 - **Status:** Fixed (built 2026-08-14 · verified on the Fold 7 by the user, 2026-08-18,

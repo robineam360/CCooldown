@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.ClaudeUsage" parent="@android:style/Theme.Material.Light.NoActionBar" />
+    <style name="Theme.ClaudeUsage" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <!-- CCBG-13: dark status-bar icons over the light palette; values-night keeps
+             the platform default (light icons on dark). -->
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
 </resources>
