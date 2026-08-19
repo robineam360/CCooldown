@@ -33,10 +33,12 @@ abstract class BaseUsageTileService(private val profile: Profile) : TileService(
                     // CCRM-22 (Used or Left): room for the word, so it flips worded.
                     label = "$profileLabel ${Fmt.usageShort(session.percent, cache.usageLeft())}"
                     // The 5-hour reset earns the subtitle over the 7-day number:
-                    // it's the one that changes what you do next.
+                    // it's the one that changes what you do next. The countdown/clock
+                    // choice is the global CCRM-23 (Reset Display) token now — the
+                    // tile reads it, it no longer owns it.
                     subtitle = when {
                         session.resetsAt == null -> "not started"
-                        cache.tileSubtitle() == "clock" ->
+                        cache.resetClock() ->
                             "resets ${Fmt.timeOnly(session.resetsAt, cache.use24hTime())}"
                         else -> "resets ${Fmt.relIn(session.resetsAt)}"
                     }

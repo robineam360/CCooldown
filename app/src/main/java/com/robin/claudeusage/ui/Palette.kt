@@ -200,11 +200,17 @@ object Fmt {
         return DateTimeFormatter.ofPattern("d MMM").withZone(ZoneId.systemDefault()).format(instant)
     }
 
-    /** "in 4h 47m" */
+    /**
+     * "in 4h 47m", collapsing to **"soon" inside five minutes** (CCRM-23
+     * (Reset Display), aligned with the ring faces' `widgetCountdown`): most
+     * surfaces showing this refresh on a 15-minute cadence, so counting down the
+     * last seconds would just be a stale number wearing false precision.
+     */
     fun relIn(instant: Instant?): String {
         instant ?: return "unknown"
         val d = Duration.between(Instant.now(), instant)
         if (d.isNegative) return "any moment"
+        if (d.toMinutes() < 5) return "soon"
         val h = d.toHours()
         val m = d.toMinutes() % 60
         return when {

@@ -67,6 +67,7 @@ class BarWidget : GlanceAppWidget() {
         val snapshot = cache.snapshot(profile)
         val use24h = cache.use24hTime()
         val usageLeft = cache.usageLeft()
+        val resetClock = cache.resetClock()
         val themeName = cache.themeColorName()
         val profileLabel = cache.profileLabel(profile)
         val showOverPace = cache.paceOverOnWidgets()
@@ -76,8 +77,8 @@ class BarWidget : GlanceAppWidget() {
         provideContent {
             GlanceTheme {
                 BarContent(
-                    profile, profileLabel, bar, snapshot, use24h, usageLeft, themeName,
-                    showOverPace, widthDp,
+                    profile, profileLabel, bar, snapshot, use24h, usageLeft, resetClock,
+                    themeName, showOverPace, widthDp,
                 )
             }
         }
@@ -92,6 +93,7 @@ private fun BarContent(
     snapshot: com.robin.claudeusage.data.Snapshot,
     use24h: Boolean,
     usageLeft: Boolean,
+    resetClock: Boolean,
     themeName: String,
     showOverPace: Boolean = true,
     widgetWidthDp: Float? = null,
@@ -200,7 +202,7 @@ private fun BarContent(
                     widgetWidthDp = widgetWidthDp,
                 )
                 Spacer(GlanceModifier.height(1.dp))
-                ResetSubText(window, use24h)
+                ResetSubText(window, use24h, resetClock)
             }
         }
     }

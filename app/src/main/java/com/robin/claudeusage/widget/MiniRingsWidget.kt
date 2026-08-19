@@ -230,7 +230,13 @@ private fun MiniRingsFace(
                             }
                             if (l.showCountdown) {
                                 Text(
-                                    if (percent == null) "no data" else widgetCountdown(row.window.resetsAt),
+                                    // Deliberately exempt from CCRM-23's clock mode:
+                                    // this face's 9sp slot can't carry a day, and a
+                                    // bare "4:12 PM" on a 7-day or model-cap ring
+                                    // wouldn't say *which* day. A countdown is the
+                                    // only honest single-token form here.
+                                    if (percent == null) "no data"
+                                    else widgetCountdown(row.window.resetsAt),
                                     style = TextStyle(
                                         color = GlanceTheme.colors.onSurfaceVariant,
                                         fontSize = 9.sp,

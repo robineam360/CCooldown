@@ -101,6 +101,7 @@ class UsageWidget : GlanceAppWidget() {
         val snapshot = cache.snapshot(profile)
         val use24h = cache.use24hTime()
         val usageLeft = cache.usageLeft()
+        val resetClock = cache.resetClock()
         val themeName = cache.themeColorName()
         // Both gates: the per-profile switch decides whether credits exist for this
         // account at all, the widget switch whether they're worth the height here.
@@ -115,7 +116,7 @@ class UsageWidget : GlanceAppWidget() {
             GlanceTheme {
                 WidgetContent(
                     profile, cache.profileLabel(profile), snapshot, use24h, usageLeft,
-                    themeName, showCredits, showOverPace, widthDp,
+                    resetClock, themeName, showCredits, showOverPace, widthDp,
                 )
             }
         }
@@ -171,6 +172,7 @@ private fun WidgetContent(
     snapshot: Snapshot,
     use24h: Boolean,
     usageLeft: Boolean,
+    resetClock: Boolean,
     themeName: String,
     showCredits: Boolean,
     showOverPace: Boolean = true,
@@ -209,7 +211,7 @@ private fun WidgetContent(
                 // Only the large bucket has the height for a fourth bar.
                 val credits = data.credits?.takeIf { showCredits && it.isReportable }
                 SessionBlock(
-                    profile, data.session, use24h, usageLeft, theme, dark,
+                    profile, data.session, use24h, usageLeft, resetClock, theme, dark,
                     label = "5-hour · $profileLabel", barHeight = 14.dp,
                     showOverPace = showOverPace, contentPadding = pad,
                     widgetWidthDp = widgetWidthDp,
@@ -277,13 +279,13 @@ private fun WidgetContent(
                         }
                     }
                     Spacer(GlanceModifier.height(4.dp))
-                    FooterRow(snapshot, data.weekly, use24h)
+                    FooterRow(snapshot, data.weekly, use24h, resetClock)
                 }
             }
             medium -> {
                 val data = snapshot.data!!
                 SessionBlock(
-                    profile, data.session, use24h, usageLeft, theme, dark,
+                    profile, data.session, use24h, usageLeft, resetClock, theme, dark,
                     label = "5-hour · $profileLabel", barHeight = 12.dp,
                     showOverPace = showOverPace, contentPadding = pad,
                     widgetWidthDp = widgetWidthDp,
@@ -305,13 +307,13 @@ private fun WidgetContent(
                         widgetWidthDp = widgetWidthDp,
                     )
                     Spacer(GlanceModifier.height(2.dp))
-                    FooterRow(snapshot, data.weekly, use24h)
+                    FooterRow(snapshot, data.weekly, use24h, resetClock)
                 }
             }
             else -> {
                 val data = snapshot.data!!
                 SessionBlock(
-                    profile, data.session, use24h, usageLeft, theme, dark,
+                    profile, data.session, use24h, usageLeft, resetClock, theme, dark,
                     label = "5h · $profileLabel", barHeight = 12.dp,
                     showOverPace = showOverPace, contentPadding = pad,
                     widgetWidthDp = widgetWidthDp,
@@ -327,6 +329,7 @@ internal fun SessionBlock(
     session: UsageWindow?,
     use24h: Boolean,
     usageLeft: Boolean,
+    resetClock: Boolean,
     theme: Color,
     dark: Boolean,
     label: String,
@@ -352,15 +355,24 @@ internal fun SessionBlock(
         )
         // Trimmed from 4.dp for the same reason, on the underside.
         Spacer(GlanceModifier.height(1.dp))
-        ResetSubText(session, use24h)
+        ResetSubText(session, use24h, resetClock)
     }
 }
 
-/** Reset countdown row; a window with no reset time hasn't started yet. */
+/**
+ * Reset countdown row; a window with no reset time hasn't started yet.
+ * CCRM-23 (Reset Display), Option A: the chosen form leads, the other keeps the
+ * second slot — the token decides order, never presence.
+ */
 @Composable
-internal fun ResetSubText(window: UsageWindow?, use24h: Boolean) {
-    if (window?.resetsAt == null) SubTextRow("Starts when a message is sent", "")
-    else SubTextRow(Fmt.relIn(window.resetsAt), Fmt.dayTime(window.resetsAt, use24h))
+internal fun ResetSubText(window: UsageWindow?, use24h: Boolean, resetClock: Boolean = false) {
+    if (window?.resetsAt == null) {
+        SubTextRow("Starts when a message is sent", "")
+        return
+    }
+    val countdown = Fmt.relIn(window.resetsAt)
+    val clock = Fmt.dayTime(window.resetsAt, use24h)
+    if (resetClock) SubTextRow(clock, countdown) else SubTextRow(countdown, clock)
 }
 
 @Composable
@@ -538,12 +550,17 @@ internal fun SubTextRow(left: String, right: String) {
 }
 
 @Composable
-internal fun FooterRow(snapshot: Snapshot, weekly: UsageWindow?, use24h: Boolean) {
+internal fun FooterRow(
+    snapshot: Snapshot,
+    weekly: UsageWindow?,
+    use24h: Boolean,
+    resetClock: Boolean = false,
+) {
     val failed = snapshot.lastStatus != "OK"
     val ageMinutes = (System.currentTimeMillis() - snapshot.fetchedAt) / 60_000L
     val stale = failed || snapshot.fetchedAt <= 0 || ageMinutes > 45
     Column(modifier = GlanceModifier.fillMaxWidth()) {
-        ResetSubText(weekly, use24h)
+        ResetSubText(weekly, use24h, resetClock)
         Spacer(GlanceModifier.height(2.dp))
         Text(
             if (failed) "updated ${Fmt.ago(snapshot.fetchedAt)} · ${snapshot.lastStatus}"

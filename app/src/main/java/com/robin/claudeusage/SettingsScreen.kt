@@ -121,6 +121,9 @@ fun SettingsScreen(
     /** CCRM-22 (Used or Left) — hoisted like use24h so the main screen recomposes. */
     usageLeft: Boolean,
     onUsageLeft: (Boolean) -> Unit,
+    /** CCRM-23 (Reset Display) — same hoisting for which reset form leads. */
+    resetClock: Boolean,
+    onResetClock: (Boolean) -> Unit,
     /** Hoisted so flipping it recomposes the usage screen's bars behind this one. */
     paceOverInApp: Boolean,
     onPaceOverInApp: (Boolean) -> Unit,
@@ -441,32 +444,8 @@ fun SettingsScreen(
         SectionCard {
             Text(
                 "The tile in the notification shade / Control Center. It shows the 5-hour " +
-                    "percentage; this picks what sits under it.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(8.dp))
-            var tileSubtitle by remember { mutableStateOf(cacheSettings.tileSubtitle()) }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for ((value, text) in listOf("countdown" to "Countdown", "clock" to "Clock time")) {
-                    FilterChip(
-                        selected = tileSubtitle == value,
-                        onClick = {
-                            tileSubtitle = value
-                            cacheSettings.setTileSubtitle(value)
-                        },
-                        label = { Text(text) },
-                    )
-                }
-            }
-            Spacer(Modifier.height(6.dp))
-            Text(
-                if (tileSubtitle == "clock")
-                    "Shows \"resets 4:12 PM\". The tile only updates when you open the shade, " +
-                        "so a clock time can't go stale while it sits open."
-                else
-                    "Shows \"resets in 2h 14m\". Reads more naturally, but drifts if the " +
-                        "shade stays open a while.",
+                    "percentage, with the reset under it — countdown or clock time, " +
+                    "following the Reset time choice under Appearance.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -565,6 +544,50 @@ fun SettingsScreen(
             Text(
                 if (usageLeft) "Shows \"53% left\" — what remains of each window."
                 else "Shows \"47% used\" — what each window has consumed.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            RowDivider()
+            // CCRM-23 (Reset Display), Option A: the token decides which reset form
+            // *leads*; surfaces with a second slot keep the other form there. Grown
+            // from the tile-only countdown/clock choice (CCRM-11), which this
+            // replaces — the tile now just follows it.
+            Text(
+                "Reset time",
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                "Which form leads wherever a reset is shown. Where there's room, " +
+                    "the other form keeps the second slot.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                for ((value, text) in listOf("countdown" to "Countdown", "clock" to "Clock time")) {
+                    FilterChip(
+                        selected = if (value == "clock") resetClock else !resetClock,
+                        onClick = {
+                            onResetClock(value == "clock")
+                            cacheSettings.setResetDisplay(value)
+                            refreshWidgets()
+                            // Re-post so the change lands without waiting for a poll.
+                            com.robin.claudeusage.notify.PinnedNotification
+                                .update(context, cacheSettings)
+                        },
+                        label = { Text(text) },
+                    )
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                if (resetClock)
+                    "Leads with \"resets 4:12 PM\". A clock time can't go stale on " +
+                        "surfaces that refresh every 15 minutes."
+                else
+                    "Leads with \"resets in 2h 14m\", collapsing to \"resets soon\" " +
+                        "inside five minutes.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

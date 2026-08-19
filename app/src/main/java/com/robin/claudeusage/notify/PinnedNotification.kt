@@ -115,16 +115,25 @@ object PinnedNotification {
         // The worded form for text slots that have room for the word.
         val pctShort = if (pct == null) "—" else Fmt.usageShort(pct, left)
 
-        val resetShort =
-            if (session?.resetsAt != null) "resets ${Fmt.relIn(session.resetsAt)}"
-            else "not started yet"
+        // CCRM-23 (Reset Display), Option A: the chosen form leads. The collapsed
+        // line has one slot, so it carries the chosen form only; the expanded line
+        // keeps both, chosen first.
+        val resetClock = cache.resetClock()
+        val resetShort = when {
+            session?.resetsAt == null -> "not started yet"
+            resetClock -> "resets ${Fmt.timeOnly(session.resetsAt, use24h)}"
+            else -> "resets ${Fmt.relIn(session.resetsAt)}"
+        }
         // Collapsed is the 5-hour window and nothing else: percentage, bar, and when
         // it resets. The 7-day window and the model caps live in the expanded panel,
         // so repeating any of it here would just be duplicate info.
-        val resetLong =
-            if (session?.resetsAt != null) "Resets ${Fmt.relIn(session.resetsAt)} · " +
+        val resetLong = when {
+            session?.resetsAt == null -> "Not started yet"
+            resetClock -> "Resets at ${Fmt.timeOnly(session.resetsAt, use24h)} · " +
+                Fmt.relIn(session.resetsAt)
+            else -> "Resets ${Fmt.relIn(session.resetsAt)} · " +
                 Fmt.timeOnly(session.resetsAt, use24h)
-            else "Not started yet"
+        }
 
         // "progress" is the odd one out: with setProgress() occupying a row, the
         // shade drops the content-text line when collapsed, which is where the reset
@@ -178,7 +187,7 @@ object PinnedNotification {
         // Not gated on data any more: a condition is worth showing even before the first
         // successful fetch, which is exactly when a sign-in problem is most likely.
         val panel = drawPanel(
-            context, label, data, theme, dark, use24h, left, showOverPace,
+            context, label, data, theme, dark, use24h, left, resetClock, showOverPace,
             panelState.strips, panelState.overflow,
         )
 
@@ -531,6 +540,8 @@ object PinnedNotification {
         use24h: Boolean,
         /** CCRM-22 (Used or Left) — flips the row readouts; the bars draw the spend. */
         usageLeft: Boolean,
+        /** CCRM-23 (Reset Display) — which form leads the 7-day reset line. */
+        resetClock: Boolean,
         showOverPace: Boolean,
         conditions: List<Conditions.Condition>,
         overflow: Int = 0,
@@ -577,7 +588,12 @@ object PinnedNotification {
             add(
                 Bar(
                     "7-day", data.weekly,
-                    data.weekly?.resetsAt?.let { "Resets ${Fmt.dayTime(it, use24h)}" } ?: "",
+                    // CCRM-23 (Reset Display): both forms, chosen first. The panel
+                    // has the room, and a 7-day clock needs its weekday to be honest.
+                    data.weekly?.resetsAt?.let {
+                        if (resetClock) "Resets ${Fmt.dayTime(it, use24h)} · ${Fmt.relIn(it)}"
+                        else "Resets ${Fmt.relIn(it)} · ${Fmt.dayTime(it, use24h)}"
+                    } ?: "",
                 )
             )
             for (cap in data.modelCaps) add(Bar(cap.modelName, cap.window, ""))

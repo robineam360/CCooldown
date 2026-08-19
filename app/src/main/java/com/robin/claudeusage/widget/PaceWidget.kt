@@ -108,6 +108,7 @@ class PaceWidget : GlanceAppWidget() {
         val snapshot = cache.snapshot(profile)
         val use24h = cache.use24hTime()
         val usageLeft = cache.usageLeft()
+        val resetClock = cache.resetClock()
         val themeName = cache.themeColorName()
         val weekly = windowKey == "weekly"
         val window = snapshot.data?.let { if (weekly) it.weekly else it.session }
@@ -123,7 +124,7 @@ class PaceWidget : GlanceAppWidget() {
             GlanceTheme {
                 PaceFace(
                     profile, snapshot, window, windowKey, windowLengthMs, samples,
-                    use24h, usageLeft, themeName,
+                    use24h, usageLeft, resetClock, themeName,
                 )
             }
         }
@@ -140,6 +141,7 @@ private fun PaceFace(
     samples: List<Pair<Long, Double>>,
     use24h: Boolean,
     usageLeft: Boolean,
+    resetClock: Boolean,
     themeName: String,
 ) {
     val context = LocalContext.current
@@ -206,9 +208,14 @@ private fun PaceFace(
                 ),
                 modifier = GlanceModifier.defaultWeight(),
             )
+            // CCRM-23 (Reset Display), Option A: the chosen form takes the big
+            // slot, the other keeps the small one underneath.
+            val countdownText = widgetCountdown(window?.resetsAt)
+            val momentText = resetMoment(window?.resetsAt, use24h)
+            val clockLeads = resetClock && momentText.isNotEmpty()
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    widgetCountdown(window?.resetsAt),
+                    if (clockLeads) momentText else countdownText,
                     style = TextStyle(
                         color = GlanceTheme.colors.onSurface,
                         fontSize = 14.sp,
@@ -216,7 +223,7 @@ private fun PaceFace(
                     ),
                 )
                 Text(
-                    resetMoment(window?.resetsAt, use24h),
+                    if (clockLeads) countdownText else momentText,
                     style = TextStyle(
                         color = GlanceTheme.colors.onSurfaceVariant,
                         fontSize = 10.sp,

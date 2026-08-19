@@ -142,6 +142,8 @@ private fun App(startProfile: Profile) {
     // CCRM-22 (Used or Left): hoisted like use24h so flipping the chips in
     // Settings recomposes every readout behind them.
     var usageLeft by remember { mutableStateOf(cache.usageLeft()) }
+    // CCRM-23 (Reset Display): same hoisting for which reset form leads.
+    var resetClock by remember { mutableStateOf(cache.resetClock()) }
     // Hoisted like use24h so flipping the toggle in Settings recomposes the bars
     // behind it — CCRM-43 (Bar Pace Marks) gates the in-app red separately from the
     // widgets' and the notification's.
@@ -247,8 +249,8 @@ private fun App(startProfile: Profile) {
                 when (screen) {
                     Screen.MAIN ->
                         ProfileTabs(
-                            repo, use24h, usageLeft, paceOverInApp, tick, startProfile,
-                            Modifier.padding(innerPadding),
+                            repo, use24h, usageLeft, resetClock, paceOverInApp, tick,
+                            startProfile, Modifier.padding(innerPadding),
                         )
                     else -> ContentColumn(
                         modifier = Modifier.padding(innerPadding),
@@ -264,6 +266,8 @@ private fun App(startProfile: Profile) {
                                 onUse24h = { use24h = it },
                                 usageLeft = usageLeft,
                                 onUsageLeft = { usageLeft = it },
+                                resetClock = resetClock,
+                                onResetClock = { resetClock = it },
                                 paceOverInApp = paceOverInApp,
                                 onPaceOverInApp = { paceOverInApp = it },
                                 themeName = themeName,
@@ -300,6 +304,7 @@ private fun ProfileTabs(
     repo: UsageRepository,
     use24h: Boolean,
     usageLeft: Boolean,
+    resetClock: Boolean,
     showOverPace: Boolean,
     tick: Int,
     startProfile: Profile,
@@ -350,7 +355,7 @@ private fun ProfileTabs(
         ) { page ->
             ContentColumn(maxWidth = ChartColumnMaxWidth) {
                 Spacer(Modifier.height(16.dp))
-                ProfileScreen(repo, profiles[page], use24h, usageLeft, showOverPace, tick)
+                ProfileScreen(repo, profiles[page], use24h, usageLeft, resetClock, showOverPace, tick)
                 Spacer(Modifier.height(24.dp))
             }
         }
@@ -440,7 +445,7 @@ private fun UsageBarLine(
 }
 
 @Composable
-private fun ResetRow(window: UsageWindow?, use24h: Boolean) {
+private fun ResetRow(window: UsageWindow?, use24h: Boolean, resetClock: Boolean) {
     // A window with no reset time hasn't started yet (0% and idle).
     if (window?.resetsAt == null) {
         Text(
@@ -450,15 +455,19 @@ private fun ResetRow(window: UsageWindow?, use24h: Boolean) {
         )
         return
     }
+    // CCRM-23 (Reset Display), Option A: the chosen form leads, the other keeps
+    // the second slot — the token decides order here, never presence.
+    val countdown = "Resets ${Fmt.relIn(window.resetsAt)}"
+    val clock = "Resets at ${Fmt.dayTime(window.resetsAt, use24h)}"
     Row(modifier = Modifier.fillMaxWidth()) {
         Text(
-            "Resets ${Fmt.relIn(window.resetsAt)}",
+            if (resetClock) clock else countdown,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.weight(1f))
         Text(
-            "Resets at ${Fmt.dayTime(window.resetsAt, use24h)}",
+            if (resetClock) countdown else clock,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -475,6 +484,7 @@ private fun ProfileScreen(
     profile: Profile,
     use24h: Boolean,
     usageLeft: Boolean,
+    resetClock: Boolean,
     showOverPace: Boolean,
     tick: Int,
 ) {
@@ -539,7 +549,7 @@ private fun ProfileScreen(
                     )
                 }
                 Spacer(Modifier.height(8.dp))
-                ResetRow(data.session, use24h)
+                ResetRow(data.session, use24h, resetClock)
             }
         }
         Spacer(Modifier.height(12.dp))
@@ -566,7 +576,7 @@ private fun ProfileScreen(
                 Spacer(Modifier.height(2.dp))
                 HorizontalDivider()
                 Spacer(Modifier.height(8.dp))
-                ResetRow(data.weekly, use24h)
+                ResetRow(data.weekly, use24h, resetClock)
             }
         }
 

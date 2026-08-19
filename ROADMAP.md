@@ -539,7 +539,27 @@ keys) would still make this a different product. Not filed, not an open question
   mode, or a red bar will sit next to "8% left" and read as backwards.
 
 ### CCRM-23 · Reset Display — countdown or clock time, on every surface
-- **Status:** Planned · small · pairs with CCRM-22
+- **Status:** Done (2026-08-19) · wireframe approved same day, **Option A:
+  primary-first** (`design/display-tokens-wireframe.html`) · needs on-device
+  verification
+- **Shipped:** global `resetDisplay` token ("countdown" default / "clock") in
+  `UsageCache`, migrated by a read-time fallback from the old `tileSubtitle` key —
+  the tile keeps its behaviour and stops owning the preference. Option A rule from
+  review: **the chosen form leads; surfaces with a second slot keep the other form
+  there** (the countdown reads better, the clock can't go stale). Applied: in-app
+  `ResetRow` and widget `ResetSubText` swap slot order; the Ring face's
+  always-present line takes the chosen form with the other on the layout-gated
+  line; the Pace widget swaps its stacked pair; the collapsed notification and the
+  QS tile (single-slot) carry the chosen form only; the expanded notification
+  header and the panel's 7-day line show both, chosen first (the panel line gains
+  the countdown it never had — the one addition to a default rendering).
+  `Fmt.relIn` collapses to **"resets soon" inside five minutes** on every surface,
+  aligned with `widgetCountdown`. **Deliberately exempt:** the mini-rings face
+  keeps its countdown in both modes — its 9sp slot can't carry a day, and a bare
+  clock on a 7-day ring wouldn't say which day. Chips moved from the Quick
+  Settings tile section to Appearance → "Reset time". 3 cases in
+  `ResetDisplayTest` (201 total, 0 failures) pin the soon-collapse boundary.
+- **Was:** Planned · small · pairs with CCRM-22
 - **Why:** We already built this and scoped it to one surface — `tileSubtitle`, countdown
   vs clock, from CCRM-11. The reasoning there (the countdown reads better; the clock can't
   go stale) applies to the whole app, and the widgets and notification currently have no

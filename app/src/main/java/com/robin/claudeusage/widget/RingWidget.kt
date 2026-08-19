@@ -80,6 +80,7 @@ class RingWidget : GlanceAppWidget() {
         val snapshot = cache.snapshot(profile)
         val use24h = cache.use24hTime()
         val usageLeft = cache.usageLeft()
+        val resetClock = cache.resetClock()
         val themeName = cache.themeColorName()
         // Single-account users don't need to be told which account.
         val multiProfile = Profile.entries.count {
@@ -101,6 +102,7 @@ class RingWidget : GlanceAppWidget() {
                     windowLengthMs = windowLengthMs,
                     use24h = use24h,
                     usageLeft = usageLeft,
+                    resetClock = resetClock,
                     themeName = themeName,
                     showOverPace = showOverPace,
                 )
@@ -118,6 +120,7 @@ private fun RingFace(
     windowLengthMs: Long,
     use24h: Boolean,
     usageLeft: Boolean,
+    resetClock: Boolean,
     themeName: String,
     showOverPace: Boolean = true,
 ) {
@@ -184,14 +187,23 @@ private fun RingFace(
                     )
                 }
             }
+            // CCRM-23 (Reset Display), Option A: the chosen form takes the
+            // always-present line; the other keeps the layout-gated second line.
+            val momentText = resetMoment(window?.resetsAt, use24h)
+            val primaryText =
+                if (resetClock && momentText.isNotEmpty()) momentText
+                else widgetCountdown(window?.resetsAt)
+            val secondaryText =
+                if (resetClock && momentText.isNotEmpty()) widgetCountdown(window?.resetsAt)
+                else momentText
             val countdownLine: @Composable () -> Unit = {
                 Text(
                     // The "left ·" prefix disambiguates the flipped bore number
                     // (CCRM-22 rev B) — the one spare line this face has.
                     when {
                         percent == null -> "Waiting"
-                        usageLeft -> "left · ${widgetCountdown(window?.resetsAt)}"
-                        else -> widgetCountdown(window?.resetsAt)
+                        usageLeft -> "left · $primaryText"
+                        else -> primaryText
                     },
                     style = TextStyle(
                         color = GlanceTheme.colors.onSurfaceVariant,
@@ -201,9 +213,9 @@ private fun RingFace(
                 )
             }
             val momentLine: @Composable () -> Unit = {
-                if (percent != null) {
+                if (percent != null && secondaryText.isNotEmpty()) {
                     Text(
-                        resetMoment(window?.resetsAt, use24h),
+                        secondaryText,
                         style = TextStyle(
                             color = GlanceTheme.colors.onSurfaceVariant,
                             fontSize = 10.sp,

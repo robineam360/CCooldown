@@ -264,16 +264,25 @@ class UsageCache(context: Context) {
     }
 
     /**
-     * What the Quick Settings tile puts in its subtitle: "countdown" ("resets in
-     * 2h 14m", the default) or "clock" ("resets 4:12 PM"). The tile only recomputes
-     * when the shade opens, so the countdown drifts while the panel stays open —
-     * the clock reading never does.
+     * CCRM-23 (Reset Display): which reset form *leads* on every surface —
+     * "countdown" ("resets in 2h 14m", the default) or "clock" ("resets 4:12 PM").
+     * Grown from the tile-only `tileSubtitle` pref (CCRM-11), whose stored value is
+     * migrated by the read-time fallback below; the tile keeps the behaviour and
+     * stops owning the preference. Option A of the approved wireframe: surfaces
+     * with a second slot keep the other form there — the countdown reads better,
+     * the clock can't go stale, and the token only decides which one leads.
      */
-    fun tileSubtitle(): String = prefs.getString("tileSubtitle", "countdown") ?: "countdown"
+    fun resetDisplay(): String =
+        prefs.getString("resetDisplay", null)
+            ?: prefs.getString("tileSubtitle", "countdown")
+            ?: "countdown"
 
-    fun setTileSubtitle(mode: String) {
-        prefs.edit().putString("tileSubtitle", mode).apply()
+    fun setResetDisplay(mode: String) {
+        prefs.edit().putString("resetDisplay", mode).apply()
     }
+
+    /** The flag render sites actually branch on. */
+    fun resetClock(): Boolean = resetDisplay() == "clock"
 
     /**
      * How the pinned notification renders the 5-hour percentage (CCRM-3 phase 1):
