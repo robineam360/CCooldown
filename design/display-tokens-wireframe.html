@@ -1,0 +1,383 @@
+<title>Display Tokens — CCRM-22 / CCRM-23 / CCRM-29</title>
+<style>
+  :root {
+    --bg: #FAF8F6; --ink: #26211E; --muted: #6E6660; --accent: #C15F3C;
+    --hair: #E7E1DC; --card: #FFFFFF; --bad: #B3402A; --good: #2F6D44; --warn: #9A6B1E;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171513; --ink: #EDE8E4; --muted: #9B928B; --accent: #E59980;
+      --hair: #2C2825; --card: #201D1B; --bad: #E08268; --good: #7FC08F; --warn: #D8AC63;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171513; --ink: #EDE8E4; --muted: #9B928B; --accent: #E59980;
+    --hair: #2C2825; --card: #201D1B; --bad: #E08268; --good: #7FC08F; --warn: #D8AC63;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    margin: 0; padding: 48px 24px 96px; line-height: 1.5; }
+  .page { max-width: 1240px; margin: 0 auto; }
+  .eyebrow { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11px;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin: 0 0 10px; }
+  h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 8px; }
+  .lede { color: var(--muted); max-width: 68ch; margin: 0 0 12px; font-size: 14px; }
+  h2 { font-size: 19px; font-weight: 650; margin: 56px 0 4px; }
+  h3 { font-size: 15px; font-weight: 650; margin: 28px 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; max-width: 80ch; margin: 0 0 16px; }
+  code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px;
+    background: color-mix(in srgb, var(--hair) 55%, transparent); padding: 1px 5px; border-radius: 4px; }
+  .row { display: flex; flex-wrap: wrap; gap: 22px; align-items: flex-start; }
+  .cap { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 10px;
+    letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+  .cap.bad { color: var(--bad); } .cap.good { color: var(--good); } .cap.warn { color: var(--warn); }
+  .note { font-size: 12.5px; color: var(--muted); max-width: 360px; margin-top: 8px; }
+  .hr { height: 1px; background: var(--hair); margin: 46px 0 0; border: 0; }
+  table.rules { border-collapse: collapse; font-size: 13px; margin: 12px 0; }
+  table.rules th, table.rules td { border: 1px solid var(--hair); padding: 7px 12px; text-align: left; vertical-align: top; }
+  table.rules th { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .q { border-left: 3px solid var(--accent); padding: 8px 14px; margin: 18px 0;
+    background: color-mix(in srgb, var(--accent) 6%, transparent); font-size: 13.5px; max-width: 76ch; }
+  .q b { color: var(--accent); }
+
+  /* in-app card mock (340dp column) */
+  .appcard { width: 340px; border-radius: 16px; background: var(--card); border: 1px solid var(--hair);
+    padding: 14px 16px; font-size: 13.5px; }
+  .appcard .t { display: flex; justify-content: space-between; align-items: baseline; }
+  .appcard .t .name { font-weight: 600; }
+  .appcard .t .pct { font-weight: 700; font-size: 15px; }
+  .appcard .t .pct.warn { color: var(--warn); } .appcard .t .pct.bad { color: var(--bad); }
+  .abar { height: 10px; border-radius: 5px; background: color-mix(in srgb, var(--hair) 80%, transparent);
+    margin: 8px 0 6px; position: relative; overflow: hidden; }
+  .abar > i { position: absolute; inset: 0 auto 0 0; background: var(--accent); border-radius: 5px; }
+  .abar > i.warn { background: var(--warn); } .abar > i.bad { background: var(--bad); }
+  .abar > s { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--muted); }
+  .appcard .reset { font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; }
+
+  /* One UI-ish notification (Huge number style — the base per the house rule) */
+  .notif { width: 340px; border-radius: 22px; background: #232529; color: #E9E9EC;
+    padding: 14px 16px; border: 1px solid #33363C; font-size: 13.5px; }
+  .notif .hdr { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: #A6A9B0; margin-bottom: 8px; }
+  .notif .dotico { width: 14px; height: 14px; border-radius: 50%; border: 2.5px solid #E59980; display: inline-block; }
+  .notif .bigrow { display: flex; gap: 14px; align-items: center; }
+  .notif .bignum { font-size: 32px; font-weight: 700; line-height: 1; }
+  .notif .bignum small { display: block; font-size: 10px; font-weight: 500; color: #A6A9B0;
+    text-align: center; letter-spacing: .06em; text-transform: uppercase; margin-top: 2px; }
+  .notif .col { flex: 1; }
+  .notif .lbl { font-size: 12.5px; font-weight: 600; }
+  .notif .line { font-size: 12px; color: #A6A9B0; }
+  .nbar { height: 8px; border-radius: 4px; background: #3A3D44; margin: 5px 0 4px; position: relative; overflow: hidden; }
+  .nbar > i { position: absolute; inset: 0 auto 0 0; background: #E59980; border-radius: 4px; }
+  .nbar > s { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #9B9EA6; }
+
+  /* widget mock */
+  .widget { width: 300px; border-radius: 20px; background: color-mix(in srgb, var(--card) 92%, var(--accent) 2%);
+    border: 1px solid var(--hair); padding: 12px 14px; font-size: 12.5px; }
+  .widget .wh { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+  .widget .wh .wt { font-weight: 600; font-size: 12.5px; }
+  .widget .wh .wp { font-weight: 700; font-size: 14px; }
+  .widget .wsub { font-size: 11px; color: var(--muted); display: flex; justify-content: space-between; }
+
+  /* ring face mock */
+  .ringface { width: 130px; height: 130px; border-radius: 24px; background: color-mix(in srgb, var(--card) 92%, var(--accent) 2%);
+    border: 1px solid var(--hair); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+  .ring { width: 81px; height: 81px; border-radius: 50%;
+    background: conic-gradient(var(--accent) 0 47%, color-mix(in srgb, var(--hair) 85%, transparent) 47% 100%);
+    display: flex; align-items: center; justify-content: center; position: relative; }
+  .ring::after { content: ""; position: absolute; inset: 9px; border-radius: 50%; background: color-mix(in srgb, var(--card) 96%, var(--accent) 2%); }
+  .ring .rp { position: relative; z-index: 1; font-weight: 700; font-size: 17px; }
+  .ringface .rc { font-size: 10.5px; color: var(--muted); }
+
+  /* QS tile mock */
+  .tile { width: 190px; border-radius: 26px; background: #2A3140; color: #DCE2EE; padding: 12px 16px; font-size: 12px; }
+  .tile .tt { font-weight: 600; font-size: 12.5px; }
+  .tile .ts { color: #97A1B4; font-size: 11px; }
+
+  /* settings mock */
+  .settings { width: 360px; border-radius: 16px; background: var(--card); border: 1px solid var(--hair); padding: 4px 16px 14px; }
+  .settings .sec { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent);
+    margin: 12px 0 6px; font-weight: 600; }
+  .settings .srow { padding: 7px 0; border-bottom: 1px solid color-mix(in srgb, var(--hair) 60%, transparent); }
+  .settings .srow:last-child { border-bottom: 0; }
+  .settings .sl { font-size: 13.5px; font-weight: 550; }
+  .settings .ss { font-size: 11.5px; color: var(--muted); }
+  .chips { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+  .chip { border: 1px solid var(--hair); border-radius: 8px; padding: 3px 12px; font-size: 12px; color: var(--muted); }
+  .chip.on { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent);
+    border-color: color-mix(in srgb, var(--accent) 40%, transparent); font-weight: 600; }
+</style>
+
+<div class="page">
+  <p class="eyebrow">CCRM-22 · CCRM-23 · CCRM-29 — wireframe for approval</p>
+  <h1>Display tokens: Used/Left, reset display, theme &amp; time mode</h1>
+  <p class="lede">
+    Three global display preferences, all landing in <b>Settings → Appearance</b>, each read by
+    every surface from one token — no surface reimplements the choice. Defaults keep today's
+    rendering exactly: <b>Used</b>, <b>Countdown-led</b>, <b>System</b> theme, and time format
+    migrating from the existing 24-hour switch. Nothing moves for existing installs until they
+    touch a chip.
+  </p>
+
+  <h2>1 · CCRM-22 (Used or Left) — the rule <span style="font-size:12px;color:var(--accent)">rev B, decided 2026-08-19</span></h2>
+  <p class="sub">
+    One token: <code>usageDisplay = used | left</code>, default <b>used</b>. The governing rule
+    (rev B, per review): <b>every numeric readout flips — worded or bare;
+    fills, ticks and colours never do.</b>
+    Labels flip to "53% left"; bare numbers (ring bores, status-bar icon digits, the
+    number-tile plate) flip to the remaining figure; where a spare line exists the small word
+    "left" disambiguates. The ring's stroke still fills by used — the reviewer accepted that a
+    Left-mode bore states the remainder while the stroke shows the spend. Fills, pace ticks,
+    red segments and the 80/90/100 colour ladder <b>always</b> key on used percent (verified:
+    every <code>Palette.barColor</code> call site passes used%).
+    <i>Rev A's "bare gauges stay on used" was reviewed and rejected 2026-08-19.</i>
+  </p>
+  <table class="rules">
+    <tr><th>Surface</th><th>Used (default — today)</th><th>Left</th></tr>
+    <tr><td>Main cards (5-hour / 7-day / model caps)</td><td>47% used</td><td>53% left</td></tr>
+    <tr><td>Credits card</td><td>6% used</td><td>94% left</td></tr>
+    <tr><td>UsageWidget / BarWidget bar labels</td><td>47%</td><td>53% left</td></tr>
+    <tr><td>Pinned notification — Huge number</td><td>47 with % — word "used" hidden today</td><td>53 with % + "left" caption under the number</td></tr>
+    <tr><td>Pinned notification — title lines (progress style etc.)</td><td>47% · resets in 2h 14m</td><td>53% left · resets in 2h 14m</td></tr>
+    <tr><td>QS tile label</td><td>Personal 47%</td><td>Personal 53% left</td></tr>
+    <tr><td>Chart callout (tap/scrub)</td><td>47% · +6 vs pace</td><td>53% left · +6 vs pace</td></tr>
+    <tr><td>Pace-widget stat line</td><td>47%</td><td>53% left</td></tr>
+    <tr><td>Ring / mini-ring bores</td><td>47%</td><td>53% (+ small "left" where a spare line exists)</td></tr>
+    <tr><td>Status-bar icon digits, number-tile plate, gauge ring text</td><td>47</td><td>53 (Q1b: flip, decided 2026-08-19)</td></tr>
+    <tr><td>Chart threshold guides / now marker / projection labels</td><td>80% · 47% · ~100%</td><td><b>unchanged — they mark absolute chart positions</b></td></tr>
+  </table>
+  <p class="sub">
+    <b>Arithmetic, so the two modes never overstate:</b> used truncates (99.7 → 99, the
+    BEHAVIOR-SPEC rule); left is <code>floor(100 − exact)</code>, so 99.7% used reads
+    <b>0% left</b>, never 1% you don't have. The same never-flatter rule, pointed the other way.
+    Credits keep their rounding (6% used ↔ 94% left, from the rounded figure) — the deliberate
+    windows/credits disagreement from CCRM-3 (Unified Theming) is preserved, not multiplied.
+  </p>
+
+  <h3>Main card — both modes, plus the states nobody looks at</h3>
+  <div class="row">
+    <div>
+      <p class="cap">Used (default) · under pace</p>
+      <div class="appcard">
+        <div class="t"><span class="name">5-hour window</span><span class="pct">47% used</span></div>
+        <div class="abar"><i style="width:47%"></i><s style="left:52%"></s></div>
+        <div class="reset"><span>Resets in 2h 14m</span><span>Resets at 4:12 PM</span></div>
+      </div>
+    </div>
+    <div>
+      <p class="cap">Left · same window</p>
+      <div class="appcard">
+        <div class="t"><span class="name">5-hour window</span><span class="pct">53% left</span></div>
+        <div class="abar"><i style="width:47%"></i><s style="left:52%"></s></div>
+        <div class="reset"><span>Resets in 2h 14m</span><span>Resets at 4:12 PM</span></div>
+      </div>
+      <p class="note">The bar, the pace tick and the fill are identical in both modes —
+        only the label flips. The bar always draws what's spent.</p>
+    </div>
+    <div>
+      <p class="cap bad">Left · at the limit</p>
+      <div class="appcard">
+        <div class="t"><span class="name">5-hour window</span><span class="pct bad">0% left</span></div>
+        <div class="abar"><i class="bad" style="width:100%"></i></div>
+        <div class="reset"><span>Resets in 41m</span><span>Resets at 4:12 PM</span></div>
+      </div>
+      <p class="note">Red comes from used=100 — the colour never reads the display mode,
+        so "0% left" can't render green.</p>
+    </div>
+    <div>
+      <p class="cap">Left · no data</p>
+      <div class="appcard">
+        <div class="t"><span class="name">5-hour window</span><span class="pct" style="color:var(--muted)">—</span></div>
+        <div class="abar"></div>
+        <div class="reset"><span>Starts when a message is sent</span><span></span></div>
+      </div>
+      <p class="note">Null percent renders "—" in both modes; no word, since there's
+        no number to attach it to.</p>
+    </div>
+  </div>
+
+  <h3>Pinned notification — Huge number style (the base), both modes</h3>
+  <div class="row">
+    <div>
+      <p class="cap">Used (default) — exactly today</p>
+      <div class="notif">
+        <div class="hdr"><span class="dotico"></span> Claude Cooldown</div>
+        <div class="bigrow">
+          <div class="bignum">47<span style="font-size:16px">%</span></div>
+          <div class="col">
+            <div class="lbl">5-hour · Personal</div>
+            <div class="nbar"><i style="width:47%"></i><s style="left:52%"></s></div>
+            <div class="line">Resets in 2h 14m · 4:12 PM</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <p class="cap">Left — number flips, caption appears</p>
+      <div class="notif">
+        <div class="hdr"><span class="dotico"></span> Claude Cooldown</div>
+        <div class="bigrow">
+          <div class="bignum">53<span style="font-size:16px">%</span><small>left</small></div>
+          <div class="col">
+            <div class="lbl">5-hour · Personal</div>
+            <div class="nbar"><i style="width:47%"></i><s style="left:52%"></s></div>
+            <div class="line">Resets in 2h 14m · 4:12 PM</div>
+          </div>
+        </div>
+      </div>
+      <p class="note">A 10sp "LEFT" caption under the number carries the word the huge
+        digits can't. Bar unchanged — it still draws what's spent. Gauge and number-tile
+        styles keep used digits (bare gauges); the progress style's title line flips
+        ("53% left · resets in 2h 14m") since it has words.</p>
+    </div>
+  </div>
+
+  <h3>Widget, tile, ring — the boundary of the rule</h3>
+  <div class="row">
+    <div>
+      <p class="cap">BarWidget · Left</p>
+      <div class="widget">
+        <div class="wh"><span class="wt">5-hour · Personal</span><span class="wp">53% left</span></div>
+        <div class="abar" style="height:7px"><i style="width:47%"></i><s style="left:52%"></s></div>
+        <div class="wsub"><span>in 2h 14m</span><span>Thu 4:12 PM</span></div>
+      </div>
+    </div>
+    <div>
+      <p class="cap">QS tile · Left</p>
+      <div class="tile">
+        <div class="tt">Personal 53% left</div>
+        <div class="ts">resets in 2h 14m</div>
+      </div>
+      <p class="note">Tile label has room for the word; it flips.</p>
+    </div>
+    <div>
+      <p class="cap">Ring face · Left — bore flips (rev B)</p>
+      <div class="ringface">
+        <div class="ring"><span class="rp">53%</span></div>
+        <span class="rc">left · in 2h 14m</span>
+      </div>
+      <p class="note">The bore states the remainder; the stroke still draws the spend, and
+        the pace tick stays on the used geometry. The countdown line gains the "left ·"
+        prefix so the flipped number is never a bare guess. On the mini-rings face (no
+        spare line) the bore is a bare flipped number.</p>
+    </div>
+  </div>
+  <div class="q"><b>Q1 — resolved 2026-08-19: flip the bores too</b> (rev A's gauge
+    exemption rejected). <b>Q1b — resolved same day: flip everything.</b> Every numeric
+    readout follows the token, including the status-bar icon digits and the number-tile
+    plate; nothing is exempt. The gauge/icon <i>fill</i> and the ≥100% "!!" overflow glyph
+    still key on used.</div>
+
+  <hr class="hr">
+  <h2>2 · CCRM-23 (Reset Display) — countdown or clock, one token, every surface</h2>
+  <p class="sub">
+    One token: <code>resetDisplay = countdown | clock</code>, default <b>countdown</b> (today's
+    primary). The tile's <code>tileSubtitle</code> becomes a read of this token — the tile keeps
+    the behaviour, stops owning the preference. The decision this wireframe settles: several
+    surfaces show <b>both</b> forms today (main cards, widget sub-rows, ring faces, expanded
+    notification). Two options, mocked below.
+  </p>
+  <table class="rules">
+    <tr><th></th><th>Option A — primary-first, keep both where there's room</th><th>Option B — full swap: the chosen one, only</th></tr>
+    <tr><td>Main card reset row</td><td>Chosen form leads (left slot), other stays right</td><td>Only the chosen form renders</td></tr>
+    <tr><td>Widget sub-row</td><td>Chosen leads, other trails</td><td>Only the chosen form</td></tr>
+    <tr><td>Ring face (moment line)</td><td>Countdown in bore area, exact moment stays when layout shows it</td><td>Only the chosen form in the countdown slot</td></tr>
+    <tr><td>Tile / collapsed notification (one line)</td><td colspan="2" style="text-align:center">Chosen form only — identical in both options</td></tr>
+  </table>
+  <p class="sub">
+    <b>Recommendation: Option A.</b> The dual displays were deliberate (CCRM-11 (Tile Reset Time):
+    the countdown reads better, the clock can't go stale) — the token should decide which leads,
+    not delete the safety net where space already exists. Option B is more deletion but throws
+    away the stale-proof clock on every 15-minute-refresh surface.
+  </p>
+  <div class="row">
+    <div>
+      <p class="cap">Option A · clock chosen — clock leads, countdown trails</p>
+      <div class="appcard">
+        <div class="t"><span class="name">5-hour window</span><span class="pct">47% used</span></div>
+        <div class="abar"><i style="width:47%"></i><s style="left:52%"></s></div>
+        <div class="reset"><span>Resets at 4:12 PM</span><span>in 2h 14m</span></div>
+      </div>
+    </div>
+    <div>
+      <p class="cap">Option B · clock chosen — countdown gone</p>
+      <div class="appcard">
+        <div class="t"><span class="name">5-hour window</span><span class="pct">47% used</span></div>
+        <div class="abar"><i style="width:47%"></i><s style="left:52%"></s></div>
+        <div class="reset"><span>Resets at 4:12 PM</span><span></span></div>
+      </div>
+    </div>
+    <div>
+      <p class="cap warn">Both options · "soon" collapse</p>
+      <div class="tile">
+        <div class="tt">Personal 47%</div>
+        <div class="ts">resets soon</div>
+      </div>
+      <p class="note">Countdown collapses to "resets soon" under 5 minutes on every surface
+        (aligning <code>Fmt.relIn</code> with the ring faces' existing rule) — a widget on a
+        15-minute refresh has no business printing "resets in 43s".</p>
+    </div>
+  </div>
+  <div class="q"><b>Q2 — resolved 2026-08-19: Option A</b> (primary-first). The token decides
+    which form leads; the second slot keeps the other form wherever it exists today.
+    Single-line surfaces show the chosen form only; countdowns collapse to "resets soon"
+    under 5 minutes everywhere.</div>
+
+  <hr class="hr">
+  <h2>3 · CCRM-29 (Display Mode) — Settings → Appearance, all four controls together</h2>
+  <p class="sub">
+    Theme gains a three-way override (<code>themeMode = system | light | dark</code>, default
+    system); the 24-hour switch becomes a three-way (<code>timeFormat = system | 12 | 24</code>).
+    <b>Migration:</b> an install that ever touched the old boolean keeps its explicit choice
+    (mapped to 12/24); only fresh installs get System — nobody's clock flips on upgrade.
+    A forced theme drives everything the system flag drives today: the Material scheme, the
+    chart's per-mode wash/overshoot/fill opacities (0.07/0.10 · 0.18/0.20 · 0.30/0.34), and the
+    status-bar icon appearance (so CCBG-13 (Light Status Bar) stays correct when forced).
+    Widgets and the notification keep following the system — they render on surfaces whose
+    backdrop the in-app override doesn't own.
+  </p>
+  <div class="row">
+    <div>
+      <p class="cap">Settings → Appearance, after all three items</p>
+      <div class="settings">
+        <div class="sec">Appearance</div>
+        <div class="srow">
+          <div class="sl">Theme</div>
+          <div class="chips"><span class="chip on">System</span><span class="chip">Light</span><span class="chip">Dark</span></div>
+        </div>
+        <div class="srow">
+          <div class="sl">Time format</div>
+          <div class="ss">System follows the phone's clock setting</div>
+          <div class="chips"><span class="chip on">System</span><span class="chip">12-hour</span><span class="chip">24-hour</span></div>
+        </div>
+        <div class="srow">
+          <div class="sl">Usage display</div>
+          <div class="ss">How percentages read on every surface</div>
+          <div class="chips"><span class="chip on">Used</span><span class="chip">Left</span></div>
+        </div>
+        <div class="srow">
+          <div class="sl">Reset time</div>
+          <div class="ss">Which form leads wherever a reset is shown</div>
+          <div class="chips"><span class="chip on">Countdown</span><span class="chip">Clock time</span></div>
+        </div>
+        <div class="srow">
+          <div class="sl">Theme color</div>
+          <div class="chips"><span class="chip on">●</span><span class="chip">●</span><span class="chip">●</span><span class="chip">●</span></div>
+        </div>
+        <div class="srow">
+          <div class="sl">Show red past the pace mark</div>
+          <div class="ss">On widgets · In-app bars · Pinned notification (unchanged)</div>
+        </div>
+      </div>
+      <p class="note">The "24-hour time" ToggleRow is replaced by the Time format chips.
+        The Quick Settings tile section loses its Countdown/Clock chips — that preference
+        moved up here and the tile now just follows it (its section keeps only an
+        explanatory line).</p>
+    </div>
+  </div>
+  <div class="q"><b>Q3 — resolved 2026-08-19: approved as shown.</b> Section order and chip
+    labels as mocked; widgets + notification deliberately keep following the system theme.
+    <br><b>Batch approved 2026-08-19</b> — CCRM-22 rev B (every numeric readout flips),
+    CCRM-23 Option A (primary-first), CCRM-29 as mocked. Build order 22 → 23 → 29.
+    Wireframe kept until the on-device pass, then deleted per the design-folder rule.</div>
+</div>
