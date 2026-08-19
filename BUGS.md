@@ -130,7 +130,7 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
   path leaves the defect live in exactly those two cases.
 
 ### CCBG-11 · Ring Face Clutter — four stacked lines crowd the small ring's bore
-- **Status:** Fixed (2026-08-13) · needs on-device verification
+- **Status:** Fixed (2026-08-13) · verified on the Fold 7, 2026-08-19
 - **Severity:** Low (legibility, no wrong numbers)
 - **Symptom:** Observed on the Fold 7 outer screen, 2026-08-13, by the user: the
   CCRM-39 (Ring Widget) face reads as cluttered. Four lines stack inside the ring's
@@ -161,7 +161,7 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
   `WidgetFaceTest`. Wireframe rev B approved 2026-08-13.
 
 ### CCBG-10 · Mini-Rings Emptiness — two rings marooned in a mostly empty face
-- **Status:** Fixed (2026-08-13) · needs on-device verification
+- **Status:** Fixed (2026-08-13) · verified on the Fold 7, 2026-08-19
 - **Severity:** Low (wasted space, no wrong numbers)
 - **Symptom:** Observed on the Fold 7 outer screen, 2026-08-13, by the user: on an
   account with only two windows, the CCRM-40 (Mini-Rings Widget) face is mostly empty

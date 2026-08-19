@@ -13,7 +13,7 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
 ## Next — small, high value, ready to build
 
 ### CCRM-39 · Ring Widget — small face, one window as a pace-marked ring
-- **Status:** Done (2026-08-13) · needs on-device verification
+- **Status:** Done (2026-08-13) · verified on the Fold 7, 2026-08-19
 - **Provenance:** the Mac's CCRM-18 [Desktop] small face + CCM-49 [Desktop] pace marks,
   via `ANDROID-WIDGET-HANDOVER.md`; wireframe approved 2026-08-13 (rev 2 — the stale
   pill overlays the ring's bottom edge) in `design/widget-wireframes.html`.
@@ -35,7 +35,7 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
   process from the same APK, so snapshot-vs-binary skew can't happen here.
 
 ### CCRM-40 · Mini-Rings Widget — medium face, every window as battery-style rings
-- **Status:** Done (2026-08-13) · needs on-device verification
+- **Status:** Done (2026-08-13) · verified on the Fold 7, 2026-08-19
 - **Provenance/wireframe:** same record as CCRM-39 (Ring Widget).
 - **What:** 4×2 provider ("Mini-rings"), one profile, ignores the configured window.
   Header (profile · "Updated Xm ago" · ↻), then payload-ordered columns — session,
@@ -46,7 +46,7 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
 - **Where:** `widget/MiniRingsWidget.kt`, sharing `RingRenderer`/`WidgetFace`.
 
 ### CCRM-41 · Pace Widget — large face, the pace story with an on-face 5h/7d toggle
-- **Status:** Done (2026-08-13) · needs on-device verification
+- **Status:** Done (2026-08-13) · verified on the Fold 7, 2026-08-19
 - **Provenance/wireframe:** same record as CCRM-39 (Ring Widget). Supersedes
   CCRM-13 (Chart Widget), which stays as the historical sketch.
 - **What:** 4×3 provider ("Pace chart"). Header window title + a segmented 5h/7d
@@ -64,7 +64,7 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
   can't drift is shared. Recorded here so it isn't re-litigated.
 
 ### CCRM-42 · App Icon — the reset-ring identity
-- **Status:** Done (2026-08-13) · needs on-device verification
+- **Status:** Done (2026-08-13) · verified on the Fold 7, 2026-08-19
 - **Provenance:** the Mac's CCM-42 [Desktop] icon; `AppIcon.svg` is the master.
   Preview approved 2026-08-13 (`design/icon-preview.html`, deleted after sign-off per
   the design-folder rule).
@@ -95,10 +95,10 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
   - **Rings:** the ring and mini-rings faces showed the red arc *beginning on the tick
     with no fill-coloured nub past its tip* — the D7 cap fix, which was invisible before
     this change and is now seen correct.
-  - **Still owed:** light theme, the inner screen, and the three toggles flipped against
-    a live red (the crossing arrived after the device went offline). One thing to watch:
-    on the 8 dp collapsed notification bar the tick is the least legible of the
-    surfaces — present, but only just. Judge it under pace, where it is the only mark.
+  - **Owed items closed 2026-08-19:** the light theme, the inner screen, and the three
+    toggles flipped against a live red were all verified in the follow-up device pass.
+    One thing that stays worth watching: on the 8 dp collapsed notification bar the
+    tick is the least legible of the surfaces — present, but only just.
 - **Provenance/wireframe:** the Mac's CCM-50 [Panel] bars + CCM-51 [Pace] toggle, via
   `ANDROID-PACE-BARS-HANDOVER.md` (which lives outside this repo — copy it in if this
   line should cite something durable). Wireframe rev B approved 2026-08-13 in
@@ -376,8 +376,8 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
   copy-the-desktop-sign-in path (README §"If the phone can't complete the sign-in").
 
 ### CCRM-4 · Widget Quick-Edit — reconfigure a placed widget by long-press
-- **Status:** Built (2026-08-12) · wireframe approved same day · **on-device
-  verification outstanding** · was the prerequisite for CCRM-3 phase 2, now cleared
+- **Status:** Done (2026-08-12) · wireframe approved same day · verified on the
+  Fold 7, 2026-08-19 · was the prerequisite for CCRM-3 phase 2, now cleared
 - **Shipped:**
   - `android:widgetFeatures="reconfigurable"` in both `usage_widget_info.xml` and
     `bar_widget_info.xml` — minSdk 31, so no version gating.
@@ -400,10 +400,10 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
     dead one's settings. Both receivers now clean up.
   - The brittle `className?.endsWith("BarWidgetReceiver")` provider check became a
     `ComponentName` comparison.
-- **Not device-verified yet** (97 unit tests green, but nothing here is unit-testable —
-  it's all launcher interaction): the long-press reconfigure entry point appearing, the
-  pre-fill, save/re-render, cancel harmlessness, "Use my defaults", and the
-  delete-then-recycle id case. Run the checklist on the Fold 7 when next connected.
+- **Device-verified 2026-08-19** (nothing here was unit-testable — it's all launcher
+  interaction): the long-press reconfigure entry point appearing, the pre-fill,
+  save/re-render, cancel harmlessness, "Use my defaults", and the
+  delete-then-recycle id case, all confirmed on the Fold 7.
 - **Moved up from *Later* on 2026-07-30.** CCRM-3 phase 2 gives each widget a layout, a
   background and an accent. A cosmetic setting you can only change by deleting the widget
   and adding it again is worse than not shipping it, so this now leads that work rather
@@ -740,15 +740,35 @@ keys) would still make this a different product. Not filed, not an open question
 
 ## Needs design — decide the shape before building
 
+### CCRM-6 · Multi-Account — more than two accounts
+- **Status:** Needs design · **scheduled next after the current small-items batch**
+  (decided 2026-08-19). Moved up from *Later*: the user needs a **third Claude
+  account** tracked, so this is now the first item after the batch of CCBG-13
+  (Light Status Bar), CCRM-22 (Used or Left), CCRM-23 (Reset Display), CCRM-29
+  (Display Mode), CCRM-27 (Error Taxonomy), CCRM-30 (Estimate Honesty), CCRM-34
+  (Diagnostics Log) and CCRM-33 (App Shortcuts).
+- **Why:** `Profile` is a hard-coded `PERSONAL`/`WORK` enum ([Profile.kt](app/src/main/java/com/robin/claudeusage/data/Profile.kt)),
+  wired through credentials, cache keys, notification IDs, widgets and alerts. Users
+  with 3+ accounts (multiple work orgs, side projects) can't be served — and the
+  concrete driver is now real, not hypothetical.
+- **Approach:** Move from a fixed enum to a dynamic profile registry (stable
+  string keys + user labels). Touches `CredentialStore`, `UsageCache`, `HistoryStore`,
+  the `+100` notification-ID scheme, widget config, and every `Profile.entries` loop.
+  Non-trivial — scope it as its own milestone, ideally before CCRM-7 so iOS inherits
+  the flexible model instead of the 2-slot one. The design question to settle first:
+  a proper registry (preferred here and by CCBG-1 (History Retention)'s note on
+  history ownership) versus a cheap third enum slot — the registry costs more now but
+  is the version that doesn't get rebuilt when account four arrives.
+
 ### CCRM-44 · One Surface — every alert folds into the pinned notification
-- **Status:** **Built (2026-08-18), partially verified on the Fold 7 the same day**
-  (release-signed build, Huge number style — the user's own): with the panel switched
-  to Teams (live re-auth state), the collapsed row showed "● Sign-in stopped working"
-  in place of the reset line and the expanded panel stacked all three condition strips
-  (re-auth red, stale red, expiry accent) above the 7-day bar, with **zero** standalone
-  notifications from the app. Still unobserved: event strips (threshold / pace / reset
-  need a live crossing), the "+ n more" overflow line, and the update strip (needs a
-  release ahead of the installed version). Ships in the next release.
+- **Status:** **Done — built 2026-08-18, verified on the Fold 7 (pass completed
+  2026-08-19)** (release-signed build, Huge number style — the user's own): with the
+  panel switched to Teams (live re-auth state), the collapsed row showed "● Sign-in
+  stopped working" in place of the reset line and the expanded panel stacked all three
+  condition strips (re-auth red, stale red, expiry accent) above the 7-day bar, with
+  **zero** standalone notifications from the app. The states still unobserved on
+  2026-08-18 — event strips, the "+ n more" overflow line, and the update strip — were
+  confirmed in the 2026-08-19 pass. Ships in the next release.
 - **Revised same day, on device feedback:** the approved "other profile posts
   standalone" rule survived first contact for about an hour — the Teams re-auth
   posting beside a Pro panel was exactly the clutter the feature exists to remove.
@@ -1314,17 +1334,6 @@ keys) would still make this a different product. Not filed, not an open question
   Work (`+100`); extend the pinned notification to run one instance per enabled
   profile, each with its own channel/icon/style so they're distinguishable in the
   status bar. Add per-profile "pin this" toggles in settings.
-
-### CCRM-6 · Multi-Account — more than two accounts
-- **Status:** Needs design
-- **Why:** `Profile` is a hard-coded `PERSONAL`/`WORK` enum ([Profile.kt](app/src/main/java/com/robin/claudeusage/data/Profile.kt)),
-  wired through credentials, cache keys, notification IDs, widgets and alerts. Users
-  with 3+ accounts (multiple work orgs, side projects) can't be served.
-- **Approach:** Move from a fixed enum to a dynamic profile registry (stable
-  string keys + user labels). Touches `CredentialStore`, `UsageCache`, `HistoryStore`,
-  the `+100` notification-ID scheme, widget config, and every `Profile.entries` loop.
-  Non-trivial — scope it as its own milestone, ideally before CCRM-7 so iOS inherits
-  the flexible model instead of the 2-slot one.
 
 ### CCRM-24 · Share Card — share a usage snapshot as an image
 - **Status:** Planned · medium · **gated on the Canvas-to-bitmap extraction**
