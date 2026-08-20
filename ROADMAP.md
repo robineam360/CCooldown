@@ -726,7 +726,22 @@ keys) would still make this a different product. Not filed, not an open question
   refactoring the error path.
 
 ### CCRM-30 · Estimate Honesty — mark inferred numbers as inferred
-- **Status:** Planned · small
+- **Status:** Done (2026-08-19) · wireframe `design/error-and-estimates-wireframe.html`,
+  built under the same-day "finish this" blanket instruction · needs on-device
+  verification
+- **Shipped:** `ui/Estimates.kt` — `EstimateLine` (muted trailing ⓘ; tapping the
+  line toggles a one-sentence `ProvenanceNote` beneath) applied to the three
+  inferred figures: the pace/projection sentence in `TrendBlock` ("a least-squares
+  fit anchored on the latest reading — it shifts as new polls land"), the ~30-day
+  sign-in expiry line ("Anthropic doesn't report the real expiry…"), and the
+  credits percentage — whose note says it is *finer* than the server's rounded
+  figure, not a hedge, exactly as this entry asked. `SignInExpiry.Line.Exact`
+  stays plain: marking a measurement would hedge it. Chart canvas labels
+  unchanged (the "~" already carries them); widgets and the notification get
+  nothing (too tight). **One substitution from the wireframe sketch, recorded
+  there:** Compose text has no dotted underline and a solid one reads as a link,
+  so the marker is the ⓘ glyph — same tap interaction.
+- **Was:** Planned · small
 - **Why:** Every metric in OpenQuota carries an `estimated` flag and an optional
   `sourceNote`, and the UI renders both — so a number the app *inferred* never wears the
   same confidence as a number the server *reported*. We currently render several inferences

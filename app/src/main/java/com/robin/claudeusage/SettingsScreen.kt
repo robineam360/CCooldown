@@ -10,6 +10,7 @@ import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import com.robin.claudeusage.ui.EstimateLine
 import com.robin.claudeusage.ui.appDark
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -1117,9 +1118,15 @@ private fun TokenCard(
                             color = MaterialTheme.colorScheme.error,
                         )
                     }
-                    is SignInExpiry.Line.Estimated -> Text(
-                        "Sign-in expires around ${Fmt.dateTime(expiry.expiresAt, use24h)} · ~${Fmt.dhm(expiry.expiresAt)} left",
-                        style = MaterialTheme.typography.bodySmall,
+                    // CCRM-30 (Estimate Honesty): the ~30-day figure is inferred and
+                    // has never been observed, so it carries the marker; the Exact
+                    // line below is server-reported and stays plain — marking a
+                    // measurement would hedge it.
+                    is SignInExpiry.Line.Estimated -> EstimateLine(
+                        text = "Sign-in expires around ${Fmt.dateTime(expiry.expiresAt, use24h)} · ~${Fmt.dhm(expiry.expiresAt)} left",
+                        provenance = "Anthropic doesn't report the real expiry — this is " +
+                            "a flat ~30-day estimate from sign-in, corrected if renewal " +
+                            "stops working earlier.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     is SignInExpiry.Line.Exact -> Text(

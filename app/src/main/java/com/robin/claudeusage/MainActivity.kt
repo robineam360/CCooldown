@@ -11,6 +11,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -71,8 +72,12 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
@@ -88,6 +93,8 @@ import com.robin.claudeusage.ui.BarGeometry
 import com.robin.claudeusage.ui.ChartColumnMaxWidth
 import com.robin.claudeusage.ui.ContentColumn
 import com.robin.claudeusage.ui.ContentMaxWidth
+import com.robin.claudeusage.ui.EstimateLine
+import com.robin.claudeusage.ui.ProvenanceNote
 import com.robin.claudeusage.ui.Fmt
 import com.robin.claudeusage.ui.LocalWidthClass
 import com.robin.claudeusage.ui.LocalWindowHeight
@@ -634,6 +641,7 @@ private fun ProfileScreen(
             Spacer(Modifier.height(12.dp))
             Card {
                 Column(Modifier.padding(16.dp)) {
+                    var creditsProv by remember { mutableStateOf(false) }
                     // Same shape as the 5-hour card: name on the left, the headline
                     // percentage on the right, bar underneath. With no cap there is no
                     // percentage and no bar — just what has been spent.
@@ -653,15 +661,27 @@ private fun ProfileScreen(
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f),
                         )
+                        // CCRM-30 (Estimate Honesty): the percentage is computed
+                        // locally, so it carries the marker — with a note that says
+                        // it's *finer* than the server's figure, not a hedge.
                         Text(
                             // The rounded display percent, not the exact one — credits
                             // round where windows truncate (CCRM-3, deliberate).
-                            if (pct != null) {
-                                Fmt.usageWorded(credits.percentDisplay?.toDouble(), usageLeft)
-                            } else "No cap",
+                            if (pct != null) buildAnnotatedString {
+                                append(Fmt.usageWorded(credits.percentDisplay?.toDouble(), usageLeft))
+                                withStyle(
+                                    SpanStyle(
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            .copy(alpha = 0.7f),
+                                    )
+                                ) { append(" ⓘ") }
+                            } else AnnotatedString("No cap"),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.clickable(enabled = pct != null) {
+                                creditsProv = !creditsProv
+                            },
                         )
                     }
                     if (pct != null) {
@@ -670,6 +690,13 @@ private fun ProfileScreen(
                         // has no clock. Spending them faster than the month isn't a
                         // thing to be behind or ahead of.
                         UsageBarLine(pct, barFill(pct))
+                    }
+                    if (creditsProv) {
+                        Spacer(Modifier.height(6.dp))
+                        ProvenanceNote(
+                            "Computed from the exact amounts — finer than the " +
+                                "server's rounded figure, not an estimate.",
+                        )
                     }
                     Spacer(Modifier.height(8.dp))
                     Text(
@@ -884,13 +911,16 @@ private fun TrendBlock(
         Spacer(Modifier.height(2.dp))
         val hits = est.hitsLimitAtMs
         val rate = " · ${String.format(Locale.US, "%.1f", est.ratePctPerHour)}%/h"
-        Text(
-            (if (hits != null)
+        // CCRM-30 (Estimate Honesty): the projection is inferred, so it carries
+        // the marker and a tap-to-reveal provenance line.
+        EstimateLine(
+            text = (if (hits != null)
                 "At this pace: 100% at ${Fmt.dayTime(Instant.ofEpochMilli(hits), use24h)} — " +
                     "${Fmt.span(resetMs - hits)} before the reset"
             else
                 "At this pace: ~${est.pctAtReset.toInt()}% when the window resets") + rate,
-            style = MaterialTheme.typography.bodySmall,
+            provenance = "Projected from this window's samples — a least-squares fit " +
+                "anchored on the latest reading. It shifts as new polls land.",
             color = if (hits != null) MaterialTheme.colorScheme.error
             else MaterialTheme.colorScheme.onSurfaceVariant,
         )
