@@ -53,10 +53,14 @@ internal fun FacePill(text: String, fontSize: androidx.compose.ui.unit.TextUnit 
     )
 }
 
-/** The pill's text for [FaceState.STALE] / [FaceState.FETCH_ERROR]. */
+/**
+ * The pill's text for [FaceState.STALE] / [FaceState.FETCH_ERROR]. The error case
+ * shows CCRM-27 (Error Taxonomy)'s short label rather than the raw status — the
+ * remediation and detail live in-app.
+ */
 internal fun pillText(state: FaceState, snapshot: Snapshot): String? = when (state) {
     FaceState.STALE -> "⚠ Updated ${Fmt.ago(snapshot.fetchedAt)}"
-    FaceState.FETCH_ERROR -> "⚠ ${snapshot.lastStatus}"
+    FaceState.FETCH_ERROR -> "⚠ ${com.robin.claudeusage.data.ErrorKind.fromKey(snapshot.lastStatusKind).short}"
     else -> null
 }
 

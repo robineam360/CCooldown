@@ -688,7 +688,25 @@ keys) would still make this a different product. Not filed, not an open question
   silently swapping an APK is not something this app should do. Notify and link the release.
 
 ### CCRM-27 · Error Taxonomy — typed failures, each with the fix rather than the symptom
-- **Status:** Planned · small-to-medium
+- **Status:** Done (2026-08-19) · wireframe `design/error-and-estimates-wireframe.html`,
+  built under the same-day "finish this" blanket instruction (recommended options
+  taken; judge at the on-device pass) · needs on-device verification
+- **Shipped:** `data/ErrorKind.kt` — six kinds (auth · rateLimited · network ·
+  server · invalidResponse · internal), each carrying a remediation-phrased title,
+  a widget-length short label, and a severity (only auth/internal render red).
+  Produced in `doFetch`/`authFailure` and persisted as `lastStatusKind` beside
+  `lastStatus` (`Snapshot` gains the field; pre-upgrade statuses are mapped once by
+  `ErrorKind.fromStatus`, pinned string-by-string in `ErrorKindTest`). The main
+  screen's bare red "Status:" line became `ErrorNotice` — a tinted row with the
+  fix-naming title, the raw status as a small monospace evidence line (rate-limited
+  appends the real next-try time from `backoffUntil`), and one action per kind:
+  Open Settings (auth), Check Anthropic status (network/server — CCRM-26
+  (Quick Links) kept, now scoped), Check for updates (invalidResponse). Widget
+  captions (`FooterRow`, `FaceBits.pillText`) and the CCRM-44 (One Surface) stale
+  strip show the short label instead of the raw string. **Kept, per the entry's own
+  warning:** the last-good snapshot still renders beside the error — `saveFailure`
+  never touches `rawJson`. 207 tests, 0 failures.
+- **Was:** Planned · small-to-medium
 - **Why:** We keep the failure as a bare string and print it: `Status: ${snapshot.lastStatus}`
   ([MainActivity.kt:541](app/src/main/java/com/robin/claudeusage/MainActivity.kt#L541)).
   That's an HTTP code or an exception name in front of someone who wants to know what to do

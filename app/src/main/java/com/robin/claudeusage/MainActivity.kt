@@ -71,12 +71,14 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.glance.appwidget.updateAll
 import android.text.format.DateFormat
+import com.robin.claudeusage.data.ErrorKind
 import com.robin.claudeusage.data.Profile
 import com.robin.claudeusage.ping.PingScheduler
 import com.robin.claudeusage.data.Projection
@@ -277,7 +279,8 @@ private fun App(startProfile: Profile) {
                     Screen.MAIN ->
                         ProfileTabs(
                             repo, use24h, usageLeft, resetClock, paceOverInApp, tick,
-                            startProfile, Modifier.padding(innerPadding),
+                            startProfile, { screen = Screen.SETTINGS },
+                            Modifier.padding(innerPadding),
                         )
                     else -> ContentColumn(
                         modifier = Modifier.padding(innerPadding),
@@ -339,6 +342,7 @@ private fun ProfileTabs(
     showOverPace: Boolean,
     tick: Int,
     startProfile: Profile,
+    onOpenSettings: () -> Unit,
     modifier: Modifier,
 ) {
     val profiles = Profile.entries
@@ -386,7 +390,10 @@ private fun ProfileTabs(
         ) { page ->
             ContentColumn(maxWidth = ChartColumnMaxWidth) {
                 Spacer(Modifier.height(16.dp))
-                ProfileScreen(repo, profiles[page], use24h, usageLeft, resetClock, showOverPace, tick)
+                ProfileScreen(
+                    repo, profiles[page], use24h, usageLeft, resetClock, showOverPace,
+                    tick, onOpenSettings,
+                )
                 Spacer(Modifier.height(24.dp))
             }
         }
@@ -518,6 +525,7 @@ private fun ProfileScreen(
     resetClock: Boolean,
     showOverPace: Boolean,
     tick: Int,
+    onOpenSettings: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     var refreshing by remember { mutableStateOf(false) }
@@ -729,17 +737,70 @@ private fun ProfileScreen(
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     if (snapshot.lastStatus != "OK") {
-        Text(
-            "Status: ${snapshot.lastStatus}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.error,
+        Spacer(Modifier.height(6.dp))
+        ErrorNotice(
+            snapshot = snapshot,
+            backoffUntil = repo.cacheSettings().backoffUntil(profile),
+            use24h = use24h,
+            onOpenSettings = onOpenSettings,
         )
-        // CCRM-26 (Quick Links): the "is it me or is it them" escape, shown under
-        // the same gate as the red line — including the no-data-yet state, where
-        // it matters most.
-        val context = LocalContext.current
-        TextButton(onClick = { openInBrowser(context, ANTHROPIC_STATUS_URL, null) }) {
-            Text("Check Anthropic status")
+    }
+}
+
+/**
+ * CCRM-27 (Error Taxonomy): the typed failure as a tinted notice row — copy that
+ * names the fix up top, the raw status as the small evidence line, and the one
+ * action that actually helps for this kind. Renders *beside* the retained
+ * last-good cards above, never in place of them.
+ */
+@Composable
+private fun ErrorNotice(
+    snapshot: com.robin.claudeusage.data.Snapshot,
+    backoffUntil: Long,
+    use24h: Boolean,
+    onOpenSettings: () -> Unit,
+) {
+    val kind = ErrorKind.fromKey(snapshot.lastStatusKind)
+    val context = LocalContext.current
+    val tint = if (kind.severe) MaterialTheme.colorScheme.error else barFill(95.0)
+    val detail = buildString {
+        append(snapshot.lastStatus)
+        // The retry moment comes from the backoff clock the app already keeps —
+        // printed, not invented (CCRM-26 (Quick Links)'s honesty rule).
+        if (kind == ErrorKind.RATE_LIMITED && backoffUntil > System.currentTimeMillis()) {
+            append(" · next try ~${Fmt.timeOnly(Instant.ofEpochMilli(backoffUntil), use24h)}")
+        }
+    }
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = tint.copy(alpha = 0.11f),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+            Text(
+                kind.title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = tint,
+            )
+            Text(
+                detail,
+                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                color = tint.copy(alpha = 0.8f),
+            )
+            when (kind) {
+                // CCRM-26 (Quick Links): the "is it me or is it them" escape stays,
+                // now scoped to the kinds where it answers the question.
+                ErrorKind.NETWORK, ErrorKind.SERVER ->
+                    TextButton(onClick = { openInBrowser(context, ANTHROPIC_STATUS_URL, null) }) {
+                        Text("Check Anthropic status")
+                    }
+                ErrorKind.AUTH ->
+                    TextButton(onClick = onOpenSettings) { Text("Open Settings") }
+                ErrorKind.INVALID_RESPONSE ->
+                    TextButton(onClick = onOpenSettings) { Text("Check for updates") }
+                else -> {}
+            }
         }
     }
 }

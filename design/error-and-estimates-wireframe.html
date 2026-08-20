@@ -1,0 +1,210 @@
+<title>Errors &amp; Estimates — CCRM-27 / CCRM-30</title>
+<style>
+  :root {
+    --bg: #FAF8F6; --ink: #26211E; --muted: #6E6660; --accent: #C15F3C;
+    --hair: #E7E1DC; --card: #FFFFFF; --bad: #B3402A; --good: #2F6D44; --warn: #9A6B1E;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171513; --ink: #EDE8E4; --muted: #9B928B; --accent: #E59980;
+      --hair: #2C2825; --card: #201D1B; --bad: #E08268; --good: #7FC08F; --warn: #D8AC63;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171513; --ink: #EDE8E4; --muted: #9B928B; --accent: #E59980;
+    --hair: #2C2825; --card: #201D1B; --bad: #E08268; --good: #7FC08F; --warn: #D8AC63;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    margin: 0; padding: 48px 24px 96px; line-height: 1.5; }
+  .page { max-width: 1240px; margin: 0 auto; }
+  .eyebrow { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11px;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin: 0 0 10px; }
+  h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 8px; }
+  .lede { color: var(--muted); max-width: 68ch; margin: 0 0 12px; font-size: 14px; }
+  h2 { font-size: 19px; font-weight: 650; margin: 56px 0 4px; }
+  h3 { font-size: 15px; font-weight: 650; margin: 28px 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; max-width: 80ch; margin: 0 0 16px; }
+  code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px;
+    background: color-mix(in srgb, var(--hair) 55%, transparent); padding: 1px 5px; border-radius: 4px; }
+  .row { display: flex; flex-wrap: wrap; gap: 22px; align-items: flex-start; }
+  .cap { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 10px;
+    letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+  .cap.bad { color: var(--bad); } .cap.warn { color: var(--warn); }
+  .note { font-size: 12.5px; color: var(--muted); max-width: 360px; margin-top: 8px; }
+  .hr { height: 1px; background: var(--hair); margin: 46px 0 0; border: 0; }
+  table.rules { border-collapse: collapse; font-size: 13px; margin: 12px 0; }
+  table.rules th, table.rules td { border: 1px solid var(--hair); padding: 7px 12px; text-align: left; vertical-align: top; }
+  table.rules th { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .q { border-left: 3px solid var(--accent); padding: 8px 14px; margin: 18px 0;
+    background: color-mix(in srgb, var(--accent) 6%, transparent); font-size: 13.5px; max-width: 76ch; }
+  .q b { color: var(--accent); }
+
+  .screen { width: 360px; border-radius: 16px; background: var(--card); border: 1px solid var(--hair);
+    padding: 14px 16px; font-size: 13px; }
+  .meta { font-size: 12px; color: var(--muted); }
+  .notice { border-radius: 12px; padding: 10px 12px; margin-top: 8px; font-size: 13px; }
+  .notice .nt { font-weight: 600; }
+  .notice .nd { font-size: 11.5px; opacity: .8; margin-top: 2px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  .notice .nb { display: inline-block; margin-top: 6px; font-size: 12.5px; font-weight: 600; color: var(--accent); }
+  .notice.warn { background: color-mix(in srgb, var(--warn) 11%, transparent); color: var(--warn); }
+  .notice.bad { background: color-mix(in srgb, var(--bad) 11%, transparent); color: var(--bad); }
+  .appcard { border-radius: 12px; border: 1px solid var(--hair); padding: 10px 12px; margin-bottom: 8px; }
+  .appcard .t { display: flex; justify-content: space-between; font-size: 13px; }
+  .abar { height: 9px; border-radius: 5px; background: color-mix(in srgb, var(--hair) 80%, transparent);
+    margin: 7px 0 2px; position: relative; overflow: hidden; }
+  .abar > i { position: absolute; inset: 0 auto 0 0; background: var(--accent); border-radius: 5px; }
+  .est { border-bottom: 1px dotted var(--muted); }
+  .prov { font-size: 11.5px; color: var(--muted); background: color-mix(in srgb, var(--hair) 45%, transparent);
+    border-radius: 8px; padding: 6px 9px; margin-top: 4px; }
+  .widget { width: 300px; border-radius: 20px; background: color-mix(in srgb, var(--card) 92%, var(--accent) 2%);
+    border: 1px solid var(--hair); padding: 12px 14px; font-size: 12.5px; }
+</style>
+
+<div class="page">
+  <p class="eyebrow">CCRM-27 · CCRM-30 — wireframe for approval</p>
+  <h1>Typed errors, honest estimates</h1>
+  <p class="lede">
+    Two changes to how the app talks about what it doesn't know. CCRM-27 (Error Taxonomy):
+    the bare <code>Status: HTTP 529</code> line becomes a tinted notice row whose copy
+    <b>names the fix</b>, driven by a typed error kind stored beside the status string.
+    CCRM-30 (Estimate Honesty): every inferred number carries a subtle marker and a
+    tap-to-reveal provenance line, so an inference never wears a measurement's confidence.
+    The retained last-good snapshot keeps rendering beside the error in both — that
+    behaviour is load-bearing and untouched.
+  </p>
+
+  <h2>1 · CCRM-27 — the kind table (one mapping, every surface reads it)</h2>
+  <table class="rules">
+    <tr><th>Kind</th><th>Produced by</th><th>Notice title (names the fix)</th><th>Tone</th><th>Extra</th></tr>
+    <tr><td><code>auth</code></td><td>401 on usage; refresh 400–403; stuck-refresh escalation</td><td>Sign-in stopped working — re-sign in from Settings.</td><td>red</td><td>"Open Settings" button</td></tr>
+    <tr><td><code>rateLimited</code></td><td>HTTP 429</td><td>Rate limited — backing off, retries on its own.</td><td>amber</td><td>next-retry time from the existing backoff clock</td></tr>
+    <tr><td><code>network</code></td><td>IOException</td><td>Couldn't reach Anthropic — check your connection, or see if it's them.</td><td>amber</td><td>"Check Anthropic status" button (CCRM-26 (Quick Links), kept)</td></tr>
+    <tr><td><code>server</code></td><td>any other non-200</td><td>Anthropic's server errored — usually theirs, usually brief.</td><td>amber</td><td>status button + raw "HTTP 529" as the small detail line</td></tr>
+    <tr><td><code>invalidResponse</code></td><td>200 with an unrecognised shape</td><td>The server answered in a shape this app doesn't know — an app update may be needed.</td><td>amber</td><td>"Check for updates" points at the CCRM-28 (Auto Update Check) section</td></tr>
+    <tr><td><code>internal</code></td><td>anything else thrown</td><td>Something unexpected went wrong in the app.</td><td>red</td><td>raw detail line, for a bug report</td></tr>
+  </table>
+  <p class="sub">
+    The kind is produced in <code>doFetch()</code>/<code>authFailure()</code> and persisted
+    beside <code>lastStatus</code> (<code>lastStatusKind</code>), so widgets and the
+    notification's stale strip can read it after process death. The raw status string
+    survives as the notice's small monospace detail — remediation up top, evidence below.
+    The <code>lastStatus != "OK"</code> gate is unchanged.
+  </p>
+
+  <h3>Main screen — the notice row replaces the red status line</h3>
+  <div class="row">
+    <div>
+      <p class="cap warn">network · with retained last-good data</p>
+      <div class="screen">
+        <div class="appcard">
+          <div class="t"><span>5-hour window</span><b>47% used</b></div>
+          <div class="abar"><i style="width:47%"></i></div>
+          <div class="meta">Resets in 2h 14m</div>
+        </div>
+        <div class="meta">Last success: Thu 7:46 PM (32m ago)</div>
+        <div class="meta">Last attempt: Thu 8:14 PM (4m ago)</div>
+        <div class="notice warn">
+          <div class="nt">Couldn't reach Anthropic — check your connection, or see if it's them.</div>
+          <div class="nd">Network: Unable to resolve host</div>
+          <span class="nb">Check Anthropic status</span>
+        </div>
+      </div>
+      <p class="note">The cards above keep rendering the last-good numbers — the error
+        sits beside the data, never in place of it (unchanged behaviour, now typed).</p>
+    </div>
+    <div>
+      <p class="cap bad">auth · the red case</p>
+      <div class="screen">
+        <div class="meta">Last success: Thu 7:46 PM (6h ago)</div>
+        <div class="meta">Last attempt: Thu 8:14 PM (4m ago)</div>
+        <div class="notice bad">
+          <div class="nt">Sign-in stopped working — re-sign in from Settings.</div>
+          <div class="nd">Re-auth needed — renewal kept failing</div>
+          <span class="nb">Open Settings</span>
+        </div>
+      </div>
+    </div>
+    <div>
+      <p class="cap warn">rateLimited · names the retry moment</p>
+      <div class="screen">
+        <div class="notice warn">
+          <div class="nt">Rate limited — backing off, retries on its own.</div>
+          <div class="nd">Rate limited (429) · next try ~8:24 PM</div>
+        </div>
+      </div>
+      <p class="note">The retry time comes from the backoff clock the app already keeps
+        (`backoffUntil`) — printed, not invented.</p>
+    </div>
+  </div>
+
+  <h3>Widget caption &amp; notification strip — short form of the same kind</h3>
+  <div class="row">
+    <div>
+      <p class="cap warn">widget footer (FaceBits / UsageWidget)</p>
+      <div class="widget">
+        <div style="display:flex;justify-content:space-between"><b>5-hour · Personal</b><b>47%</b></div>
+        <div class="abar" style="height:7px"><i style="width:47%"></i></div>
+        <div class="meta" style="font-size:11px">updated 32m ago · ⚠ can't reach Anthropic</div>
+      </div>
+      <p class="note">The caption swaps the raw string for the kind's short label:
+        "can't reach Anthropic" / "rate limited" / "re-auth needed" / "server error" /
+        "unrecognised response" / "app error". The full detail stays in-app.</p>
+    </div>
+    <div>
+      <p class="cap warn">pinned notification stale strip (CCRM-44 (One Surface))</p>
+      <div class="widget" style="background:#232529;color:#E9E9EC;border-color:#33363C">
+        <div style="border-radius:10px;padding:7px 10px;background:color-mix(in srgb,#D8AC63 13%,transparent);color:#E6C88C;font-size:13px">
+          Data is 6h old
+          <span style="display:block;font-size:11.5px;opacity:.75">Last error: can't reach Anthropic — check connection</span>
+        </div>
+      </div>
+      <p class="note">The strip's detail line uses the kind's copy instead of the raw
+        status string. Strip mechanics unchanged.</p>
+    </div>
+  </div>
+  <div class="q"><b>Q1 — built as shown under the 2026-08-19 "finish this" blanket
+    instruction</b> (the reviewer ended the per-question walkthrough and asked for
+    completion; recommended options taken). Judge at the on-device pass — change
+    requests reopen the item.</div>
+
+  <hr class="hr">
+  <h2>2 · CCRM-30 — mark inferred numbers as inferred</h2>
+  <p class="sub">
+    Mechanism: inferred figures get a <span class="est">dotted underline</span> and the
+    line becomes tappable; a tap reveals a one-line provenance note under it (tap again to
+    hide). Subtle at rest, explicit on demand — no info icons spent on every line, nothing
+    for a screenshot to misread as data. Widgets and the notification get nothing (too
+    tight, per the entry).
+  </p>
+  <table class="rules">
+    <tr><th>Figure</th><th>Marker</th><th>Provenance note (on tap)</th></tr>
+    <tr><td>Pace sentence ("At this pace: ~87% …")</td><td>dotted underline</td><td>Projected from this window's samples — a least-squares fit anchored on the latest reading. It shifts as new polls land.</td></tr>
+    <tr><td>Chart projection label (~87%)</td><td>already "~" — unchanged</td><td>covered by the pace sentence's note; the canvas stays clean</td></tr>
+    <tr><td>Sign-in expiry "expires around &lt;date&gt;"</td><td>dotted underline</td><td>Anthropic doesn't report the real expiry — this is a flat ~30-day estimate from sign-in, corrected if renewal dies earlier (CCRM-16 (Sign-in Expiry Accuracy)).</td></tr>
+    <tr><td>Sign-in expiry "valid until &lt;date&gt;" (pasted token)</td><td>none</td><td>— exact, reported by the server; marking it would hedge a measurement</td></tr>
+    <tr><td>Credits percentage</td><td>dotted underline</td><td>Computed from the exact amounts — finer than the server's rounded figure, not an estimate.</td></tr>
+  </table>
+  <div class="row">
+    <div>
+      <p class="cap">pace sentence · collapsed then expanded</p>
+      <div class="screen">
+        <div class="meta">At this pace: <span class="est">~87% when the window resets · 2.1%/h</span></div>
+      </div>
+      <div class="screen" style="margin-top:8px">
+        <div class="meta">At this pace: <span class="est">~87% when the window resets · 2.1%/h</span></div>
+        <div class="prov">Projected from this window's samples — a least-squares fit anchored
+          on the latest reading. It shifts as new polls land.</div>
+      </div>
+    </div>
+  </div>
+  <div class="q"><b>Q2 — built under the same blanket instruction</b>, with one
+    implementation substitution: Compose text has no dotted underline, and a solid one
+    reads as a link — so the marker is a muted trailing "ⓘ" glyph and the line toggles
+    the provenance note on tap. Same interaction, different affordance.</div>
+
+  <div class="q"><b>Q3 — both built 2026-08-19.</b> Wireframe kept until the on-device
+    pass, then deleted per the design-folder rule.</div>
+</div>

@@ -45,6 +45,7 @@ import androidx.glance.text.TextStyle
 import com.robin.claudeusage.MainActivity
 import com.robin.claudeusage.R
 import com.robin.claudeusage.data.AuthState
+import com.robin.claudeusage.data.ErrorKind
 import com.robin.claudeusage.data.Profile
 import com.robin.claudeusage.data.Projection
 import com.robin.claudeusage.data.Snapshot
@@ -563,8 +564,12 @@ internal fun FooterRow(
         ResetSubText(weekly, use24h, resetClock)
         Spacer(GlanceModifier.height(2.dp))
         Text(
-            if (failed) "updated ${Fmt.ago(snapshot.fetchedAt)} · ${snapshot.lastStatus}"
-            else "updated ${Fmt.ago(snapshot.fetchedAt)}",
+            // CCRM-27 (Error Taxonomy): the kind's short label, not the raw status —
+            // the full remediation and detail live in-app.
+            if (failed) {
+                "updated ${Fmt.ago(snapshot.fetchedAt)} · ⚠ " +
+                    ErrorKind.fromKey(snapshot.lastStatusKind).short
+            } else "updated ${Fmt.ago(snapshot.fetchedAt)}",
             style = TextStyle(
                 color = if (stale) staleColor else GlanceTheme.colors.onSurfaceVariant,
                 fontSize = 11.sp,

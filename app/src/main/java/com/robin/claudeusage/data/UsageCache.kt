@@ -11,6 +11,8 @@ data class Snapshot(
     val lastStatus: String,     // human-readable outcome of the last attempt
     val lastAttemptAt: Long,
     val authState: AuthState,
+    /** CCRM-27 (Error Taxonomy): the typed kind behind [lastStatus]. */
+    val lastStatusKind: String = ErrorKind.INTERNAL.key,
 ) {
     // Lazy, not get(): the UI reads this several times per composition and
     // on a 5-second tick — one parse per snapshot is plenty.
@@ -41,16 +43,24 @@ class UsageCache(context: Context) {
     private fun k(profile: Profile, name: String): String =
         if (profile == Profile.PERSONAL) name else "${profile.key}.$name"
 
-    fun snapshot(profile: Profile): Snapshot = Snapshot(
-        rawJson = prefs.getString(k(profile, "rawJson"), null),
-        fetchedAt = prefs.getLong(k(profile, "fetchedAt"), 0L),
-        lastStatus = prefs.getString(k(profile, "lastStatus"), "Never fetched") ?: "Never fetched",
-        lastAttemptAt = prefs.getLong(k(profile, "lastAttemptAt"), 0L),
-        authState = AuthState.valueOf(
-            prefs.getString(k(profile, "authState"), AuthState.NO_CREDENTIALS.name)
-                ?: AuthState.NO_CREDENTIALS.name
-        ),
-    )
+    fun snapshot(profile: Profile): Snapshot {
+        val lastStatus =
+            prefs.getString(k(profile, "lastStatus"), "Never fetched") ?: "Never fetched"
+        return Snapshot(
+            rawJson = prefs.getString(k(profile, "rawJson"), null),
+            fetchedAt = prefs.getLong(k(profile, "fetchedAt"), 0L),
+            lastStatus = lastStatus,
+            lastAttemptAt = prefs.getLong(k(profile, "lastAttemptAt"), 0L),
+            authState = AuthState.valueOf(
+                prefs.getString(k(profile, "authState"), AuthState.NO_CREDENTIALS.name)
+                    ?: AuthState.NO_CREDENTIALS.name
+            ),
+            // Pre-CCRM-27 installs have a status but no kind: guess from the
+            // string once; the next failure writes the real kind.
+            lastStatusKind = prefs.getString(k(profile, "lastStatusKind"), null)
+                ?: ErrorKind.fromStatus(lastStatus).key,
+        )
+    }
 
     fun saveSuccess(profile: Profile, rawJson: String, now: Long) {
         prefs.edit()
@@ -65,9 +75,16 @@ class UsageCache(context: Context) {
             .apply()
     }
 
-    fun saveFailure(profile: Profile, status: String, now: Long, authState: AuthState? = null) {
+    fun saveFailure(
+        profile: Profile,
+        status: String,
+        now: Long,
+        authState: AuthState? = null,
+        kind: ErrorKind = ErrorKind.INTERNAL,
+    ) {
         val e = prefs.edit()
             .putString(k(profile, "lastStatus"), status)
+            .putString(k(profile, "lastStatusKind"), kind.key)
             .putLong(k(profile, "lastAttemptAt"), now)
         if (authState != null) e.putString(k(profile, "authState"), authState.name)
         e.apply()

@@ -162,8 +162,9 @@ object Conditions {
                 java.time.Instant.ofEpochMilli(snapshot.fetchedAt), use24h,
             )}",
             title = "Usage data is stale",
+            // CCRM-27 (Error Taxonomy): the kind's short label, not the raw status.
             detail = "Nothing fetched since ${Fmt.dayTimeWithAgo(snapshot.fetchedAt, use24h)}. " +
-                "Last error: ${snapshot.lastStatus}",
+                "Last error: ${com.robin.claudeusage.data.ErrorKind.fromKey(snapshot.lastStatusKind).short}",
             error = true,
         )
     }

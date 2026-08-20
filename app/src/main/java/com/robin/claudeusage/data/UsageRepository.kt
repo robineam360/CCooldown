@@ -383,7 +383,7 @@ class UsageRepository(private val context: Context) {
     private fun doFetch(profile: Profile, manual: Boolean, ignoreGates: Boolean = false): FetchResult {
         val now = System.currentTimeMillis()
         val creds = credStore.load(profile) ?: run {
-            cache.saveFailure(profile, "No token set", now, AuthState.NO_CREDENTIALS)
+            cache.saveFailure(profile, "No token set", now, AuthState.NO_CREDENTIALS, ErrorKind.AUTH)
             return FetchResult.NoCredentials()
         }
 
@@ -420,22 +420,25 @@ class UsageRepository(private val context: Context) {
                     FetchResult.Success()
                 }
                 resp.code == 200 -> {
-                    cache.saveFailure(profile, "Unrecognized response shape", now)
+                    cache.saveFailure(
+                        profile, "Unrecognized response shape", now,
+                        kind = ErrorKind.INVALID_RESPONSE,
+                    )
                     FetchResult.Error("Unrecognized response shape")
                 }
                 resp.code == 429 -> {
                     cache.bumpBackoff(profile, now)
-                    cache.saveFailure(profile, "Rate limited (429)", now)
+                    cache.saveFailure(profile, "Rate limited (429)", now, kind = ErrorKind.RATE_LIMITED)
                     FetchResult.RateLimited()
                 }
                 resp.code == 401 -> authFailure(profile, now)
                 else -> {
-                    cache.saveFailure(profile, "HTTP ${resp.code}", now)
+                    cache.saveFailure(profile, "HTTP ${resp.code}", now, kind = ErrorKind.SERVER)
                     FetchResult.Error("HTTP ${resp.code}")
                 }
             }
         } catch (e: IOException) {
-            cache.saveFailure(profile, "Network: ${e.message ?: "offline"}", now)
+            cache.saveFailure(profile, "Network: ${e.message ?: "offline"}", now, kind = ErrorKind.NETWORK)
             FetchResult.Error(e.message ?: "network error")
         }
     }
@@ -486,7 +489,7 @@ class UsageRepository(private val context: Context) {
     private fun authFailure(profile: Profile, now: Long): FetchResult {
         val state = cache.snapshot(profile).authState
         if (state == AuthState.REAUTH_NEEDED) {
-            cache.saveFailure(profile, "Re-auth needed", now, AuthState.REAUTH_NEEDED)
+            cache.saveFailure(profile, "Re-auth needed", now, AuthState.REAUTH_NEEDED, ErrorKind.AUTH)
             return FetchResult.AuthNeeded()
         }
         // The refresh endpoint 429s on dead tokens (anti-enumeration), which
@@ -495,11 +498,18 @@ class UsageRepository(private val context: Context) {
         if (firstFail == 0L) {
             cache.setFirstRefreshFailAt(profile, now)
         } else if (now - firstFail > STUCK_REFRESH_MS) {
-            cache.saveFailure(profile, "Re-auth needed — renewal kept failing", now, AuthState.REAUTH_NEEDED)
+            cache.saveFailure(
+                profile, "Re-auth needed — renewal kept failing", now,
+                AuthState.REAUTH_NEEDED, ErrorKind.AUTH,
+            )
             return FetchResult.AuthNeeded()
         }
         val detail = lastRefreshFailDetail?.let { " ($it)" } ?: ""
-        cache.saveFailure(profile, "Token refresh failed$detail — will retry", now)
+        // A transient refresh failure is either the network or their server —
+        // the detail string knows which.
+        val kind = if (lastRefreshFailDetail?.startsWith("HTTP") == true) ErrorKind.SERVER
+        else ErrorKind.NETWORK
+        cache.saveFailure(profile, "Token refresh failed$detail — will retry", now, kind = kind)
         return FetchResult.Error("token refresh failed$detail")
     }
 
