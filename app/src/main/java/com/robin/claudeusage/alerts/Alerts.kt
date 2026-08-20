@@ -15,6 +15,7 @@ import com.robin.claudeusage.data.Profile
 import com.robin.claudeusage.data.Projection
 import com.robin.claudeusage.data.SessionLog
 import com.robin.claudeusage.data.UsageCache
+import com.robin.claudeusage.diag.AppLog
 import com.robin.claudeusage.data.UsageWindow
 import com.robin.claudeusage.notify.Conditions
 import com.robin.claudeusage.ui.Fmt
@@ -612,9 +613,16 @@ object Alerts {
 
         return try {
             NotificationManagerCompat.from(context).notify(id, builder.build())
+            // CCRM-34 (Diagnostics Log): titles carry no secrets — percentages and
+            // window names only.
+            AppLog.log(context, AppLog.Level.INFO, "alerts", profile, "posted [$channel] $title")
             true
         } catch (_: SecurityException) {
             // POST_NOTIFICATIONS not granted — silently skip.
+            AppLog.log(
+                context, AppLog.Level.WARN, "alerts", profile,
+                "post blocked — notifications permission missing",
+            )
             false
         }
     }

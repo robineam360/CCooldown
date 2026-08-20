@@ -1,0 +1,97 @@
+<title>Diagnostics &amp; Shortcuts — CCRM-34 / CCRM-33</title>
+<style>
+  :root { --bg:#FAF8F6; --ink:#26211E; --muted:#6E6660; --accent:#C15F3C; --hair:#E7E1DC; --card:#FFFFFF; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg:#171513; --ink:#EDE8E4; --muted:#9B928B; --accent:#E59980; --hair:#2C2825; --card:#201D1B; } }
+  :root[data-theme="dark"] { --bg:#171513; --ink:#EDE8E4; --muted:#9B928B; --accent:#E59980; --hair:#2C2825; --card:#201D1B; }
+  * { box-sizing:border-box; }
+  body { background:var(--bg); color:var(--ink); margin:0; padding:48px 24px 96px; line-height:1.5;
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif; }
+  .page { max-width:1100px; margin:0 auto; }
+  .eyebrow { font-family:ui-monospace,Menlo,monospace; font-size:11px; letter-spacing:.12em;
+    text-transform:uppercase; color:var(--accent); margin:0 0 10px; }
+  h1 { font-size:28px; font-weight:700; margin:0 0 8px; }
+  h2 { font-size:18px; font-weight:650; margin:44px 0 4px; }
+  .sub { color:var(--muted); font-size:13px; max-width:80ch; margin:0 0 16px; }
+  code { font-family:ui-monospace,Menlo,monospace; font-size:12px;
+    background:color-mix(in srgb,var(--hair) 55%,transparent); padding:1px 5px; border-radius:4px; }
+  .cap { font-family:ui-monospace,Menlo,monospace; font-size:10px; letter-spacing:.08em;
+    text-transform:uppercase; color:var(--muted); margin:0 0 8px; }
+  .row { display:flex; flex-wrap:wrap; gap:22px; align-items:flex-start; }
+  .screen { width:360px; border-radius:16px; background:var(--card); border:1px solid var(--hair);
+    padding:14px 16px; font-size:13px; }
+  .mono { font-family:ui-monospace,Menlo,monospace; font-size:11px; color:var(--muted); }
+  .chips { display:flex; gap:6px; margin:6px 0; }
+  .chip { border:1px solid var(--hair); border-radius:8px; padding:3px 12px; font-size:12px; color:var(--muted); }
+  .chip.on { background:color-mix(in srgb,var(--accent) 14%,transparent); color:var(--accent);
+    border-color:color-mix(in srgb,var(--accent) 40%,transparent); font-weight:600; }
+  .btn { display:inline-block; border:1px solid var(--hair); border-radius:99px; padding:4px 14px;
+    font-size:12.5px; color:var(--accent); font-weight:600; margin-right:6px; }
+  .shortcut { display:flex; align-items:center; gap:10px; padding:7px 0; border-bottom:1px solid var(--hair); }
+  .shortcut:last-child { border-bottom:0; }
+  .sicon { width:26px; height:26px; border-radius:8px; background:color-mix(in srgb,var(--accent) 20%,transparent);
+    display:flex; align-items:center; justify-content:center; font-size:13px; }
+  .q { border-left:3px solid var(--accent); padding:8px 14px; margin:18px 0;
+    background:color-mix(in srgb,var(--accent) 6%,transparent); font-size:13.5px; max-width:76ch; }
+  .q b { color:var(--accent); }
+</style>
+
+<div class="page">
+  <p class="eyebrow">CCRM-34 · CCRM-33 — design record</p>
+  <h1>App log &amp; launcher shortcuts</h1>
+  <p class="sub">
+    <b>Built 2026-08-19 under the "finish this" blanket instruction</b> (the reviewer ended
+    the per-question walkthrough and asked for completion) — this document records what was
+    built for the on-device review; change requests reopen the items.
+  </p>
+
+  <h2>1 · CCRM-34 (Diagnostics Log) — Settings → Diagnostics</h2>
+  <p class="sub">
+    `PingLog` generalised into <code>diag/AppLog.kt</code>: levelled (Error/Warn/Info/Debug),
+    categorised (<code>poll · alerts · auth · ping</code>), one lock across the background
+    writers, same pullable external-files location (<code>app-log.txt</code>). Minimum level
+    is a user-facing pref, default Info. Logged: poll outcomes (success at Debug), alert
+    posts and permission blocks, token-renewal outcomes as status codes only, every ping
+    event as before. <b>Hard rule enforced in the object's contract: never tokens, headers,
+    or the code_verifier.</b> The card moved out of the debug unlock into its own visible
+    Diagnostics section — "share your log" can't hide behind a 7-tap ritual.
+  </p>
+  <div class="row">
+    <div class="screen">
+      <p class="cap">Settings → Diagnostics</p>
+      <b>App log</b>
+      <div class="sub" style="margin:2px 0 6px">What the app does in the background — polls,
+        alerts, sign-in renewals, ping alarms. Share it when reporting a problem; it never
+        contains tokens.</div>
+      <div class="mono">adb pull /sdcard/Android/data/…/files/app-log.txt</div>
+      <div class="chips"><span class="chip on">Info</span><span class="chip">Debug</span></div>
+      <div class="mono">08-19 21:04:11.402 I [poll][personal] auto → OK<br>
+        08-19 21:19:12.048 W [auth][work] token renewal failed: HTTP 429<br>
+        08-19 21:19:12.371 I [alerts][work] posted [usage_alerts] Work: 7-day at 90%</div>
+      <div style="margin-top:8px"><span class="btn">Reload</span><span class="btn">Share</span><span class="btn">Clear</span></div>
+    </div>
+  </div>
+  <p class="sub">Share = <code>ACTION_SEND</code> plain text of the last 400 lines — no
+    FileProvider, nothing the receiving app must know how to open.</p>
+
+  <h2>2 · CCRM-33 (App Shortcuts) — launcher long-press</h2>
+  <p class="sub">
+    Dynamic shortcuts (labels follow renamed profiles, republished on launch and on rename):
+    the profile entries reuse the <code>"profile"</code> extra every other entry point sends;
+    Refresh now opens the app with a <code>refresh</code> extra that triggers a manual poll of
+    every account.
+  </p>
+  <div class="row">
+    <div class="screen" style="width:280px">
+      <p class="cap">long-press on the launcher icon</p>
+      <div class="shortcut"><span class="sicon">◔</span> Personal</div>
+      <div class="shortcut"><span class="sicon">◔</span> Work</div>
+      <div class="shortcut"><span class="sicon">↻</span> Refresh now</div>
+    </div>
+  </div>
+  <p class="sub">Icons: the launcher mark for the profile entries, the refresh glyph for the
+    action — dedicated per-profile glyphs are a cosmetic follow-up if wanted.</p>
+
+  <div class="q"><b>Review at the on-device pass.</b> Kept until then, deleted after per the
+    design-folder rule.</div>
+</div>

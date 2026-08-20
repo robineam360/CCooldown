@@ -425,6 +425,15 @@ class UsageCache(context: Context) {
     /** The flag render sites actually branch on. */
     fun usageLeft(): Boolean = usageDisplay() == "left"
 
+    // CCRM-34 (Diagnostics Log): the app log's minimum level. "info" default;
+    // "debug" only while someone is chasing something — a user-facing setting,
+    // deliberately (OpenQuota's call, and the right one).
+    fun logLevel(): String = prefs.getString("logLevel", "info") ?: "info"
+
+    fun setLogLevel(level: String) {
+        prefs.edit().putString("logLevel", level).apply()
+    }
+
     fun themeColorName(): String = prefs.getString("themeColor", "Claude Orange") ?: "Claude Orange"
 
     fun setThemeColorName(name: String) {

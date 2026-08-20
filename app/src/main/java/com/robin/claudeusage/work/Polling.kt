@@ -18,6 +18,7 @@ import com.robin.claudeusage.data.FetchResult
 import com.robin.claudeusage.data.Profile
 import com.robin.claudeusage.data.UsageCache
 import com.robin.claudeusage.data.UsageRepository
+import com.robin.claudeusage.diag.AppLog
 import com.robin.claudeusage.notify.UpdateNotification
 import com.robin.claudeusage.widget.MiniRingsWidget
 import com.robin.claudeusage.widget.PaceWidget
@@ -35,9 +36,19 @@ class UsagePollWorker(context: Context, params: WorkerParameters) :
         val onlyProfile = inputData.getString("profile")?.let { Profile.fromKey(it) }
         val repo = UsageRepository(applicationContext)
 
-        val results: Collection<FetchResult> =
-            if (onlyProfile != null) listOf(repo.refreshNow(onlyProfile, manual))
-            else repo.refreshAll(manual).values
+        val byProfile: Map<Profile, FetchResult> =
+            if (onlyProfile != null) mapOf(onlyProfile to repo.refreshNow(onlyProfile, manual))
+            else repo.refreshAll(manual)
+        // CCRM-34 (Diagnostics Log): successes at DEBUG (routine), anything else at
+        // INFO — outcomes only, never payloads.
+        for ((p, r) in byProfile) {
+            AppLog.log(
+                applicationContext,
+                if (r is FetchResult.Success) AppLog.Level.DEBUG else AppLog.Level.INFO,
+                "poll", p, "${if (manual) "manual" else "auto"} → ${r.message}",
+            )
+        }
+        val results: Collection<FetchResult> = byProfile.values
 
         // Alerts are evaluated inside the repository after every fetch path.
         val cache = UsageCache(applicationContext)

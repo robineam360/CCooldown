@@ -93,8 +93,8 @@ import com.robin.claudeusage.data.UpdateGate
 import com.robin.claudeusage.data.UpdateInfo
 import com.robin.claudeusage.data.UsageCache
 import com.robin.claudeusage.data.UsageRepository
+import com.robin.claudeusage.diag.AppLog
 import com.robin.claudeusage.notify.UpdateNotification
-import com.robin.claudeusage.ping.PingLog
 import com.robin.claudeusage.ping.PingScheduler
 import com.robin.claudeusage.ui.Fmt
 import com.robin.claudeusage.ui.Palette
@@ -722,6 +722,13 @@ fun SettingsScreen(
         UpdatesCard(cacheSettings)
         Spacer(Modifier.height(24.dp))
 
+        // CCRM-34 (Diagnostics Log): visible without the debug unlock — for a
+        // sideload-only app with an email feedback channel, "share your log" is
+        // the diagnosis path, so it can't hide behind a 7-tap ritual.
+        SectionLabel("Diagnostics")
+        AppLogCard(cacheSettings)
+        Spacer(Modifier.height(24.dp))
+
         SectionLabel("About")
         AboutCard(debugUnlocked, onDebugUnlock)
 
@@ -729,8 +736,6 @@ fun SettingsScreen(
             Spacer(Modifier.height(24.dp))
             SectionLabel("Debug")
             TrendDiagnostics(repo, use24h)
-            Spacer(Modifier.height(10.dp))
-            PingLogCard()
             Spacer(Modifier.height(10.dp))
             DebugSection(repo)
         }
@@ -2253,20 +2258,24 @@ private fun ResetModeRow(label: String, window: String, cache: UsageCache) {
 }
 
 /**
- * The window-ping trace (CCRM-17). Shows the tail in-app and, more usefully, tells you
- * where to pull the whole thing from — the interesting run is an unattended overnight
- * one, so it has to survive being read hours later.
+ * The app log (CCRM-34 (Diagnostics Log)), grown from the window-ping trace:
+ * polls, alert posts, token renewals and ping alarms, levelled and categorised.
+ * Shows the tail in-app; Share hands the recent lines to any mail/chat app,
+ * which is the whole point — "paste your log" is the only realistic way to
+ * diagnose someone else's phone. Never contains tokens, headers, or the
+ * code_verifier (hard rule in `AppLog`).
  */
 @Composable
-private fun PingLogCard() {
+private fun AppLogCard(cache: UsageCache) {
     val context = LocalContext.current
     var tail by remember { mutableStateOf<List<String>>(emptyList()) }
     var refreshTick by remember { mutableIntStateOf(0) }
+    var level by remember { mutableStateOf(cache.logLevel()) }
 
     LaunchedEffect(refreshTick) {
         tail = withContext(Dispatchers.IO) {
             try {
-                val f = PingLog.file(context)
+                val f = AppLog.file(context)
                 if (f.exists()) f.readLines().takeLast(12) else emptyList()
             } catch (_: Exception) {
                 emptyList()
@@ -2275,18 +2284,39 @@ private fun PingLogCard() {
     }
 
     SectionCard {
-        Text("Window ping log", style = MaterialTheme.typography.bodyLarge)
+        Text("App log", style = MaterialTheme.typography.bodyLarge)
         Text(
-            "Every alarm, decision, send and verification, with Doze state at the moment " +
-                "it fired. Pull the full file with:",
+            "What the app does in the background — polls, alerts, sign-in renewals, " +
+                "ping alarms. Share it when reporting a problem; it never contains " +
+                "tokens. Pull the full file with:",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(6.dp))
         Text(
-            "adb pull ${PingLog.file(context).absolutePath}",
+            "adb pull ${AppLog.file(context).absolutePath}",
             style = MaterialTheme.typography.bodySmall,
             fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+        )
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            for ((value, text) in listOf("info" to "Info", "debug" to "Debug")) {
+                FilterChip(
+                    selected = level == value,
+                    onClick = {
+                        level = value
+                        cache.setLogLevel(value)
+                    },
+                    label = { Text(text) },
+                )
+            }
+        }
+        Text(
+            if (level == "debug")
+                "Debug adds routine successes — turn it on only while chasing something."
+            else "Info records failures, alerts and decisions; routine successes stay out.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(10.dp))
         if (tail.isEmpty()) {
@@ -2308,7 +2338,21 @@ private fun PingLogCard() {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = { refreshTick++ }) { Text("Reload") }
             OutlinedButton(onClick = {
-                PingLog.clear(context)
+                // Recent lines as plain text — no FileProvider, nothing the
+                // receiving app has to know how to open.
+                val body = try {
+                    AppLog.file(context).readLines().takeLast(400).joinToString("\n")
+                } catch (_: Exception) {
+                    ""
+                }
+                val send = Intent(Intent.ACTION_SEND)
+                    .setType("text/plain")
+                    .putExtra(Intent.EXTRA_SUBJECT, "Claude Cooldown app log")
+                    .putExtra(Intent.EXTRA_TEXT, body.ifEmpty { "(log is empty)" })
+                context.startActivity(Intent.createChooser(send, "Share app log"))
+            }) { Text("Share") }
+            OutlinedButton(onClick = {
+                AppLog.clear(context)
                 refreshTick++
             }) { Text("Clear") }
         }

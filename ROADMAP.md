@@ -779,7 +779,20 @@ keys) would still make this a different product. Not filed, not an open question
   `MotionTest` (garbage scales fail towards stillness; the unset 1f default keeps motion).
 
 ### CCRM-33 · App Shortcuts — launcher long-press entries
-- **Status:** Planned · small
+- **Status:** Done (2026-08-19) · design record
+  `design/diagnostics-shortcuts-wireframe.html`, built under the same-day
+  "finish this" blanket instruction · needs on-device verification (launcher
+  interaction — nothing here is unit-testable)
+- **Shipped:** `Shortcuts.kt` — dynamic shortcuts via `ShortcutManagerCompat`
+  (dynamic, not static XML, exactly because labels follow
+  `UsageCache.profileLabel`): one per profile reusing the `"profile"` extra
+  every other entry point already sends, plus **Refresh now**, which opens
+  MainActivity with a `refresh` extra that triggers a manual poll of every
+  account. Republished on every app launch and on a profile rename. Icons are
+  the launcher mark / refresh glyph; per-profile glyphs are a cosmetic
+  follow-up if wanted. Publishing is wrapped defensively — some launchers
+  ration slots and throw, and a shortcut must never be a crash source.
+- **Was:** Planned · small
 - **Why:** OpenQuota's global keyboard shortcut has no Android equivalent, but the intent —
   reach the number without navigating — maps cleanly onto launcher shortcuts.
 - **Approach:** static/dynamic shortcuts for **Personal**, **Work** and **Refresh now**,
@@ -789,7 +802,24 @@ keys) would still make this a different product. Not filed, not an open question
   (`UsageCache.profileLabel`), which means they're dynamic shortcuts, not static XML.
 
 ### CCRM-34 · Diagnostics Log — widen the ping log into a general app log
-- **Status:** Planned · small
+- **Status:** Done (2026-08-19) · design record
+  `design/diagnostics-shortcuts-wireframe.html`, built under the same-day
+  "finish this" blanket instruction · needs on-device verification
+- **Shipped:** `diag/AppLog.kt` — levelled (Error/Warn/Info/Debug, tolerant
+  decode), categorised (`poll · alerts · auth · ping`), a single lock across the
+  background writers, 256KB → keep-last-600-lines trim, same pullable
+  external-files location (`app-log.txt`). Minimum level is the user-facing
+  `logLevel` pref, default Info. `PingLog` became a thin shim (category "ping",
+  INFO) so the ping machinery kept its call sites. New call sites: poll outcomes
+  in `UsagePollWorker` (success at Debug — routine stays out of Info), alert
+  posts and permission blocks in `Alerts.notify`, token-renewal outcomes in
+  `refreshAccessToken` as **status codes only**. The card moved out of the debug
+  unlock into a visible Settings → Diagnostics section, with Info/Debug chips
+  and a Share button (`ACTION_SEND` plain text, last 400 lines — no
+  FileProvider). **Hard rule honoured and stated in the object's contract: never
+  tokens, authorization headers, or the `code_verifier`.** Pure pieces (level
+  gate, decode, line shape, trim) pinned by `AppLogTest`.
+- **Was:** Planned · small
 - **Why:** CCRM-17 just built `ping/PingLog.kt` with a pullable in-app view, and it earned
   its keep immediately. Everything else the app does in the background — polls, widget
   updates, alert delivery, token renewals — is invisible unless it's attached to logcat.

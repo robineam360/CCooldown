@@ -3,6 +3,7 @@ package com.robin.claudeusage.data
 import android.content.Context
 import androidx.glance.appwidget.updateAll
 import com.robin.claudeusage.alerts.Alerts
+import com.robin.claudeusage.diag.AppLog
 import com.robin.claudeusage.ui.Fmt
 import com.robin.claudeusage.widget.BarWidget
 import com.robin.claudeusage.widget.UsageWidget
@@ -454,6 +455,12 @@ class UsageRepository(private val context: Context) {
             if (resp.code != 200) {
                 lastRefreshFailDetail = "HTTP ${resp.code}"
                 if (resp.code in 400..403) cache.setAuthState(profile, AuthState.REAUTH_NEEDED)
+                // CCRM-34 (Diagnostics Log): status codes only — never tokens,
+                // headers, or bodies (hard rule).
+                AppLog.log(
+                    context, AppLog.Level.WARN, "auth", profile,
+                    "token renewal failed: HTTP ${resp.code}",
+                )
                 return null
             }
             val o = JSONObject(resp.body)
@@ -479,9 +486,17 @@ class UsageRepository(private val context: Context) {
             ) {
                 cache.clearRefreshExpiry(profile)
             }
+            AppLog.log(
+                context, AppLog.Level.DEBUG, "auth", profile,
+                "token renewed (rotated=${rotatedRefresh.isNotEmpty() && rotatedRefresh != creds.refreshToken})",
+            )
             newAccess
         } catch (e: Exception) {
             lastRefreshFailDetail = e.message ?: e.javaClass.simpleName
+            AppLog.log(
+                context, AppLog.Level.WARN, "auth", profile,
+                "token renewal failed: ${e.javaClass.simpleName}",
+            )
             null
         }
     }
