@@ -172,6 +172,8 @@ fun SettingsScreen(
                         cacheSettings.setProfileLabel(profile, name)
                         namesTick++
                         refreshWidgets()
+                        // CCRM-33 (App Shortcuts): shortcut labels follow renames.
+                        Shortcuts.publish(context)
                     },
                     label = { Text("${profile.label} profile") },
                     singleLine = true,

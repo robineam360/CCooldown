@@ -129,6 +129,15 @@ class MainActivity : ComponentActivity() {
         // open instead of waiting for the next poll.
         PingScheduler.rescheduleAll(this)
         val startProfile = Profile.fromKey(intent?.getStringExtra("profile"))
+        // CCRM-33 (App Shortcuts): the "Refresh now" shortcut opens the app with
+        // this extra — a manual poll of every signed-in account, the same path
+        // the widgets' ↻ takes.
+        if (intent?.getBooleanExtra("refresh", false) == true) {
+            Polling.refreshOnce(this, manual = true)
+        }
+        // Republish so shortcut labels track renamed profiles even when the
+        // rename happened on another device restore or a cleared cache.
+        Shortcuts.publish(this)
         // Measured at the root so every screen sees the same window width, and so
         // it re-measures on a fold/unfold without the activity being torn down.
         setContent { ProvideWidthClass { App(startProfile) } }
