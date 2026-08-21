@@ -48,9 +48,12 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
 ## Fixed
 
 ### CCBG-14 · Stale Notification Theme — theme colour changes don't reach the pinned notification until the next poll
-- **Status:** Fixed (2026-08-21) · verified on the Fold 7 the same day (the fix is the
-  same `refreshPinned()` the icon-style chips already use, whose immediacy was verified
-  during CCRM-48 (Status-Bar Gauge) testing).
+- **Status:** Fixed (2026-08-21) · **verified live on the Fold 7 the same day, v1.3
+  build**: tapping the Blue swatch repainted the status-bar glyph's pace line to the
+  Blue theme's spring-green partner within a second, and tapping Claude Orange flipped
+  it straight back — no poll either way. (The same moment verified the ladder override
+  live: the 5-hour had just crossed 80, and the fill stayed ladder-yellow through both
+  theme changes, exactly as CCRM-49 (Glyph Legibility) specifies.)
 - **Severity:** Low (cosmetic staleness, self-heals on the next poll)
 - **Symptom:** Observed on the Fold 7, 2026-08-21, during CCRM-50 (Weekly Flag)
   verification. Picking a new theme colour in Settings recolours the app and the
