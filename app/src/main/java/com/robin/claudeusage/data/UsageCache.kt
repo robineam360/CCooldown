@@ -276,7 +276,13 @@ class UsageCache(context: Context) {
     }
 
     /** Status-bar icon style: "pie", "ring", "battery", or "number". */
-    fun pinnedIconStyle(): String = prefs.getString("pinnedIconStyle", "ring") ?: "ring"
+    /**
+     * CCRM-49 (Glyph Legibility) withdrew the concentric "twin" style, so anyone left
+     * holding it lands back on the default rather than on no selection at all.
+     */
+    fun pinnedIconStyle(): String =
+        (prefs.getString("pinnedIconStyle", "ring") ?: "ring")
+            .let { if (it == "twin") "ring" else it }
 
     fun setPinnedIconStyle(style: String) {
         prefs.edit().putString("pinnedIconStyle", style).apply()

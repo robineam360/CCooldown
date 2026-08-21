@@ -14,28 +14,30 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * The small monochrome usage icon, shared by the status bar and the Quick Settings
- * tile. Everything is drawn white and the two-tone look (faint track + solid fill)
- * rides on the alpha channel, because both surfaces tint the icon themselves — they
- * treat it as an alpha mask, so the level can only be conveyed through fill, never
- * through colour.
+ * The small usage icon, shared by the status bar and the Quick Settings tile.
  *
- * CCRM-48 (Status-Bar Gauge) adds the pace mark. On this surface fill and mark are
- * the same ink, so a tick drawn *over* the band would vanish on the fill — the mark
- * is instead a slot **erased through** the band (PorterDuff.CLEAR), the Mac gauge's
- * cleared-gap tick with nothing redrawn inside; the bar shows through the cut. Same
- * honesty rule as every other ring: no reset clock → no cut, never a guessed
- * position ([RingGeometry.showTick]). And because the tint also strips the severity
- * ladder, ≥100% is marked by shape instead: a notch opens at 12 o'clock, so a
- * closed ring reads as *closed* rather than merely long.
+ * **The two surfaces disagree about colour, and that shapes everything here.**
+ * Measured on a Fold 7 (CCRM-49 (Glyph Legibility)): the status bar reproduces a
+ * bitmap's colours exactly, while the QS tile flattens it to a single tint. So
+ * colour can only ever be an *enhancement* — alpha and shape carry the level and the
+ * pace mark, because that is all a tinting surface will show. [draw]'s `fillArgb`
+ * picks the mode: null for the alpha-mask rendering, a colour for the rest.
+ *
+ * **Size is the other hard fact.** The bitmap is 24 dp but the status bar fits it
+ * into a ~15 dp slot *by width*, so it lands around 14 dp — which is why this draws
+ * one window at full size rather than two small ones, and why a wide bitmap buys
+ * nothing (it keeps the width and loses the height).
+ *
+ * CCRM-48 (Status-Bar Gauge) added the pace mark and CCRM-49 made it readable. The
+ * mark is a slot **erased through** the band (PorterDuff.CLEAR) so it shows on fill
+ * and track alike; in colour a cool line is drawn inside that slot. Honesty rule as
+ * everywhere: no reset clock → no mark, never a guessed position
+ * ([RingGeometry.showTick]).
  */
 object UsageIcon {
 
     /** Styles offered in settings. */
     const val RING = "ring"
-
-    /** Both windows as concentric rings: 7-day outside, 5-hour inside. */
-    const val TWIN = "twin"
 
     /**
      * [left] is CCRM-22 (Used or Left): it flips only the "number" style's digits
@@ -43,10 +45,11 @@ object UsageIcon {
      * slice, battery liquid — always draw the used fraction, and the ≥100% "!!"
      * overflow glyph keys on used in both modes.
      *
-     * [sessionElapsed] / [weeklyElapsed] are the windows' time-elapsed percents;
-     * they position the pace cuts on the ring/twin styles. [weeklyPct] feeds the
-     * twin style's outer ring. All defaulted, so call sites that predate CCRM-48
-     * (Status-Bar Gauge) keep compiling and keep today's cutless drawing.
+     * [sessionElapsed] positions the ring's pace mark. [fillArgb] is the resolved
+     * severity colour — pass `Palette.barColor(...)` so the glyph and the
+     * notification's own gauge can never disagree — or null for the monochrome
+     * alpha-mask rendering a tinting surface needs. Both defaulted, so call sites
+     * that predate CCRM-49 keep compiling and keep the monochrome drawing.
      */
     fun draw(
         context: Context,
@@ -54,8 +57,8 @@ object UsageIcon {
         style: String,
         left: Boolean = false,
         sessionElapsed: Double? = null,
-        weeklyPct: Double? = null,
-        weeklyElapsed: Double? = null,
+        fillArgb: Int? = null,
+        dark: Boolean = true,
     ): Bitmap {
         val size = dp(context, 24f).toInt().coerceAtLeast(24)
         val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
@@ -111,18 +114,14 @@ object UsageIcon {
                 val baseline = size / 2f - (text.descent() + text.ascent()) / 2f
                 c.drawText(label, size / 2f, baseline, text)
             }
-            TWIN -> {
-                // CCRM-48 (Status-Bar Gauge): both windows, concentric, each ring as
-                // large as the 24 dp square allows so the pace cuts stay legible —
-                // 7-day outside (23/24 across), 5-hour inside (14.5/24), 2.6 stroke.
+            else -> { // "ring" (default) — one window, as large as the square allows
+                // CCRM-49 (Glyph Legibility): 22.4 dp across at a 4 dp stroke, sized so
+                // the band plus the pace mark's overhang just fit the 24 dp box. The
+                // status bar then renders the whole thing at ~14 dp (measured), which
+                // is the size that actually has to be readable.
                 val cx = size / 2f
                 val u = size / 24f
-                windowRing(c, cx, 10.2f * u, 2.6f * u, weeklyPct, weeklyElapsed)
-                windowRing(c, cx, 5.95f * u, 2.6f * u, pct, sessionElapsed)
-            }
-            else -> { // "ring" (default) — faint full ring + solid arc from the top
-                val cx = size / 2f
-                windowRing(c, cx, size * 0.38f, size * 0.14f, pct, sessionElapsed)
+                windowRing(c, cx, 9.2f * u, 4f * u, pct, sessionElapsed, fillArgb, dark)
             }
         }
         return bmp
@@ -131,8 +130,13 @@ object UsageIcon {
     /**
      * One pace-marked window ring, centred at ([cx],[cx]) with band-centre radius
      * [r] and stroke [sw], all in px. Draw order: track · fill · ≥100 notch · pace
-     * cut — the cut erases last so it survives everything under it, exactly the
-     * [RingGeometry] ordering with CLEAR standing in for the neutral tick colour.
+     * mark — the mark goes last so it survives everything under it, exactly the
+     * [RingGeometry] ordering.
+     *
+     * [fillArgb] null means **monochrome**: white on alpha, for surfaces that tint
+     * the bitmap and throw colour away. Non-null means the surface keeps colour, and
+     * then used / remaining / pace get three different treatments instead of three
+     * alphas of one ink.
      */
     private fun windowRing(
         c: Canvas,
@@ -141,10 +145,14 @@ object UsageIcon {
         sw: Float,
         pct: Double?,
         elapsed: Double?,
+        fillArgb: Int?,
+        dark: Boolean,
     ) {
-        val white = Color.WHITE
+        val colour = fillArgb != null
+        val trackColor = if (colour) TRACK_NEUTRAL else Color.WHITE
         val track = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE; strokeWidth = sw; color = white; alpha = 90
+            style = Paint.Style.STROKE; strokeWidth = sw; color = trackColor
+            if (!colour) alpha = 90
         }
         // No data ≠ 0%: a null percent leaves the bare track and nothing else.
         c.drawCircle(cx, cx, r, track)
@@ -154,40 +162,83 @@ object UsageIcon {
             if (sweep > 0f) {
                 val arc = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     style = Paint.Style.STROKE; strokeWidth = sw
-                    strokeCap = Paint.Cap.ROUND; color = white
+                    strokeCap = Paint.Cap.ROUND
+                    color = fillArgb ?: Color.WHITE
                 }
                 c.drawArc(RectF(cx - r, cx - r, cx + r, cx + r), -90f, 360f * sweep, false, arc)
             }
-            // Severity has no colour on a tinted mask, so ≥100 is shape: a notch at
-            // 12 o'clock makes a closed ring read as closed rather than merely long.
+            // ≥100 is also marked by shape, not only by the red rung: a notch at 12
+            // o'clock makes a closed ring read as *closed* rather than merely long.
+            // Kept in colour too, because it is the only cue that survives a surface
+            // which flattens the bitmap to one tint.
             if (pct >= 100.0) eraseSlot(c, cx, r, sw, 0f, sw * 0.7f)
         }
-        // The pace cut. Honesty rule shared with every other ring surface: both a
+        // The pace mark. Honesty rule shared with every other ring surface: both a
         // percent and an elapsed, or no mark at all — never a guessed position.
         if (RingGeometry.showTick(pct, elapsed)) {
-            eraseSlot(c, cx, r, sw, RingGeometry.tickSweep(elapsed!!), 0.6f * sw)
+            val at = RingGeometry.tickSweep(elapsed!!)
+            // The slot is erased in both modes — real transparency, so the mark reads
+            // on fill and on track alike.
+            val line = 0.40f * sw
+            eraseSlot(c, cx, r, sw, at, if (colour) line + 0.5f * sw else 0.6f * sw)
+            if (colour) {
+                // …then a cool line inside the slot. A cool hue can never collide with
+                // the warm severity ladder, so the mark stays "where am I in the
+                // window" and never becomes "how bad is it". The slot is deliberately
+                // wider than the line: that transparent margin is what still reads as
+                // a mark on a surface that flattens us to one tint.
+                drawRadial(c, cx, r, sw, at, PACE_COOL, line)
+            }
         }
     }
+
+    /** The pace mark's cool hue — deliberately outside the warm severity ladder. */
+    private const val PACE_COOL = 0xFF5BC8FF.toInt()
+
+    /** Remaining, in colour mode: a mid neutral that holds up on a light or dark bar. */
+    private val TRACK_NEUTRAL = Color.argb(150, 150, 150, 150)
 
     /**
      * Erases a radial slot through the ring band at [sweepDeg] past 12 o'clock,
      * clockwise — real transparency, so whatever the icon sits on shows through.
      */
     private fun eraseSlot(c: Canvas, cx: Float, r: Float, sw: Float, sweepDeg: Float, width: Float) {
-        val rad = Math.toRadians((sweepDeg - 90f).toDouble())
-        // A hair past each band edge, so antialiased fringes can't survive the cut.
-        val overhang = 0.15f * sw
-        val rIn = r - sw / 2f - overhang
-        val rOut = r + sw / 2f + overhang
         val clear = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
             strokeWidth = width
             xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
         }
+        radial(c, cx, r, sw, sweepDeg, clear)
+    }
+
+    /** Draws a radial stroke across the band, in [color] at [width]. */
+    private fun drawRadial(
+        c: Canvas, cx: Float, r: Float, sw: Float, sweepDeg: Float, color: Int, width: Float,
+    ) {
+        val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = width
+            strokeCap = Paint.Cap.ROUND
+            this.color = color
+        }
+        radial(c, cx, r, sw, sweepDeg, p)
+    }
+
+    /**
+     * The shared radial geometry: a line across the band at [sweepDeg] past 12
+     * o'clock, clockwise, overhanging each edge just enough that antialiased fringes
+     * can't survive a cut. Deliberately a small overhang — at this size a longer one
+     * reads as a spike into the ring's hollow rather than a mark on the band.
+     */
+    private fun radial(c: Canvas, cx: Float, r: Float, sw: Float, sweepDeg: Float, paint: Paint) {
+        val rad = Math.toRadians((sweepDeg - 90f).toDouble())
+        val overhang = 0.12f * sw
+        val rIn = r - sw / 2f - overhang
+        val rOut = r + sw / 2f + overhang
         c.drawLine(
             cx + rIn * cos(rad).toFloat(), cx + rIn * sin(rad).toFloat(),
             cx + rOut * cos(rad).toFloat(), cx + rOut * sin(rad).toFloat(),
-            clear,
+            paint,
         )
     }
 

@@ -182,6 +182,48 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
 - **Out of scope, deliberately:** the Mac's third per-model element (a later
   revision if wanted), and its "clock hand" variant — illegible at 11–14 dp.
 
+### CCRM-49 · Glyph Legibility — one ring, in colour, at the size it is really drawn
+- **Status:** Done and **verified on the Fold 7, 2026-08-21**.
+- **Why:** CCRM-48 (Status-Bar Gauge) shipped and could not be read. The cause was a
+  wrong assumption about the canvas, found by measuring: the bitmap is 24 dp but the
+  status bar fits it into a **~15 dp slot, by width**, so it lands at ~14 dp. Two
+  concentric rings therefore arrived as 13.5 dp and 8.5 dp with a 0.9 dp pace cut.
+- **Two facts established by an on-device probe** (a 48 × 24 dp bitmap carrying a
+  measuring frame, pure RGB stripes and an asymmetric ring), both of which overturned
+  an assumption in CCRM-48:
+  - **A wide bitmap buys nothing.** 48 × 24 dp rendered at 39 × 20 px = 14.9 × 7.6 dp:
+    aspect honoured, same width as the square, half the height. The slot is
+    width-constrained, so **square is optimal** and the Mac's side-by-side menu-bar
+    layout does not port to Android at all.
+  - **Colour survives in the status bar** — pure `#FF0000`/`#00FF00`/`#0000FF` were
+    sampled back exactly — **but is stripped in the Quick Settings tile**, which
+    flattens to one tint. CCRM-48's "the severity ladder cannot exist here" was true
+    of the tile and false of the status bar.
+- **What:** the status-bar icon is **one window, one ring, as large as the square
+  allows** (22.4 dp across at a 4 dp stroke), with three deliberately different
+  treatments: **used** in the severity colour (the very same `Palette.barColor` value
+  the notification's gauge uses, so the two can never disagree), **remaining** in a
+  mid neutral, and the **pace mark** as a cool `#5BC8FF` line — a hue chosen because
+  it can never collide with the warm ladder, keeping the mark "where am I in the
+  window" rather than "how bad is it".
+- **Colour is an enhancement, never the carrier.** The mark is still a slot *erased*
+  through the band, deliberately wider than the line it holds, so a surface that
+  flattens the bitmap still shows a gap. `UsageIcon.draw` takes `fillArgb`: the
+  notification passes a colour, the tile passes null and keeps the alpha-mask
+  rendering. ≥100% keeps its 12 o'clock notch for the same reason.
+- **The Twin style is withdrawn** — measured unreadable, and there is no point keeping
+  a chip that loses to the default. `UsageCache.pinnedIconStyle()` migrates a stored
+  `"twin"` back to `"ring"` so nobody lands on no selection.
+- **Where:** `ui/UsageIcon.kt`, `notify/PinnedNotification.kt`,
+  `tile/UsageTileService.kt`, `SettingsScreen.kt`, `data/UsageCache.kt`. Wireframe
+  `design/status-bar-glyph-legibility-wireframe.html` (rev C, as built), which mocks
+  at 14 dp and rasterises to the real 37 px rather than zooming vectors — the mistake
+  that let CCRM-48 through.
+- **Known limitation:** the 7-day window is not on this glyph. A *level* for it can
+  only come out of the 5-hour ring's size, which is what CCRM-48 proved unreadable. A
+  *state* marker (a dot in the ring's hollow, shown only past 80%) would be nearly
+  free and is unbuilt — needs a wireframe first.
+
 ### CCRM-20 · Wide Chart — one profile at full width, and a chart you can touch
 - **Status:** Done (2026-08-04) · successor to CCRM-12
 - **Verified on the Fold 7's inner screen** (1968×2184 @ 420dpi = **750×832dp**, which

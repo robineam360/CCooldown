@@ -417,12 +417,12 @@ fun SettingsScreen(
                 RowDivider()
                 Text("Status-bar icon", style = MaterialTheme.typography.bodyLarge)
                 Spacer(Modifier.height(8.dp))
-                // CCRM-48 (Status-Bar Gauge): Twin is a new fifth chip rather than a
-                // change to Ring, so nobody's icon redraws without them choosing it.
-                // Five chips can overflow a narrow screen, hence FlowRow.
+                // CCRM-49 (Glyph Legibility): the concentric two-ring "Twin" style is
+                // withdrawn — measured at ~14 dp it could not be read. Ring carries the
+                // pace mark and the colour instead. FlowRow stays, so a long chip row
+                // wraps rather than overflowing a narrow screen.
                 val iconStyles = listOf(
-                    "ring" to "Ring",
-                    UsageIcon.TWIN to "Twin",
+                    UsageIcon.RING to "Ring",
                     "pie" to "Pie",
                     "battery" to "Battery",
                     "number" to "Number",
@@ -442,7 +442,7 @@ fun SettingsScreen(
                 }
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    "The colored gauge and bars follow your theme and turn orange, then red, near the limit. The tiny status-bar icon is monochrome — Android renders it that way for every app. Ring and Twin carry a pace mark: a small cut in the ring at where you'd be at an even burn — fill past the cut means faster than even pace. Twin adds the 7-day window as an outer ring around the 5-hour one.",
+                    "The colored gauge and bars follow your theme and turn orange, then red, near the limit. Ring shows the 5-hour window and carries a pace mark — a small gap at where you'd be at an even burn, so fill past the gap means you're going faster than even pace. It follows the same colors in the status bar; the Quick Settings tile is monochrome, because Android renders tile icons that way.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

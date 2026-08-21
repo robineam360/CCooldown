@@ -1,0 +1,764 @@
+<title>Status-Bar Glyph Legibility — CCRM-49 (rev C, as built)</title>
+<style>
+  :root {
+    --bg: #FAF8F6; --ink: #26211E; --muted: #6E6660; --accent: #C15F3C;
+    --hair: #E7E1DC; --card: #FFFFFF;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171513; --ink: #EDE8E4; --muted: #9B928B; --accent: #E59980;
+      --hair: #2C2825; --card: #201D1B;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171513; --ink: #EDE8E4; --muted: #9B928B; --accent: #E59980;
+    --hair: #2C2825; --card: #201D1B;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    margin: 0; padding: 48px 24px 96px; line-height: 1.5;
+  }
+  .page { max-width: 1280px; margin: 0 auto; }
+
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 10px;
+  }
+  h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 8px; text-wrap: balance; }
+  .lede { color: var(--muted); max-width: 72ch; margin: 0 0 12px; font-size: 14px; }
+  h2 { font-size: 19px; font-weight: 650; margin: 54px 0 4px; }
+  h3 { font-size: 14px; font-weight: 650; margin: 30px 0 8px; }
+  .sub { color: var(--muted); font-size: 13px; max-width: 82ch; margin: 0 0 16px; }
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px;
+    background: color-mix(in srgb, var(--hair) 55%, transparent);
+    padding: 1px 5px; border-radius: 4px;
+  }
+  .flag {
+    margin: 14px 0 4px; padding: 13px 17px; border-radius: 10px;
+    background: var(--card); border: 1px solid var(--hair);
+    font-size: 13.5px; max-width: 88ch;
+  }
+  .flag.hot { border-color: color-mix(in srgb, var(--accent) 50%, var(--hair)); }
+  .flag b { font-weight: 650; }
+
+  .board {
+    border-radius: 18px; padding: 20px 22px 22px; border: 1px solid var(--hair);
+    margin-top: 14px;
+  }
+  .board.lt { background: linear-gradient(140deg, #C6D2E0 0%, #DACEBE 55%, #E6D6C3 100%); }
+  .board.dk { background: linear-gradient(140deg, #1E2833 0%, #30272C 60%, #382D2F 100%); }
+  .boardcap {
+    margin: 0 0 16px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+  }
+  .lt .boardcap { color: rgba(20,20,30,.62); } .dk .boardcap { color: rgba(255,255,255,.52); }
+
+  /* real status bar, 1px = 1dp */
+  .sb { display: flex; align-items: center; height: 28px; padding: 0 10px; gap: 7px;
+        border-radius: 4px 4px 0 0; width: 330px; }
+  .sb.dk { background: #0B0B0C; color: #FFFFFF; }
+  .sb.lt { background: #FFFFFF; color: #111112; }
+  .sb .clock { font-size: 12px; font-weight: 600; }
+  .sb .spacer { flex: 1; }
+  .sb .sys { display: flex; align-items: center; gap: 4px; }
+  .sb .sys svg { width: 13px; height: 13px; }
+  .z2 { zoom: 2; } .z3 { zoom: 3; }
+
+  .board { overflow-x: auto; }
+  table.grid { border-collapse: collapse; width: 100%; }
+  table.grid th, table.grid td { padding: 9px 10px; text-align: center; vertical-align: middle; }
+  table.grid th.rowh, table.grid td.rowh {
+    text-align: left; white-space: nowrap; padding-right: 18px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11px; font-weight: 600;
+  }
+  table.grid th {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 10px; letter-spacing: .06em; font-weight: 600;
+  }
+  .lt table.grid th, .lt table.grid td.rowh { color: rgba(20,20,30,.78); }
+  .dk table.grid th, .dk table.grid td.rowh { color: rgba(255,255,255,.72); }
+  .lt table.grid tbody tr + tr { border-top: 1px solid rgba(20,20,30,.10); }
+  .dk table.grid tbody tr + tr { border-top: 1px solid rgba(255,255,255,.09); }
+
+  .chipbg { display: inline-flex; align-items: center; justify-content: center;
+            padding: 3px 4px; border-radius: 3px; }
+  .chipbg.dk { background: #0B0B0C; } .chipbg.lt { background: #FFFFFF; }
+  canvas.px { image-rendering: pixelated; display: block; border-radius: 2px; }
+
+  table.geo { border-collapse: collapse; font-size: 13px; margin-top: 10px; }
+  table.geo th, table.geo td { text-align: left; padding: 7px 18px 7px 0; border-bottom: 1px solid var(--hair); vertical-align: top; }
+  table.geo th { font-weight: 650; }
+  table.geo td.n { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11.5px; white-space: nowrap; }
+  table.geo tr.win td { background: color-mix(in srgb, var(--accent) 9%, transparent); }
+
+  ul.dec { margin: 10px 0 0; padding-left: 20px; font-size: 13.5px; max-width: 90ch; }
+  ul.dec li { margin-bottom: 9px; }
+  ul.dec b { font-weight: 650; }
+  .q { margin-top: 14px; padding: 15px 19px; border-radius: 12px;
+       background: var(--card); border: 1px solid var(--hair); font-size: 13.5px; max-width: 90ch; }
+  .q ol { padding-left: 20px; margin: 8px 0 0; }
+  .q li { margin-bottom: 10px; }
+  .rec { color: var(--accent); font-weight: 650; }
+  .cap2 { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 10px;
+          margin-top: 7px; line-height: 1.5; }
+  .lt .cap2 { color: rgba(20,20,30,.78); } .dk .cap2 { color: rgba(255,255,255,.7); }
+</style>
+
+<div class="page">
+  <p class="eyebrow">CCRM-49 (Glyph Legibility) &middot; rev C (as built) &middot; approved and shipped 2026-08-21</p>
+  <h1>Reading the level and the pace line at 14&nbsp;dp</h1>
+  <p class="lede">
+    CCRM-48 (Status-Bar Gauge) shipped and is <b>too small to read easily</b>. This is the
+    revision: five ways to spend the same slot, judged on one question — <b>can you see how
+    much is used, and where the pace line sits?</b> No numbers anywhere; they are not the
+    job of this glyph.
+  </p>
+
+  <div class="flag hot">
+    <b>The measurement that reframes everything.</b> The Fold 7 is 420&nbsp;dpi (2.625×).
+    <code>UsageIcon.draw</code> hands Android a <b>63&nbsp;px = 24&nbsp;dp</b> bitmap and the
+    status bar renders it at <b>37–38&nbsp;px ≈ 14&nbsp;dp</b> — a 40% linear downscale that
+    no app can opt out of, because the icon slot is system-fixed. Every "24&nbsp;dp" number
+    in the CCRM-48 wireframe was really 14&nbsp;dp on glass, which is exactly why it read
+    fine on the page and cramped on the phone.
+    <br><br>
+    <b>So this page mocks at 14&nbsp;dp, and shows the real 37-pixel raster.</b> Where you see
+    a magnified block below, it is the glyph rasterised to 37&nbsp;px — the actual pixels the
+    phone lights up — and then blown up. It is not a clean vector zoom, because a clean
+    vector zoom is what misled us last time.
+  </div>
+
+  <!-- ============================================================ -->
+  <h2>1 · The five candidates, at true size, in a real status bar</h2>
+  <p class="sub">
+    Same reading throughout: <b>5-hour 62% used against 45% elapsed</b> (running hot) and
+    <b>7-day 44% against 51%</b> (coasting). Row 1 is what your eye gets. Rows 2 and 3
+    magnify the identical pixels.
+  </p>
+
+  <div class="board dk">
+    <p class="boardcap">Dark bar &middot; true size — 1 px = 1 dp, glyph at 14 dp as the system draws it</p>
+    <div data-strips="dark"></div>
+  </div>
+
+  <div class="board dk">
+    <p class="boardcap">The same glyphs, rasterised at the real 37 px and magnified 5× — no vector cheating</p>
+    <table class="grid" data-pxrow="dark"></table>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2>2 · Can you read the level? The discrimination ladder</h2>
+  <p class="sub">
+    The first job. Each candidate at <b>10 · 30 · 50 · 70 · 90 · 100%</b>, at true 14&nbsp;dp.
+    A glyph passes if you can rank the columns without counting pixels. The pace line is
+    parked at a fixed 50% throughout so it isn't doing the work.
+  </p>
+  <div class="board dk">
+    <p class="boardcap">Dark bar &middot; true size</p>
+    <table class="grid" data-ladder="true-dark"></table>
+  </div>
+  <div class="board dk">
+    <p class="boardcap">Dark bar &middot; the same ladder, real pixels magnified 5×</p>
+    <table class="grid" data-ladder="px-dark"></table>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2>3 · Can you see the pace line? Coasting vs over pace</h2>
+  <p class="sub">
+    The second job, and the one that decides the design. The <b>same 55% usage</b> in every
+    cell — only the pace line moves, from 85% elapsed (coasting comfortably) to 15%
+    (burning fast). If the glyph works, these three read as three different situations
+    without any number.
+  </p>
+  <div class="board dk">
+    <p class="boardcap">Dark bar &middot; true size, then magnified — 55% used against a moving pace line</p>
+    <table class="grid" data-pace="dark"></table>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2>4 · The states that aren't the happy path</h2>
+  <p class="sub">
+    No data draws a bare track — never a full glyph, never a fake 0%. No reset clock means
+    <b>no pace line at all</b>, never a guessed one. At 100% the fill closes and a notch
+    opens, because a tinted mask has no colour to turn red with.
+  </p>
+  <div class="board dk">
+    <p class="boardcap">Dark bar &middot; magnified 5×</p>
+    <table class="grid" data-states="dark"></table>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2>5 · Light bar — the tint flips, the cut still has to work</h2>
+  <p class="sub">
+    The pace line is a slot <i>erased</i> through the glyph, so it shows whatever is behind
+    it. That is what makes it survive on both tints, and it is the one thing CCRM-48
+    definitely got right — confirmed on the Quick Settings tile, which tints dark-on-light.
+  </p>
+  <div class="board lt">
+    <p class="boardcap">Light bar (black tint) &middot; true size, then magnified 5×</p>
+    <table class="grid" data-tintrow="light"></table>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2>6 · Geometry</h2>
+  <p class="sub">
+    Authored in the 24&nbsp;dp bitmap, experienced at 14.1&nbsp;dp. The <b>effective</b>
+    column is the honest one. Anything whose effective size falls below ~1.2&nbsp;dp (≈3 px)
+    is a feature you will not see.
+  </p>
+  <table class="geo">
+    <tr>
+      <th>Candidate</th><th>Windows</th><th>Key feature</th>
+      <th>Design (24 dp)</th><th>Effective (14.1 dp)</th><th>Pace line length</th>
+    </tr>
+    <tr class="win">
+      <td><b>A1 · Twin vertical bars</b></td><td>both</td><td>bar 9 × 23, gap 6</td>
+      <td class="n">stroke n/a · cut 2.6</td><td class="n">bar 5.3 × 13.5 · cut 1.5</td>
+      <td class="n">5.3 dp across the bar</td>
+    </tr>
+    <tr class="win">
+      <td><b>A2 · Stacked horizontal bars</b></td><td>both</td><td>bar 24 × 9, gap 6</td>
+      <td class="n">cut 2.6</td><td class="n">bar 14 × 5.3 · cut 1.5</td>
+      <td class="n">5.3 dp across the bar</td>
+    </tr>
+    <tr>
+      <td>B · One big ring</td><td>5-hour only</td><td>d 22.5, stroke 4</td>
+      <td class="n">cut 2.8</td><td class="n">d 13.2 · stroke 2.3 · cut 1.6</td>
+      <td class="n">2.3 dp across the band</td>
+    </tr>
+    <tr>
+      <td>C · Twin rings, side by side</td><td>both</td><td>d 11 each, gap 1.6</td>
+      <td class="n">stroke 2.2 · cut 1.5</td><td class="n">d 6.5 · stroke 1.3 · cut 0.9</td>
+      <td class="n">1.3 dp — <b>below the floor</b></td>
+    </tr>
+    <tr>
+      <td><s>C2 · Twin rings, wide bitmap</s></td><td>both</td><td>48 × 24 bitmap</td>
+      <td class="n">—</td><td class="n"><b>15 × 7.6 dp slot</b> · rings ~7 dp</td>
+      <td class="n" style="color:#B3261E"><b>measured dead — §7a</b></td>
+    </tr>
+    <tr>
+      <td><i>shipped</i> · concentric rings</td><td>both</td><td>d 23 / 14.5, stroke 2.6</td>
+      <td class="n">cut 1.56</td><td class="n">d 13.5 / <b>8.5</b> · cut 0.9</td>
+      <td class="n">1.5 dp, on an 8.5 dp ring</td>
+    </tr>
+  </table>
+
+  <div class="flag">
+    <b>Why bars win on arithmetic, before taste comes into it.</b> A ring asks you to judge
+    <i>where an arc ends</i> as it travels around a circle; a bar asks you to judge
+    <i>one edge along a straight run</i>. At this size the bar also gets a longer run —
+    14&nbsp;dp of travel for A2 versus 8.5&nbsp;dp of diameter on the shipped inner ring —
+    and its pace line is a straight rule crossing the whole bar rather than a 1.5&nbsp;dp
+    nick in a thin band. Bars are also already this app's status-bar idiom:
+    <code>ic_stat_bars</code> is the small icon for the alert and update notifications, and
+    CCRM-43 (Bar Pace Marks) put pace marks on bars everywhere else. Rings are the odd
+    one out.
+  </div>
+
+  <!-- ============================================================ -->
+  <h2>7 · Two things I tested on the phone, and both changed the design</h2>
+  <p class="sub">
+    Rev A guessed at these. I built a probe — a 48 × 24 dp bitmap with a measuring frame,
+    pure red/green/blue stripes and an asymmetric ring — installed it, and measured what the
+    Fold 7 actually did with it. Both answers were surprises, in opposite directions.
+  </p>
+
+  <h3>7a &middot; C2's wide bitmap — <span style="color:#B3261E">it does not work</span></h3>
+  <div class="board dk">
+    <p class="boardcap">The probe in the real status bar, magnified 6× — 48 × 24 dp of bitmap</p>
+    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASYAAADACAIAAAAmzFmmAAADfUlEQVR42u3dP0tbURgH4FdTcXAomc1S8FMURBEcdPMb+BEsCrqVFgoBF/cuCrqZySWbbv0S2qX+W+0gxljTtZwzJKRp7r3N84wvnnvNJb+cy8s590YAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAw5ga1YF6vZ6rSVVjMDU1tnNNu9wwTiIHIgciB4gcVM+b+C+6QBAV6a6b5UDkQOQAkQORA6KgjmXuQ1apZ5XeAMtAv2aVH58GGDbIob9klc7noQ6U/81H3zbMciByIHKAyIHIAVHcrvB8jeX3bNS7oc71Pqt8G9WiubdZ5WevbJe6QLu7u0ml2Wwmlevr66SytbWVVFqtVpRpjaVd4eDGEhA5EDlA5CAmco0lk6DRaCSV09PTpPL4+JhU5ubmzHKAyIHIASIHIgdYYxnWWP6d9fX1pHJ8fJxU6vV6qZ6Dao0luLEERA5EDhA5CB3LiNCxnFQ7OztJZX9/v++odrudVNbW1nQsAZEDkQNEDkQOQscydCx1LEfs4uIiqSwtLY1t1aWOJbixBEQORA4QOQjPsYQ/rK6uJpXn5+e+o+bn55PKzc2NWQ4QORA5EDlA5CB0LCmT2dnZvn/T6XRK9T93u90hRi0vLyeVk5MTsxwgciByIHKAyEHoWFLgb+R0+iv59PTUd9TMzExSeXl5qdxnv7+/N8sBIgciB4gciByEjiVlkj+DcRD5O2vOzs4K/BSLi4tDjDo/PzfLASIHIgeIHIgchDfvhDfvlPrNO8P1MGu1WlJ5fX0d29cuf2plvgrUm3cAkQORA0QORA7CGksqaGFhIalcXl72HZXvCs/3m49q33r+1MpBzpW/Z8csB4gciBwgciByEDqWlN7V1VVS2dvbSyrNZjP6rSocbq3mqBweHiaV29tbsxwgciBygMiByEHYFR52hUe1doUPYmNjI6m0Wq0Cd0Zvbm4mlaOjoyjuWaB2hYMbS0DkQOQAkYPQsYwIHcsyWVlZSSrb29tJpdFoJJW7u7ukcnBwkFTa7XaU++1FOpbgxhIQORA5QOQgJrJjWRvRufI3xPRGdehfeekfHprQsQREDkQOEDkQOSDG9BzLh4cH1xfMciByIHKAyIHIAVGONZZQmRhYYwluLAGRA5EDRA4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAavsNZBTWhSHSwOQAAAAASUVORK5CYII=" alt="probe in the status bar" style="border-radius:4px">
+    <p class="cap2">
+      Aspect ratio is honoured — the frame is a clean rectangle and the ring is circular, not
+      an ellipse. <b>But look at the size.</b>
+    </p>
+  </div>
+  <div class="flag hot">
+    <b>Measured: 39 × 20 px = 14.9 × 7.6 dp.</b> The square icon measured
+    37 × 37 px = 14 × 14 dp. So the status bar allots a <b>fixed-width slot of about
+    15 dp</b> and fits the bitmap inside it preserving aspect — meaning a 2:1 bitmap buys
+    the same width and <b>loses half the height</b>. Two rings side by side in that strip
+    would be ~7 dp each: no better than option C, and worse than the square.
+    <br><br>
+    <b>So C2 is dead, and the square bitmap is optimal</b> — any non-square shape simply
+    throws away part of the slot. My rev A speculation that it would be "fitted by height"
+    was wrong; sorry for the detour, but this is exactly why it needed the test rather than
+    the paragraph.
+  </div>
+
+  <h3>7b &middot; Colour — <span style="color:#1B6B3A">it works in the status bar</span>, and
+    <span style="color:#B3261E">not in the tile</span></h3>
+  <p class="sub">
+    The probe's stripes are pure <code>#FF0000</code>, <code>#00FF00</code>,
+    <code>#0000FF</code>. Sampling the screenshot pixel by pixel, the status bar reproduced
+    them as exactly <code>(255,0,0)</code>, <code>(0,255,0)</code>, <code>(0,0,255)</code> —
+    <b>no tint, no wash, untouched</b>. Android's documentation says small icons are alpha
+    masks; Samsung's One UI plainly does not enforce it. CCRM-48's "the severity ladder
+    cannot exist on this surface" was wrong on this hardware.
+  </p>
+  <div class="board dk">
+    <p class="boardcap">The same bitmap in the Quick Settings tile, magnified 3×</p>
+    <img src="data:image/png;base64,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" alt="probe in the quick settings tile" style="border-radius:6px">
+    <p class="cap2">
+      The identical red, green and blue stripes, rendered as <b>three identical grey
+      bars</b>. The tile is a true alpha mask and flattens everything to one tint.
+    </p>
+  </div>
+  <div class="flag hot">
+    <b>This asymmetry is the new design rule.</b> One bitmap feeds both surfaces today, and
+    they disagree about colour — so colour can only ever be an <i>enhancement</i>:
+    <ul style="margin:8px 0 0">
+      <li><b>Alpha and shape must carry the level and the pace line</b>, because that is all
+      the tile will show — and all a stricter OEM would show either.</li>
+      <li><b>Colour carries severity and separates used from remaining</b>, where the device
+      allows it.</li>
+    </ul>
+    The clean way to get both is to stop sharing one bitmap: <code>UsageIcon.draw</code>
+    takes a <code>monochrome</code> flag, the tile passes <code>true</code> and the
+    notification passes <code>false</code>. Cheap, and each surface gets its best rendering.
+  </div>
+
+  <!-- ============================================================ -->
+  <h2>7c · The colour design</h2>
+  <p class="sub">
+    Three elements, three deliberately different treatments — and the ranking survives when
+    the colour is stripped, which is what keeps the tile honest.
+  </p>
+  <table class="geo">
+    <tr><th>Element</th><th>In colour (status bar)</th><th>Flattened (tile, or a stricter OEM)</th></tr>
+    <tr><td><b>Used</b></td>
+      <td class="n">the severity ladder — accent <span style="color:#E59980">■</span> ·
+        &gt;80 <span style="color:#FDD663">■</span> · &gt;90 <span style="color:#FFA726">■</span> ·
+        ≥100 <span style="color:#FF5252">■</span></td>
+      <td class="n">full-alpha ink</td></tr>
+    <tr><td><b>Remaining</b></td>
+      <td class="n">neutral at 26% — deliberately desaturated so the used arc pops</td>
+      <td class="n">ink at 26–34% — unchanged from today</td></tr>
+    <tr><td><b>Pace line</b></td>
+      <td class="n"><span style="color:#5BC8FF">■</span> a cool hue (#5BC8FF) on a dark halo,
+        overhanging both band edges</td>
+      <td class="n">the erased cut, exactly as shipped</td></tr>
+  </table>
+  <div class="flag">
+    <b>Why a cool hue for the pace line.</b> It can never collide with the warm severity
+    ladder or the terracotta theme, so the line stays readable at every level — and it keeps
+    the original contract that the pace mark answers "where am I in the window", never "how
+    bad is it". <b>Why it overhangs the band:</b> that is the safety net. If a device does
+    flatten the colour, the stretch crossing the fill disappears, but the two nubs sitting on
+    the background still mark the position — the same trick the widget rings already use.
+  </div>
+
+  <div class="board dk">
+    <p class="boardcap">In colour &middot; true size in the bar, then the real pixels at 5× — 5-hour 62% over pace, 7-day 44% coasting</p>
+    <table class="grid" data-colour="dark"></table>
+  </div>
+
+  <div class="board dk">
+    <p class="boardcap">The severity ladder, in colour &middot; 62 · 84 · 93 · 100 — real pixels at 5×</p>
+    <table class="grid" data-sev="dark"></table>
+  </div>
+
+  <div class="board dk">
+    <p class="boardcap">Same glyphs flattened — what the QS tile and any tinting OEM will show &middot; real pixels at 5×</p>
+    <table class="grid" data-mono="dark"></table>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2>8 · Recommendation</h2>
+  <ul class="dec">
+    <li><b>Keep the square bitmap.</b> Measured, not assumed: the slot is ~15 dp wide and
+    fits by width, so anything non-square throws away height for nothing. C2 is dead.</li>
+    <li><b>Add the colour layer</b>, with <code>UsageIcon.draw</code> taking a
+    <code>monochrome</code> flag so the tile keeps the alpha-mask drawing and the status bar
+    gets colour. This is the single biggest legibility win available — it separates used from
+    remaining by hue as well as brightness, brings back the severity ladder that CCRM-48
+    (Status-Bar Gauge) had to abandon, and lets the pace line be a <i>drawn cool-hued
+    stroke</i> rather than a 0.9 dp nick.</li>
+    <li><b>On shape, colour changes the maths.</b> Hue does most of the work that size was
+    failing to do, so the concentric rings become far more separable than they are today, and
+    twin small rings become viable again. Compare 7c's rows before deciding — but my
+    recommendation is still <b>A2 stacked horizontal bars</b>: it has the longest run for the
+    level, the longest pace line, and it mirrors the notification body directly below it. In
+    colour it is the clearest of the five at true size.</li>
+    <li><b>Whatever wins must survive flattening</b> — judge it in the last board, not just
+    the colourful one. That is the tile, and it is also every phone that enforces the alpha
+    mask.</li>
+    <li><b>Not proposed:</b> numbers, and the per-model third element — still out of scope.</li>
+  </ul>
+
+  <div class="q">
+    <b>Decisions — approved 2026-08-21, built and verified on the Fold 7 the same day:</b>
+    <ol>
+      <li><b>Square bitmap, one ring</b> (option B), at <b>22.4 dp across on a 4 dp
+      stroke</b> — as large as the 24 dp box allows once the pace mark's overhang is
+      accounted for. C2's wide bitmap was measured dead in §7a; the bars were not taken up.</li>
+      <li><b>Colour, in the status bar only.</b> Used wears the severity colour (the same
+      <code>Palette.barColor</code> value as the notification's gauge), remaining is a mid
+      neutral, and the pace mark is a cool <code>#5BC8FF</code> line.</li>
+      <li><b>The mark stays an erased slot with the line inside it</b>, the slot deliberately
+      wider than the line — so a surface that flattens the bitmap still shows a gap. The
+      overhang was cut right back after the first install: at this size a longer one reads as
+      a spike into the ring's hollow rather than a mark on the band.</li>
+      <li><b>The Quick Settings tile keeps the monochrome rendering</b>, because it flattens
+      colour anyway. <code>UsageIcon.draw</code> takes <code>fillArgb</code>; the tile passes
+      null.</li>
+      <li><b>The Twin style is withdrawn</b>, and a stored <code>"twin"</code> migrates back
+      to <code>"ring"</code>.</li>
+    </ol>
+    <b style="display:block;margin-top:12px">Left open:</b> the 7-day window is not on the
+    glyph. A <i>level</i> for it costs the 5-hour ring its size — that is exactly what
+    CCRM-48 (Status-Bar Gauge) proved unreadable. A <i>state</i> marker is a different
+    proposition and is not yet drawn: a dot in the ring's hollow, shown <b>only</b> once the
+    7-day passes 80%, coloured by its rung where colour survives. It costs the 5-hour ring
+    nothing because the hollow is already empty, it keeps the app's "colour appearing at all
+    is the signal" habit, and it degrades honestly — on the tile the dot still means "the
+    weekly is in trouble" without needing hue. Wireframe first if wanted.
+  </div>
+</div>
+
+<script>
+/* ===================================================================
+   Everything is a tinted ALPHA MASK: one ink, and the pace line is a
+   slot erased to the bar colour behind it. Authored in a 24 dp box,
+   displayed at 14.1 dp — the numbers below are design-space dp.
+   =================================================================== */
+const BOX = 24, EFF = 14.1, DENS = 2.625;
+const PXW = Math.round(EFF * DENS);            // 37 — the real pixel count
+const MIN_FILL = 9;                            // % floor, so 1-3% still reads
+
+/* CCRM-49 rev B — the colour layer. Used, remaining and the pace line get three
+   deliberately different treatments; strip the colour and the alpha still ranks them,
+   which is what keeps the QS tile working. */
+const SEV = {                     // severity ladder, shared with Palette.barColor
+  base:  "#E59980",               // theme accent (dark surfaces)
+  warn:  "#FDD663",               // >80
+  hot:   "#FFA726",               // >90
+  over:  "#FF5252",               // >=100
+};
+const PACE = "#5BC8FF";           // the pace line: a cool hue, so it can never be
+                                  // confused with the warm severity ladder
+function sevColor(p) {
+  const t = Math.trunc(p);
+  return t >= 100 ? SEV.over : t > 90 ? SEV.hot : t > 80 ? SEV.warn : SEV.base;
+}
+const IN_D = "#FFFFFF", BG_D = "#0B0B0C";
+const IN_L = "#111112", BG_L = "#FFFFFF";
+const ink = (d) => d ? IN_D : IN_L;
+const bg  = (d) => d ? BG_D : BG_L;
+const inkA = (d, a) => d ? `rgba(255,255,255,${a})` : `rgba(17,17,18,${a})`;
+const TRACK = 0.34;
+
+const shown = (p) => p > 0 ? Math.max(p, MIN_FILL) : 0;
+
+/* ---------- ring ---------- */
+function ring(cx, cy, d, st, pct, el, dark, cut, col) {
+  const r = (d - st) / 2, back = bg(dark);
+  const fillCol = col ? sevColor(pct == null ? 0 : pct) : ink(dark);
+  const trackCol = col ? (dark ? "rgba(255,255,255,0.26)" : "rgba(17,17,18,0.24)") : inkA(dark, TRACK);
+  let s = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${trackCol}" stroke-width="${st}"/>`;
+  if (pct != null) {
+    const p = Math.min(100, Math.max(0, pct)), v = shown(p);
+    if (v >= 100) s += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${fillCol}" stroke-width="${st}"/>`;
+    else if (v > 0) s += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${fillCol}" stroke-width="${st}"
+        pathLength="100" stroke-dasharray="${v} 100" stroke-linecap="round" transform="rotate(-90 ${cx} ${cy})"/>`;
+    if (p >= 100 && !col) s += radialCut(cx, cy, r, st, 0, back, st * 0.7);
+  }
+  if (pct != null && el != null) {
+    s += col ? paceLine(cx, cy, r, st, el, back)
+             : radialCut(cx, cy, r, st, el, back, cut);
+  }
+  return s;
+}
+/* The colour pace line: a cool radial stroke that overhangs both band edges. The
+   overhang is the safety net — if a device flattens the colour, the part crossing the
+   fill disappears but the two nubs on the background still mark the position. */
+function paceLine(cx, cy, r, st, pct, back) {
+  const a = (pct / 100) * 2 * Math.PI - Math.PI / 2;
+  const o = st * 0.42, w = Math.max(1.3, st * 0.42);
+  const x1 = cx + (r - st/2 - o) * Math.cos(a), y1 = cy + (r - st/2 - o) * Math.sin(a);
+  const x2 = cx + (r + st/2 + o) * Math.cos(a), y2 = cy + (r + st/2 + o) * Math.sin(a);
+  return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${back}" stroke-width="${w * 2.1}" stroke-linecap="round"/>` +
+         `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${PACE}" stroke-width="${w}" stroke-linecap="round"/>`;
+}
+function radialCut(cx, cy, r, st, pct, back, w) {
+  const a = (pct / 100) * 2 * Math.PI - Math.PI / 2, o = 0.15 * st;
+  const x1 = cx + (r - st/2 - o) * Math.cos(a), y1 = cy + (r - st/2 - o) * Math.sin(a);
+  const x2 = cx + (r + st/2 + o) * Math.cos(a), y2 = cy + (r + st/2 + o) * Math.sin(a);
+  return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${back}" stroke-width="${w}"/>`;
+}
+
+/* ---------- bar: vertical fills upward, horizontal fills rightward ---------- */
+let CLIP = 0;
+function bar(x, y, w, h, pct, el, dark, vertical, cut, col) {
+  const back = bg(dark), rad = Math.min(w, h) * 0.28;
+  const fillCol = col ? sevColor(pct == null ? 0 : pct) : ink(dark);
+  const trackCol = col ? (dark ? "rgba(255,255,255,0.26)" : "rgba(17,17,18,0.24)") : inkA(dark, TRACK);
+  const id = "clip" + (++CLIP);
+  // The fill is clipped to the track's rounded shape, so its leading edge stays
+  // straight — a level, not a second pill. (A rounded fill rect was a mock bug.)
+  let s = `<defs><clipPath id="${id}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rad}"/></clipPath></defs>`;
+  s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rad}" fill="${trackCol}"/>`;
+  s += `<g clip-path="url(#${id})">`;
+  if (pct != null) {
+    const p = Math.min(100, Math.max(0, pct)), v = shown(p) / 100;
+    if (v > 0) {
+      s += vertical
+        ? `<rect x="${x}" y="${y + h * (1 - v)}" width="${w}" height="${h * v}" fill="${fillCol}"/>`
+        : `<rect x="${x}" y="${y}" width="${w * v}" height="${h}" fill="${fillCol}"/>`;
+    }
+    // ≥100: a notch at the far end, since a tinted mask has no red to turn
+    if (p >= 100) s += vertical
+      ? `<rect x="${x - 0.5}" y="${y + 1.6}" width="${w + 1}" height="${cut}" fill="${back}"/>`
+      : `<rect x="${x + w - 1.6 - cut}" y="${y - 0.5}" width="${cut}" height="${h + 1}" fill="${back}"/>`;
+  }
+  // the pace line — erased across the whole bar, so it reads on fill and track alike
+  if (pct != null && el != null) {
+    const e = Math.min(100, Math.max(0, el)) / 100;
+    if (col) {
+      const hw = cut * 1.05, lw = cut * 0.62;
+      s += vertical
+        ? `<rect x="${x - 0.8}" y="${y + h * (1 - e) - hw / 2}" width="${w + 1.6}" height="${hw}" fill="${back}"/>` +
+          `<rect x="${x - 0.8}" y="${y + h * (1 - e) - lw / 2}" width="${w + 1.6}" height="${lw}" fill="${PACE}"/>`
+        : `<rect x="${x + w * e - hw / 2}" y="${y - 0.8}" width="${hw}" height="${h + 1.6}" fill="${back}"/>` +
+          `<rect x="${x + w * e - lw / 2}" y="${y - 0.8}" width="${lw}" height="${h + 1.6}" fill="${PACE}"/>`;
+    } else {
+      s += vertical
+        ? `<rect x="${x - 0.5}" y="${y + h * (1 - e) - cut / 2}" width="${w + 1}" height="${cut}" fill="${back}"/>`
+        : `<rect x="${x + w * e - cut / 2}" y="${y - 0.5}" width="${cut}" height="${h + 1}" fill="${back}"/>`;
+    }
+  }
+  return s + `</g>`;
+}
+
+/* ---------- the candidates ---------- */
+const CAND = {
+  A1: { label: "A1 twin vertical bars", wide: false, draw: (a, b, d, k) =>
+        bar(0, 0.5, 9, 23, a.p, a.e, d, true, 2.6, k) + bar(15, 0.5, 9, 23, b.p, b.e, d, true, 2.6, k) },
+  A2: { label: "A2 stacked horizontal bars", wide: false, draw: (a, b, d, k) =>
+        bar(0, 0.5, 24, 9, a.p, a.e, d, false, 2.6, k) + bar(0, 15.5, 24, 9, b.p, b.e, d, false, 2.6, k) },
+  B:  { label: "B one big ring", wide: false, draw: (a, b, d, k) =>
+        ring(12, 12, 22.5, 4, a.p, a.e, d, 2.8, k) },
+  C:  { label: "C twin rings, side by side", wide: false, draw: (a, b, d, k) =>
+        ring(5.7, 12, 11, 2.2, a.p, a.e, d, 1.5, k) + ring(18.3, 12, 11, 2.2, b.p, b.e, d, 1.5, k) },
+  SHIPPED: { label: "shipped concentric", wide: false, draw: (a, b, d, k) =>
+        ring(12, 12, 23, 2.6, b.p, b.e, d, 1.56, k) + ring(12, 12, 14.5, 2.6, a.p, a.e, d, 1.56, k) },
+};
+const ORDER = ["A1", "A2", "B", "C", "SHIPPED"];
+let COLOUR = false;   // flipped per-section: the status bar gets colour, the tile does not
+
+function svgFor(key, a, b, dark) {
+  const c = CAND[key], w = c.wide ? BOX * 2 : BOX;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${BOX}" width="${w}" height="${BOX}">` +
+         c.draw(a, b, dark, COLOUR) + `</svg>`;
+}
+/* true size: the browser downsamples the same way the system does */
+function trueSize(key, a, b, dark) {
+  const c = CAND[key], w = c.wide ? EFF * 2 : EFF;
+  return svgFor(key, a, b, dark)
+    .replace(`width="${c.wide ? BOX * 2 : BOX}" height="${BOX}"`, `width="${w}" height="${EFF}"`);
+}
+/* pixel-accurate: rasterise to the real 37 px, then magnify with no smoothing */
+function pixelBlock(el, key, a, b, dark, mag) {
+  const c = CAND[key], pw = c.wide ? PXW * 2 : PXW;
+  const cv = document.createElement("canvas");
+  cv.className = "px"; cv.width = pw * mag; cv.height = PXW * mag;
+  cv.style.width = (pw * mag) + "px"; cv.style.height = (PXW * mag) + "px";
+  const ctx = cv.getContext("2d");
+  const img = new Image();
+  img.onload = () => {
+    const off = document.createElement("canvas");
+    off.width = pw; off.height = PXW;
+    const oc = off.getContext("2d");
+    oc.fillStyle = bg(dark); oc.fillRect(0, 0, pw, PXW);
+    oc.drawImage(img, 0, 0, pw, PXW);          // the real downscale
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(off, 0, 0, pw * mag, PXW * mag);
+  };
+  img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgFor(key, a, b, dark));
+  el.appendChild(cv);
+}
+
+const SYS = `<div class="sys">
+  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21 1 8.5A16 16 0 0 1 23 8.5L12 21z"/></svg>
+  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 22h3V10H2v12zm5 0h3V6H7v16zm5 0h3V2h-3v20zm5 0h3V14h-3v8z"/></svg>
+  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.7 4H14V2h-4v2H8.3C7.6 4 7 4.6 7 5.3v15.4c0 .7.6 1.3 1.3 1.3h7.4c.7 0 1.3-.6 1.3-1.3V5.3C17 4.6 16.4 4 15.7 4zm-.7 16H9v-8h6v8z"/></svg>
+</div>`;
+
+const HOT = { p: 62, e: 45 };     // 5-hour, over pace
+const COOL = { p: 44, e: 51 };    // 7-day, coasting
+
+/* ---------- 1 · status bar strips at true size ---------- */
+document.querySelectorAll("[data-strips]").forEach((host) => {
+  const dark = host.getAttribute("data-strips") === "dark";
+  host.innerHTML = ORDER.map((k) => `
+    <div style="margin-bottom:16px">
+      <div class="z2"><div class="sb ${dark ? "dk" : "lt"}">
+        <span class="clock">9:41</span>
+        <span style="display:flex;align-items:center">${trueSize(k, HOT, COOL, dark)}</span>
+        <span class="spacer"></span>${SYS}
+      </div></div>
+      <div class="cap2">${CAND[k].label}${k === "SHIPPED" ? " — what is on your phone now" : ""}</div>
+    </div>`).join("");
+});
+
+/* ---------- 1b · pixel-accurate row ---------- */
+document.querySelectorAll("[data-pxrow]").forEach((host) => {
+  const dark = host.getAttribute("data-pxrow") === "dark";
+  const head = `<thead><tr>${ORDER.map((k) => `<th>${CAND[k].label}</th>`).join("")}</tr></thead>`;
+  host.innerHTML = head + `<tbody><tr>${ORDER.map(() => `<td></td>`).join("")}</tr></tbody>`;
+  host.querySelectorAll("tbody td").forEach((td, i) => {
+    const w = document.createElement("div"); w.className = "chipbg " + (dark ? "dk" : "lt");
+    td.appendChild(w); pixelBlock(w, ORDER[i], HOT, COOL, dark, 5);
+  });
+});
+
+/* ---------- 2 · discrimination ladder ---------- */
+document.querySelectorAll("[data-ladder]").forEach((host) => {
+  const mode = host.getAttribute("data-ladder");
+  const dark = mode.endsWith("dark"), px = mode.startsWith("px");
+  const LEVELS = [10, 30, 50, 70, 90, 100];
+  host.innerHTML =
+    `<thead><tr><th class="rowh"></th>${LEVELS.map((l) => `<th>${l}%</th>`).join("")}</tr></thead>` +
+    `<tbody>${ORDER.map((k) => `<tr><td class="rowh">${CAND[k].label}</td>` +
+      LEVELS.map(() => `<td></td>`).join("") + `</tr>`).join("")}</tbody>`;
+  host.querySelectorAll("tbody tr").forEach((tr, ri) => {
+    tr.querySelectorAll("td:not(.rowh)").forEach((td, ci) => {
+      const a = { p: LEVELS[ci], e: 50 }, b = { p: LEVELS[ci], e: 50 };
+      if (px) {
+        const w = document.createElement("div"); w.className = "chipbg " + (dark ? "dk" : "lt");
+        w.style.display = "inline-flex"; td.appendChild(w);
+        pixelBlock(w, ORDER[ri], a, b, dark, 5);
+      } else {
+        td.innerHTML = `<span class="chipbg ${dark ? "dk" : "lt"}">${trueSize(ORDER[ri], a, b, dark)}</span>`;
+      }
+    });
+  });
+});
+
+/* ---------- 3 · pace line visibility ---------- */
+document.querySelectorAll("[data-pace]").forEach((host) => {
+  const dark = host.getAttribute("data-pace") === "dark";
+  const CASES = [
+    { e: 85, t: "coasting · pace at 85" },
+    { e: 55, t: "on pace · pace at 55" },
+    { e: 15, t: "burning fast · pace at 15" },
+  ];
+  host.innerHTML =
+    `<thead><tr><th class="rowh"></th>${CASES.map((c) => `<th>${c.t}</th>`).join("")}` +
+    `${CASES.map((c) => `<th>${c.t} · 5×</th>`).join("")}</tr></thead>` +
+    `<tbody>${ORDER.map((k) => `<tr><td class="rowh">${CAND[k].label}</td>` +
+      CASES.concat(CASES).map(() => `<td></td>`).join("") + `</tr>`).join("")}</tbody>`;
+  host.querySelectorAll("tbody tr").forEach((tr, ri) => {
+    tr.querySelectorAll("td:not(.rowh)").forEach((td, ci) => {
+      const c = CASES[ci % 3], a = { p: 55, e: c.e }, b = { p: 55, e: c.e };
+      if (ci < 3) {
+        td.innerHTML = `<span class="chipbg ${dark ? "dk" : "lt"}">${trueSize(ORDER[ri], a, b, dark)}</span>`;
+      } else {
+        const w = document.createElement("div"); w.className = "chipbg " + (dark ? "dk" : "lt");
+        w.style.display = "inline-flex"; td.appendChild(w);
+        pixelBlock(w, ORDER[ri], a, b, dark, 5);
+      }
+    });
+  });
+});
+
+/* ---------- 4 · states ---------- */
+document.querySelectorAll("[data-states]").forEach((host) => {
+  const dark = host.getAttribute("data-states") === "dark";
+  const S = [
+    { t: "no data at all", a: { p: null, e: null }, b: { p: null, e: null } },
+    { t: "7-day has no reading", a: { p: 62, e: 45 }, b: { p: null, e: null } },
+    { t: "no reset clock → no pace line", a: { p: 62, e: null }, b: { p: 44, e: null } },
+    { t: "2% — the min-fill floor", a: { p: 2, e: 20 }, b: { p: 2, e: 20 } },
+    { t: "100% — fill closes, notch opens", a: { p: 100, e: 80 }, b: { p: 100, e: 80 } },
+  ];
+  host.innerHTML =
+    `<thead><tr><th class="rowh"></th>${S.map((s) => `<th>${s.t}</th>`).join("")}</tr></thead>` +
+    `<tbody>${ORDER.map((k) => `<tr><td class="rowh">${CAND[k].label}</td>` +
+      S.map(() => `<td></td>`).join("") + `</tr>`).join("")}</tbody>`;
+  host.querySelectorAll("tbody tr").forEach((tr, ri) => {
+    tr.querySelectorAll("td:not(.rowh)").forEach((td, ci) => {
+      const w = document.createElement("div"); w.className = "chipbg " + (dark ? "dk" : "lt");
+      w.style.display = "inline-flex"; td.appendChild(w);
+      pixelBlock(w, ORDER[ri], S[ci].a, S[ci].b, dark, 5);
+    });
+  });
+});
+
+/* ---------- 5 · light tint ---------- */
+document.querySelectorAll("[data-tintrow]").forEach((host) => {
+  host.innerHTML =
+    `<thead><tr><th class="rowh"></th><th>true size</th><th>magnified 5×</th></tr></thead>` +
+    `<tbody>${ORDER.map((k) => `<tr><td class="rowh">${CAND[k].label}</td><td></td><td></td></tr>`).join("")}</tbody>`;
+  host.querySelectorAll("tbody tr").forEach((tr, ri) => {
+    const tds = tr.querySelectorAll("td:not(.rowh)");
+    tds[0].innerHTML = `<span class="chipbg lt">${trueSize(ORDER[ri], HOT, COOL, false)}</span>`;
+    const w = document.createElement("div"); w.className = "chipbg lt";
+    w.style.display = "inline-flex"; tds[1].appendChild(w);
+    pixelBlock(w, ORDER[ri], HOT, COOL, false, 5);
+  });
+});
+
+/* ---------- 7c · colour, severity and the flattened fallback ---------- */
+document.querySelectorAll("[data-colour]").forEach((host) => {
+  const dark = host.getAttribute("data-colour") === "dark";
+  COLOUR = true;
+  host.innerHTML =
+    `<thead><tr><th class="rowh"></th><th>in the bar, true size</th><th>real pixels, 5×</th></tr></thead>` +
+    `<tbody>${ORDER.map((k) => `<tr><td class="rowh">${CAND[k].label}</td><td></td><td></td></tr>`).join("")}</tbody>`;
+  host.querySelectorAll("tbody tr").forEach((tr, ri) => {
+    const tds = tr.querySelectorAll("td:not(.rowh)");
+    tds[0].innerHTML = `<div class="z2"><div class="sb ${dark ? "dk" : "lt"}">
+        <span class="clock">9:41</span>
+        <span style="display:flex;align-items:center">${trueSize(ORDER[ri], HOT, COOL, dark)}</span>
+        <span class="spacer"></span>${SYS}</div></div>`;
+    const w = document.createElement("div"); w.className = "chipbg " + (dark ? "dk" : "lt");
+    w.style.display = "inline-flex"; tds[1].appendChild(w);
+    pixelBlock(w, ORDER[ri], HOT, COOL, dark, 5);
+  });
+  COLOUR = false;
+});
+
+document.querySelectorAll("[data-sev]").forEach((host) => {
+  const dark = host.getAttribute("data-sev") === "dark";
+  COLOUR = true;
+  const L = [62, 84, 93, 100];
+  host.innerHTML =
+    `<thead><tr><th class="rowh"></th>${L.map((l) => `<th>${l}%</th>`).join("")}</tr></thead>` +
+    `<tbody>${ORDER.map((k) => `<tr><td class="rowh">${CAND[k].label}</td>` +
+      L.map(() => `<td></td>`).join("") + `</tr>`).join("")}</tbody>`;
+  host.querySelectorAll("tbody tr").forEach((tr, ri) => {
+    tr.querySelectorAll("td:not(.rowh)").forEach((td, ci) => {
+      const a = { p: L[ci], e: 55 }, b = { p: L[ci], e: 55 };
+      const w = document.createElement("div"); w.className = "chipbg " + (dark ? "dk" : "lt");
+      w.style.display = "inline-flex"; td.appendChild(w);
+      pixelBlock(w, ORDER[ri], a, b, dark, 5);
+    });
+  });
+  COLOUR = false;
+});
+
+document.querySelectorAll("[data-mono]").forEach((host) => {
+  const dark = host.getAttribute("data-mono") === "dark";
+  const L = [62, 84, 100];
+  host.innerHTML =
+    `<thead><tr><th class="rowh"></th>${L.map((l) => `<th>${l}% flattened</th>`).join("")}</tr></thead>` +
+    `<tbody>${ORDER.map((k) => `<tr><td class="rowh">${CAND[k].label}</td>` +
+      L.map(() => `<td></td>`).join("") + `</tr>`).join("")}</tbody>`;
+  host.querySelectorAll("tbody tr").forEach((tr, ri) => {
+    tr.querySelectorAll("td:not(.rowh)").forEach((td, ci) => {
+      const a = { p: L[ci], e: 55 }, b = { p: L[ci], e: 55 };
+      const w = document.createElement("div"); w.className = "chipbg " + (dark ? "dk" : "lt");
+      w.style.display = "inline-flex"; td.appendChild(w);
+      pixelBlock(w, ORDER[ri], a, b, dark, 5);
+    });
+  });
+});
+
+/* ---------- (removed) the wide-bitmap proposal — measured dead in 7a ---------- */
+</script>

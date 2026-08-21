@@ -47,17 +47,14 @@ abstract class BaseUsageTileService(private val profile: Profile) : TileService(
                     // Fills as the window burns, in whichever icon style is set.
                     // The system tints tile icons like status-bar icons, so this is
                     // an alpha mask — level shows through fill, never through colour.
-                    // Pace cuts and the twin style's 7-day ring ride along
-                    // (CCRM-48 (Status-Bar Gauge)) — one setting, one look.
+                    // The pace mark rides along (CCRM-48 (Status-Bar Gauge)), but no
+                    // colour: this surface flattens a bitmap to one tint, measured in
+                    // CCRM-49 (Glyph Legibility), so it gets the alpha-mask rendering.
                     icon = Icon.createWithBitmap(
                         UsageIcon.draw(
                             this@BaseUsageTileService, session.percent,
                             cache.pinnedIconStyle(), cache.usageLeft(),
                             sessionElapsed = elapsedPercent(session, Projection.SESSION_MS),
-                            weeklyPct = snapshot.data?.weekly?.percent,
-                            weeklyElapsed = elapsedPercent(
-                                snapshot.data?.weekly, Projection.WEEKLY_MS,
-                            ),
                         )
                     )
                 }

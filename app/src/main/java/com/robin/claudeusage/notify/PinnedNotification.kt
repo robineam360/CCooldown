@@ -42,8 +42,10 @@ import com.robin.claudeusage.ui.elapsedPercent
  * and re-renders on every poll so the percentage and countdown stay live.
  *
  * The colored surfaces (gauge, panel bars) follow the theme and the warning
- * ladder. The tiny status-bar icon is necessarily monochrome — Android renders
- * small icons as an alpha mask — so it conveys the level through fill only.
+ * ladder — and since CCRM-49 (Glyph Legibility) the status-bar icon does too, drawn
+ * with the very same [Palette.barColor] value so the glyph and the gauge can never
+ * disagree. (The Quick Settings tile still gets the monochrome rendering; it tints
+ * whatever it is handed.)
  */
 object PinnedNotification {
 
@@ -110,13 +112,14 @@ object PinnedNotification {
         // draws regardless; only the colour past it is optional.
         val showOverPace = cache.paceOverOnNotification()
         val sessionElapsed = elapsedPercent(session, Projection.SESSION_MS)
-        // CCRM-48 (Status-Bar Gauge): the icon's pace cuts and the twin style's
-        // outer ring. Same elapsed maths as the gauge and bars below it.
+        // CCRM-49 (Glyph Legibility): the status bar keeps colour, so the glyph wears
+        // the same severity colour as the gauge below it — one source of truth, and the
+        // two can never disagree.
         val smallIcon = drawStatusIcon(
             context, pct, cache.pinnedIconStyle(), left,
             sessionElapsed = sessionElapsed,
-            weeklyPct = data?.weekly?.percent,
-            weeklyElapsed = elapsedPercent(data?.weekly, Projection.WEEKLY_MS),
+            fillArgb = fill.toArgb(),
+            dark = dark,
         )
         val pctText = if (pct == null) "—" else "${Fmt.usageInt(pct, left)}%"
         // The worded form for text slots that have room for the word.
@@ -465,10 +468,10 @@ object PinnedNotification {
         iconStyle: String,
         left: Boolean,
         sessionElapsed: Double?,
-        weeklyPct: Double?,
-        weeklyElapsed: Double?,
+        fillArgb: Int?,
+        dark: Boolean,
     ): IconCompat = IconCompat.createWithBitmap(
-        UsageIcon.draw(context, pct, iconStyle, left, sessionElapsed, weeklyPct, weeklyElapsed)
+        UsageIcon.draw(context, pct, iconStyle, left, sessionElapsed, fillArgb, dark)
     )
 
     /**
