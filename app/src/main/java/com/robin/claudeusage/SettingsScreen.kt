@@ -98,6 +98,7 @@ import com.robin.claudeusage.notify.UpdateNotification
 import com.robin.claudeusage.ping.PingScheduler
 import com.robin.claudeusage.ui.Fmt
 import com.robin.claudeusage.ui.Palette
+import com.robin.claudeusage.ui.UsageIcon
 import com.robin.claudeusage.ui.hasTwoColumns
 import com.robin.claudeusage.widget.BarWidgetReceiver
 import com.robin.claudeusage.widget.UsageWidgetReceiver
@@ -416,13 +417,17 @@ fun SettingsScreen(
                 RowDivider()
                 Text("Status-bar icon", style = MaterialTheme.typography.bodyLarge)
                 Spacer(Modifier.height(8.dp))
+                // CCRM-48 (Status-Bar Gauge): Twin is a new fifth chip rather than a
+                // change to Ring, so nobody's icon redraws without them choosing it.
+                // Five chips can overflow a narrow screen, hence FlowRow.
                 val iconStyles = listOf(
                     "ring" to "Ring",
+                    UsageIcon.TWIN to "Twin",
                     "pie" to "Pie",
                     "battery" to "Battery",
                     "number" to "Number",
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     for ((value, text) in iconStyles) {
                         FilterChip(
                             selected = iconStyle == value,
@@ -437,7 +442,7 @@ fun SettingsScreen(
                 }
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    "The colored gauge and bars follow your theme and turn orange, then red, near the limit. The tiny status-bar icon is monochrome — Android renders it that way for every app.",
+                    "The colored gauge and bars follow your theme and turn orange, then red, near the limit. The tiny status-bar icon is monochrome — Android renders it that way for every app. Ring and Twin carry a pace mark: a small cut in the ring at where you'd be at an even burn — fill past the cut means faster than even pace. Twin adds the 7-day window as an outer ring around the 5-hour one.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

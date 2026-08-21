@@ -10,8 +10,10 @@ import android.service.quicksettings.TileService
 import com.robin.claudeusage.MainActivity
 import com.robin.claudeusage.data.Profile
 import com.robin.claudeusage.data.UsageCache
+import com.robin.claudeusage.data.Projection
 import com.robin.claudeusage.ui.Fmt
 import com.robin.claudeusage.ui.UsageIcon
+import com.robin.claudeusage.ui.elapsedPercent
 import com.robin.claudeusage.work.Polling
 
 /** Quick Settings tile: 5-hour utilization at a glance from any screen. */
@@ -45,10 +47,17 @@ abstract class BaseUsageTileService(private val profile: Profile) : TileService(
                     // Fills as the window burns, in whichever icon style is set.
                     // The system tints tile icons like status-bar icons, so this is
                     // an alpha mask — level shows through fill, never through colour.
+                    // Pace cuts and the twin style's 7-day ring ride along
+                    // (CCRM-48 (Status-Bar Gauge)) — one setting, one look.
                     icon = Icon.createWithBitmap(
                         UsageIcon.draw(
                             this@BaseUsageTileService, session.percent,
                             cache.pinnedIconStyle(), cache.usageLeft(),
+                            sessionElapsed = elapsedPercent(session, Projection.SESSION_MS),
+                            weeklyPct = snapshot.data?.weekly?.percent,
+                            weeklyElapsed = elapsedPercent(
+                                snapshot.data?.weekly, Projection.WEEKLY_MS,
+                            ),
                         )
                     )
                 }

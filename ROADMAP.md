@@ -154,6 +154,34 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
   `installedBrowsers()` via a hand-rolled `Drawable.asIconBitmap()` (core-ktx's
   `toBitmap()` is not a declared dependency).
 
+### CCRM-48 · Status-Bar Gauge — both windows, pace-marked, in the small icon
+- **Status:** Done and **verified on the Fold 7, 2026-08-21** (release-signed install
+  over the live app; both rings, both pace cuts and the min-fill floor observed on the
+  status bar and the QS tile, in both tint directions).
+- **Provenance:** the Mac menu-bar gauge (CCooldownMac `GaugeRenderer.swift`
+  `renderMulti`/`drawPaceMark`), ported to the always-on notification's status-bar
+  icon. Wireframe `design/status-bar-gauge-wireframe.html`, rev B approved 2026-08-21
+  with "make the rings as big as possible so the pace mark is clear on both windows".
+- **What:** a new **Twin** status-bar icon style — both windows as concentric rings
+  (7-day outer at 23/24 of the square, 5-hour inner at 14.5/24, 2.6 dp stroke), each
+  carrying a pace mark, no numbers. The mark is the Mac's cleared-gap tick taken to
+  its limit: the icon is a tinted alpha mask, so fill and tick are the same ink and a
+  drawn tick would vanish on the fill — the mark is a slot **erased through** the
+  band (PorterDuff.CLEAR) at `elapsedPercent`, with nothing redrawn inside. Fill past
+  the cut = burning faster than even pace. The cut was also added to the existing
+  Ring style; Pie / Battery / Number are untouched. The severity ladder cannot exist
+  on this surface (the tint strips colour), so ≥100% is shape instead: a notch opens
+  at 12 o'clock, making a closed ring read as closed rather than merely long. Honesty
+  rules as everywhere: no reset clock → no cut (`RingGeometry.showTick`), no data →
+  bare track, never a fake 0%.
+- **Where:** `ui/UsageIcon.kt` (`TWIN`, `windowRing`, `eraseSlot`),
+  `notify/PinnedNotification.kt` (`drawStatusIcon` now carries the elapsed/weekly
+  values), `tile/UsageTileService.kt` (the QS tile shares the bitmap, so it follows
+  the same style), `SettingsScreen.kt` (fifth chip; the four existing chips and the
+  `ring` default are unchanged, so nobody's icon redraws without them choosing it).
+- **Out of scope, deliberately:** the Mac's third per-model element (a later
+  revision if wanted), and its "clock hand" variant — illegible at 11–14 dp.
+
 ### CCRM-20 · Wide Chart — one profile at full width, and a chart you can touch
 - **Status:** Done (2026-08-04) · successor to CCRM-12
 - **Verified on the Fold 7's inner screen** (1968×2184 @ 420dpi = **750×832dp**, which

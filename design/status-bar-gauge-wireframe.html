@@ -1,0 +1,558 @@
+<title>Status-Bar Gauge — CCRM-48 (rev B, as built)</title>
+<style>
+  :root {
+    --bg: #FAF8F6; --ink: #26211E; --muted: #6E6660; --accent: #C15F3C;
+    --hair: #E7E1DC; --card: #FFFFFF;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171513; --ink: #EDE8E4; --muted: #9B928B; --accent: #E59980;
+      --hair: #2C2825; --card: #201D1B;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171513; --ink: #EDE8E4; --muted: #9B928B; --accent: #E59980;
+    --hair: #2C2825; --card: #201D1B;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    margin: 0; padding: 48px 24px 96px; line-height: 1.5;
+  }
+  .page { max-width: 1240px; margin: 0 auto; }
+
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 10px;
+  }
+  h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 8px; text-wrap: balance; }
+  .lede { color: var(--muted); max-width: 70ch; margin: 0 0 12px; font-size: 14px; }
+  h2 { font-size: 19px; font-weight: 650; margin: 56px 0 4px; }
+  h3 { font-size: 14px; font-weight: 650; margin: 30px 0 8px; }
+  .sub { color: var(--muted); font-size: 13px; max-width: 80ch; margin: 0 0 16px; }
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px;
+    background: color-mix(in srgb, var(--hair) 55%, transparent);
+    padding: 1px 5px; border-radius: 4px;
+  }
+  .flag {
+    margin: 14px 0 4px; padding: 13px 17px; border-radius: 10px;
+    background: var(--card); border: 1px solid var(--hair);
+    font-size: 13.5px; max-width: 86ch;
+  }
+  .flag.hot { border-color: color-mix(in srgb, var(--accent) 45%, var(--hair)); }
+  .flag b { font-weight: 650; }
+
+  .boards { display: flex; flex-wrap: wrap; gap: 14px; }
+  .board {
+    border-radius: 18px; padding: 22px 24px 24px; border: 1px solid var(--hair);
+    display: flex; flex-wrap: wrap; gap: 26px 30px; align-items: flex-start; flex: 1 1 100%;
+  }
+  .board.lt { background: linear-gradient(140deg, #C6D2E0 0%, #DACEBE 55%, #E6D6C3 100%); }
+  .board.dk { background: linear-gradient(140deg, #1E2833 0%, #30272C 60%, #382D2F 100%); }
+  .boardcap {
+    width: 100%; margin: -4px 0 0;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+  }
+  .lt .boardcap { color: rgba(20,20,30,.62); } .dk .boardcap { color: rgba(255,255,255,.5); }
+
+  .cell { display: flex; flex-direction: column; align-items: flex-start; }
+  .cell.mid { align-items: center; }
+  .cap {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 10px; margin-top: 9px; line-height: 1.55; max-width: 330px;
+  }
+  .cap.narrow { max-width: 200px; text-align: center; }
+  .lt .cap { color: rgba(25,25,35,.82); } .dk .cap { color: rgba(255,255,255,.7); }
+  .cap b { font-weight: 700; }
+  .cap .no { color: #B3261E; font-weight: 700; }
+  .dk .cap .no { color: #FF8A80; }
+  .cap .yes { color: #1B6B3A; font-weight: 700; }
+  .dk .cap .yes { color: #7BD3A0; }
+
+  /* Phone status bar, authored in dp (1px = 1dp). zoom sets the inspection scale. */
+  .sb {
+    display: flex; align-items: center; height: 28px; padding: 0 10px; gap: 6px;
+    border-radius: 4px 4px 0 0; width: 300px;
+  }
+  .sb.dk { background: #0B0B0C; color: #FFFFFF; }
+  .sb.lt { background: #FFFFFF; color: #111112; }
+  .sb .clock { font-size: 12px; font-weight: 600; letter-spacing: .01em; }
+  .sb .spacer { flex: 1; }
+  .sb .sys { display: flex; align-items: center; gap: 4px; opacity: .95; }
+  .sb .sys svg { width: 13px; height: 13px; }
+  .sb .slot { display: flex; align-items: center; }
+
+  .z1 { zoom: 1; }  .z2 { zoom: 2; }  .z3 { zoom: 3; }  .z8 { zoom: 8; }
+
+  .chip { display: inline-flex; padding: 2px; border-radius: 4px; }
+  .chip.dk { background: #0B0B0C; } .chip.lt { background: #FFFFFF; }
+
+  /* the shade / QS tile mock */
+  .tile {
+    zoom: 2; width: 164px; height: 68px; border-radius: 22px; padding: 12px 14px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .tile.on { background: #D9E2F0; color: #0F1B2A; }
+  .tile.off { background: #2A2A2E; color: #E6E6EA; }
+  .tile .tl { display: flex; flex-direction: column; line-height: 1.25; overflow: hidden; }
+  .tile .t1 { font-size: 12px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile .t2 { font-size: 10px; opacity: .7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  table.geo { border-collapse: collapse; font-size: 13px; margin-top: 10px; }
+  table.geo th, table.geo td { text-align: left; padding: 7px 18px 7px 0; border-bottom: 1px solid var(--hair); vertical-align: top; }
+  table.geo th { font-weight: 650; }
+  table.geo td.n { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11.5px; }
+  table.geo td.no { color: #B3261E; font-weight: 600; }
+  table.geo td.yes { color: #1B6B3A; font-weight: 600; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) table.geo td.no { color: #FF8A80; }
+    :root:not([data-theme="light"]) table.geo td.yes { color: #7BD3A0; }
+  }
+
+  ul.dec { margin: 10px 0 0; padding-left: 20px; font-size: 13.5px; max-width: 88ch; }
+  ul.dec li { margin-bottom: 9px; }
+  ul.dec b { font-weight: 650; }
+  .q {
+    margin-top: 14px; padding: 15px 19px; border-radius: 12px;
+    background: var(--card); border: 1px solid var(--hair); font-size: 13.5px; max-width: 88ch;
+  }
+  .q ol { padding-left: 20px; margin: 8px 0 0; }
+  .q li { margin-bottom: 10px; }
+  .rec { color: var(--accent); font-weight: 650; }
+</style>
+
+<div class="page">
+  <p class="eyebrow">CCRM-48 (Status-Bar Gauge) &middot; rev B (as built) &middot; approved 2026-08-21</p>
+  <h1>Twin rings in the status-bar icon</h1>
+  <p class="lede">
+    The always-on notification's small icon — the one at the top left of the status bar —
+    showing <b>both</b> windows instead of one, each with a pace mark, and no numbers. The
+    per-model third element is out of scope for this revision.
+  </p>
+  <p class="lede">
+    Today that icon is <code>UsageIcon.draw</code>: a 24&nbsp;dp monochrome mask of the
+    <b>5-hour window only</b>, in one of four styles (Ring / Pie / Battery / Number), with
+    no pace mark. The 7-day reading and its elapsed fraction are already computed at the
+    call site (<code>data.weekly</code>, <code>elapsedPercent(…, WEEKLY_MS)</code>), so this
+    is a drawing change, not a data one.
+  </p>
+
+  <div class="flag hot">
+    <b>Three constraints the Mac's menu bar doesn't have. They decide most of this page.</b>
+    <ol style="margin:8px 0 0; padding-left:20px">
+      <li><b>The icon is an alpha mask.</b> Android tints it — white on a dark bar, black
+      on a light one — and throws your colours away. <b>The entire severity ladder cannot
+      exist on this surface.</b> Not "looks worse"; cannot exist. §3 is about what replaces it.</li>
+      <li><b>The slot is a 24&nbsp;dp square</b>, not a wide strip. Two rings side by side
+      fit in <b>11&nbsp;dp each</b>. The Mac's ring is 15&nbsp;pt on a display an arm away.</li>
+      <li><b>Fill and tick are the same white.</b> A "neutral foreground" tick drawn on top
+      of the fill is invisible here. The Mac's <i>cleared gap</i> stops being a style choice
+      and becomes the only mechanism that works — see §4.</li>
+    </ol>
+  </div>
+
+  <!-- ================================================================= -->
+  <h2>1 · What ports, line by line</h2>
+  <table class="geo">
+    <tr><th>Mac spec</th><th>Here</th><th>Verdict</th></tr>
+    <tr><td>Two rings, 5-hour then 7-day, filling clockwise from 12</td><td class="n">yes — 11 dp each, or concentric (§2)</td><td class="yes">ports</td></tr>
+    <tr><td>No percentage text</td><td class="n">already true of the Ring style</td><td class="yes">ports</td></tr>
+    <tr><td>Track = foreground at 22–25%</td><td class="n">35% (today's <code>alpha = 90</code>) — a mask needs more</td><td class="yes">ports, retuned</td></tr>
+    <tr><td>Pace tick at the elapsed angle, neutral</td><td class="n">yes, as a cut through the band</td><td class="yes">ports</td></tr>
+    <tr><td>Tick drawn in the foreground colour over a cleared halo</td><td class="n">the cut <i>is</i> the tick; nothing drawn inside it</td><td class="n">adapted</td></tr>
+    <tr><td>Severity ladder — yellow / orange / red</td><td class="n">system strips colour from every small icon</td><td class="no">impossible</td></tr>
+    <tr><td>"Show colour past 80%" setting</td><td class="n">nothing for it to govern here</td><td class="no">n/a</td></tr>
+    <tr><td>Over-pace red segment (Android's own, CCRM-43)</td><td class="n">same problem — no second colour to paint with</td><td class="no">impossible</td></tr>
+    <tr><td>No data ≠ 0% — bare track, never full or dashed</td><td class="n">yes, and it's the one that matters most here</td><td class="yes">ports</td></tr>
+    <tr><td>Layout never changes size between polls</td><td class="n">fixed 24 dp square by construction</td><td class="yes">free</td></tr>
+    <tr><td>Accessibility text reads every window</td><td class="n">the notification's own text, unchanged</td><td class="yes">already true</td></tr>
+    <tr><td>Which account?</td><td class="n">the pinned profile (<code>cache.pinnedProfile()</code>) — settled already</td><td class="yes">no question</td></tr>
+  </table>
+
+  <!-- ================================================================= -->
+  <h2>2 · Layout — three candidates in a real status bar</h2>
+  <p class="sub">
+    Same reading throughout: <b>5-hour 62%, elapsed 45%</b> (running hot) and
+    <b>7-day 44%, elapsed 51%</b> (coasting). Shown at 3&times;, then at true dp so you can
+    judge what actually survives.
+  </p>
+
+  <div class="boards">
+    <div class="board dk">
+      <div class="boardcap">Dark bar (white tint) &middot; 3&times;</div>
+      <div class="cell"><div class="z3" data-sb='{"lay":"single","dark":true}'></div>
+        <div class="cap"><b>L0 — today, plus a tick.</b> One 22 dp ring, the 5-hour window, with the pace cut added. The honest baseline: the biggest, clearest ring available, answering only the question you act on.</div></div>
+      <div class="cell"><div class="z3" data-sb='{"lay":"twin","dark":true}'></div>
+        <div class="cap"><b>L1 — twin, side by side.</b> The literal port. Two 11 dp rings, 1.5 dp apart. Both windows at a glance; every feature is half-size, and the tick lives on a 4.5 dp radius.</div></div>
+      <div class="cell"><div class="z3" data-sb='{"lay":"conc","dark":true}'></div>
+        <div class="cap"><b>L2 — concentric.</b> 7-day outside (23 dp), 5-hour inside (14.5 dp), each with its own cut. Uses the square instead of fighting it, so the arcs stay long, but the two rings must be told apart by radius alone.</div></div>
+    </div>
+
+    <div class="board lt">
+      <div class="boardcap">Light bar (black tint) &middot; 3&times;</div>
+      <div class="cell"><div class="z3" data-sb='{"lay":"single"}'></div><div class="cap"><b>L0</b> on a light bar. The tint flips; the mask doesn't change.</div></div>
+      <div class="cell"><div class="z3" data-sb='{"lay":"twin"}'></div><div class="cap"><b>L1</b> — note how much the 1.5 dp gap is doing at this size.</div></div>
+      <div class="cell"><div class="z3" data-sb='{"lay":"conc"}'></div><div class="cap"><b>L2</b> — the inner ring's cut is the first thing to go illegible.</div></div>
+    </div>
+
+    <div class="board dk">
+      <div class="boardcap">True dp — 1 px = 1 dp. This is roughly what the bar gives you, and it is the whole argument</div>
+      <div class="cell"><div class="z1" data-sb='{"lay":"single","dark":true}'></div><div class="cap">L0</div></div>
+      <div class="cell"><div class="z1" data-sb='{"lay":"twin","dark":true}'></div><div class="cap">L1</div></div>
+      <div class="cell"><div class="z1" data-sb='{"lay":"conc","dark":true}'></div><div class="cap">L2</div></div>
+      <div class="cell"><div class="z2" data-sb='{"lay":"twin","dark":true}'></div><div class="cap">L1 at 2× — the middle ground, for reference</div></div>
+    </div>
+  </div>
+
+  <h3>2a · Geometry</h3>
+  <table class="geo">
+    <tr><th>&nbsp;</th><th>L0 single</th><th>L1 twin</th><th>L2 concentric</th></tr>
+    <tr><td>Canvas</td><td class="n">24 × 24 dp</td><td class="n">24 × 24 dp</td><td class="n">24 × 24 dp</td></tr>
+    <tr><td>Ring diameter</td><td class="n">21</td><td class="n">11 each</td><td class="n">23 outer / 14.5 inner</td></tr>
+    <tr><td>Stroke</td><td class="n">3</td><td class="n">2</td><td class="n">2.6</td></tr>
+    <tr><td>Gap</td><td class="n">—</td><td class="n">1.5 edge–edge</td><td class="n">1.65 band–band</td></tr>
+    <tr><td>Cut width</td><td class="n">1.8</td><td class="n">1.4</td><td class="n">1.56</td></tr>
+    <tr><td>Cut length</td><td colspan="3" class="n">stroke + 0.6 dp, centred on the band, at 360° × elapsed clockwise from 12</td></tr>
+    <tr><td>Track alpha</td><td colspan="3" class="n">35% (today's <code>alpha = 90</code>) — see §5a</td></tr>
+    <tr><td>Min fill</td><td colspan="3" class="n">9% of the circle, so 1–3% still reads as "started" (today's rule, kept)</td></tr>
+  </table>
+
+  <!-- ================================================================= -->
+  <h2>3 · Severity with no colour available</h2>
+  <p class="sub">
+    The bar strips colour, so 84% and 62% are the same icon unless the <i>shape</i> changes.
+    Four ways to spend shape on it, at 8&times;. The notification body below the bar keeps its
+    full colour ladder either way — this is only about the glyph.
+  </p>
+  <div class="boards">
+    <div class="board dk">
+      <div class="boardcap">Dark &middot; each shown at 62 / 84 / 100</div>
+      <div class="cell mid">
+        <div class="z8 chip dk" data-row='{"lay":"twin","sev":"none","dark":true}'></div>
+        <div class="cap narrow"><b>S0 — nothing.</b> Fill is the only signal; 100% is a closed ring. <span class="yes">Quietest</span>, and consistent with the icon never having shouted. But 99 and 100 look identical.</div>
+      </div>
+      <div class="cell mid">
+        <div class="z8 chip dk" data-row='{"lay":"twin","sev":"gap","dark":true}'></div>
+        <div class="cap narrow"><b>S1 — the 12 o'clock notch.</b> At ≥100 a cut opens at the top, so a closed ring is visibly <i>closed</i> rather than merely long. <span class="rec">Recommended.</span> Costs nothing below 100.</div>
+      </div>
+      <div class="cell mid">
+        <div class="z8 chip dk" data-row='{"lay":"twin","sev":"dot","dark":true}'></div>
+        <div class="cap narrow"><b>S2 — a hollow dot at ≥100.</b> Reads instantly, but at 11 dp the dot eats the ring's middle and the two states share no visual family.</div>
+      </div>
+      <div class="cell mid">
+        <div class="z8 chip dk" data-row='{"lay":"bang","sev":"none","dark":true}'></div>
+        <div class="cap narrow"><b>S3 — swap to "!!".</b> What the Number style already does at ≥100. Loud and unmistakable, but the rings vanish exactly when you most want to see the other window.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================= -->
+  <h2>4 · The pace mark — why it has to be a cut</h2>
+  <p class="sub">
+    On a coloured surface a tick can be drawn <i>over</i> the fill in a neutral colour. Here
+    there is one ink. Drawn over the fill, a white tick on white fill is nothing at all.
+    At 8&times;, over a filled stretch of ring:
+  </p>
+  <div class="boards">
+    <div class="board dk">
+      <div class="boardcap">Dark &middot; 62% fill, tick at 45% — the tick falls inside the fill</div>
+      <div class="cell mid"><div class="z8 chip dk" data-ring='{"d":22,"st":3,"pct":62,"el":45,"tick":"draw","dark":true}'></div>
+        <div class="cap narrow"><b>Drawn on top.</b> <span class="no">Invisible.</span> Same ink as the fill it sits on. This is the Mac's overhang/house tick, ported naively.</div></div>
+      <div class="cell mid"><div class="z8 chip dk" data-ring='{"d":22,"st":3,"pct":62,"el":45,"tick":"cut","dark":true}'></div>
+        <div class="cap narrow"><b>Cut through.</b> <span class="yes">Works.</span> The band is erased to transparency, so the bar shows through — legible on fill and on bare track alike. The Mac's cleared gap, doing real work.</div></div>
+      <div class="cell mid"><div class="z8 chip dk" data-ring='{"d":22,"st":3,"pct":62,"el":45,"tick":"pip","dark":true}'></div>
+        <div class="cap narrow"><b>External pip.</b> Also works, and survives at smaller sizes — but it steals 2 dp of diameter from the ring and reads as a second object.</div></div>
+      <div class="cell mid"><div class="z8 chip dk" data-ring='{"d":22,"st":3,"pct":28,"el":51,"tick":"cut","dark":true}'></div>
+        <div class="cap narrow"><b>Coasting.</b> Fill short of the cut. On bare track the cut is a gap in a faint circle — subtle, but it's the good news case.</div></div>
+    </div>
+    <div class="board lt">
+      <div class="boardcap">Light bar &middot; the same four, black ink</div>
+      <div class="cell mid"><div class="z8 chip lt" data-ring='{"d":22,"st":3,"pct":62,"el":45,"tick":"draw"}'></div><div class="cap narrow">Drawn on top — <span class="no">invisible</span></div></div>
+      <div class="cell mid"><div class="z8 chip lt" data-ring='{"d":22,"st":3,"pct":62,"el":45,"tick":"cut"}'></div><div class="cap narrow">Cut through — <span class="yes">works</span></div></div>
+      <div class="cell mid"><div class="z8 chip lt" data-ring='{"d":22,"st":3,"pct":62,"el":45,"tick":"pip"}'></div><div class="cap narrow">External pip</div></div>
+      <div class="cell mid"><div class="z8 chip lt" data-ring='{"d":22,"st":3,"pct":28,"el":51,"tick":"cut"}'></div><div class="cap narrow">Coasting</div></div>
+    </div>
+  </div>
+
+  <h3>4a · The cut at the size it will really be</h3>
+  <p class="sub">
+    L1's rings are 11&nbsp;dp with a 2&nbsp;dp stroke, so the cut is 1.4&nbsp;dp wide on a
+    4.5&nbsp;dp radius — about 18° of arc. On a 3× phone that's a 4-pixel notch. Shown at
+    8&times; and at true dp.
+  </p>
+  <div class="boards">
+    <div class="board dk">
+      <div class="boardcap">Dark</div>
+      <div class="cell mid"><div class="z8 chip dk" data-ring='{"d":11,"st":2,"pct":62,"el":45,"tick":"cut","dark":true}'></div><div class="cap narrow">L1 ring at 8× · over pace</div></div>
+      <div class="cell mid"><div class="z8 chip dk" data-ring='{"d":11,"st":2,"pct":44,"el":51,"tick":"cut","dark":true}'></div><div class="cap narrow">L1 ring at 8× · coasting</div></div>
+      <div class="cell mid"><div class="z8 chip dk" data-ring='{"d":14.5,"st":2.6,"pct":62,"el":45,"tick":"cut","dark":true}'></div><div class="cap narrow">L2's inner ring at 8× — 14.5 dp, the smallest thing on the page that has to carry a cut</div></div>
+      <div class="cell mid"><div class="z1 chip dk" data-ring='{"d":11,"st":2,"pct":62,"el":45,"tick":"cut","dark":true}'></div><div class="cap narrow">…and the same L1 ring at true dp</div></div>
+    </div>
+  </div>
+
+  <!-- ================================================================= -->
+  <h2>5 · States</h2>
+  <p class="sub">
+    Every state is the same 24&nbsp;dp square. No data draws a <b>bare track</b> — never a
+    full ring, never a dashed one, never a fake 0%. Shown in L1; L0 and L2 follow the same
+    rules.
+  </p>
+  <div class="boards">
+    <div class="board dk">
+      <div class="boardcap">Dark &middot; 3×</div>
+      <div class="cell"><div class="z3" data-sb='{"lay":"twin","state":"nodata7d","dark":true}'></div>
+        <div class="cap"><b>7-day has no reading.</b> Bare track on the right ring, keeping its slot. The notification text says "7-day no data" in words.</div></div>
+      <div class="cell"><div class="z3" data-sb='{"lay":"twin","state":"notick","dark":true}'></div>
+        <div class="cap"><b>No reset clock.</b> Elapsed can’t be derived, so <b>no cut at all</b> on that ring — never a guessed position. Fills still draw.</div></div>
+      <div class="cell"><div class="z3" data-sb='{"lay":"twin","state":"empty","dark":true}'></div>
+        <div class="cap"><b>No data at all</b> (first poll, or a dead token). Two bare tracks. The pinned notification is already suppressed when signed out, so there is no signed-out icon.</div></div>
+      <div class="cell"><div class="z3" data-sb='{"lay":"twin","state":"hot","dark":true}'></div>
+        <div class="cap"><b>5-hour at 100, 7-day at 93.</b> With S1, the 12 o'clock notch marks the closed ring. Colour is where this surface has nothing to give — the panel below carries it.</div></div>
+      <div class="cell"><div class="z3" data-sb='{"lay":"twin","state":"low","dark":true}'></div>
+        <div class="cap"><b>2% and 0%.</b> The 9%-minimum fill keeps a 2% window visible; a true 0% draws nothing but track, which is correct — nothing has been spent.</div></div>
+    </div>
+  </div>
+
+  <h3>5a · Track alpha</h3>
+  <p class="sub">
+    The Mac says 22–25%; this icon already uses 35%, and a bare track <i>is</i> the no-data
+    state, so it has to survive a tint and a downscale. 22% vs 35% at true dp, both bars:
+  </p>
+  <div class="boards">
+    <div class="board dk">
+      <div class="boardcap">Dark &middot; bare track only</div>
+      <div class="cell mid"><div class="z8 chip dk" data-ring='{"d":11,"st":2,"pct":null,"el":null,"track":0.22,"dark":true}'></div><div class="cap narrow">22% — the Mac's</div></div>
+      <div class="cell mid"><div class="z8 chip dk" data-ring='{"d":11,"st":2,"pct":null,"el":null,"track":0.35,"dark":true}'></div><div class="cap narrow">35% — today's, <span class="rec">proposed</span></div></div>
+      <div class="cell mid"><div class="z1 chip dk" data-ring='{"d":11,"st":2,"pct":null,"el":null,"track":0.22,"dark":true}'></div><div class="cap narrow">22% at true dp</div></div>
+      <div class="cell mid"><div class="z1 chip dk" data-ring='{"d":11,"st":2,"pct":null,"el":null,"track":0.35,"dark":true}'></div><div class="cap narrow">35% at true dp</div></div>
+    </div>
+  </div>
+
+  <!-- ================================================================= -->
+  <h2>6 · The same bitmap lands in the Quick Settings tile</h2>
+  <p class="sub">
+    <code>UsageTileService</code> draws <code>UsageIcon.draw</code> with the same style
+    setting, at a much friendlier size. Whatever wins here shows up there too — unless we
+    deliberately split them.
+  </p>
+  <div class="boards">
+    <div class="board dk">
+      <div class="boardcap">Quick Settings, 2×</div>
+      <div class="cell"><div data-tile='{"lay":"single","on":true}'></div><div class="cap">L0 in the tile</div></div>
+      <div class="cell"><div data-tile='{"lay":"twin","on":true}'></div><div class="cap">L1 in the tile — the extra window costs nothing at this size</div></div>
+      <div class="cell"><div data-tile='{"lay":"conc","on":true}'></div><div class="cap">L2 in the tile</div></div>
+      <div class="cell"><div data-tile='{"lay":"twin","on":false,"state":"empty"}'></div><div class="cap">Inactive / no data</div></div>
+    </div>
+  </div>
+
+  <!-- ================================================================= -->
+  <h2>7 · Settings, and what doesn't change</h2>
+  <ul class="dec">
+    <li><b>The style menu grows by one.</b> Settings → Status-bar icon currently offers Ring
+    · Pie · Battery · Number. Proposed: add <b>Twin</b> as a fifth chip, default unchanged
+    (Ring stays the default; nobody's icon changes without them choosing it). The
+    alternative — teaching the existing Ring chip to draw two rings — silently changes an
+    icon people have already picked.</li>
+    <li><b>The pace cut rides along with every style</b>, or only with Twin? Proposed: the
+    cut is added to <b>Ring and Twin</b> (they have a band to cut), and Pie / Battery /
+    Number are left alone — there is nowhere sensible to put it on a pie slice or two bold
+    digits.</li>
+    <li><b>"Show red past the pace mark"</b> (<code>paceOverOnNotification</code>) governs
+    the notification's colour gauge and is untouched. It cannot reach the glyph.</li>
+    <li><b>Accessibility is unchanged</b> — the icon has never been the accessible surface;
+    the notification's title, text and panel carry every number, and already read both
+    windows.</li>
+    <li><b>Which account</b> is settled: the icon follows <code>cache.pinnedProfile()</code>,
+    exactly as the notification does.</li>
+    <li><b>Nothing about the notification body changes</b> — its colour gauge, bars and
+    pace marks (CCRM-43 (Bar Pace Marks)) stay as shipped.</li>
+  </ul>
+
+  <div class="q">
+    <b>Decisions — approved 2026-08-21, built the same day:</b>
+    <ol>
+      <li><b>Layout: L2 concentric</b>, with both rings pushed to the maximum the 24 dp
+      square allows — 7-day outer at <b>23 dp</b>, 5-hour inner at <b>14.5 dp</b>, both at a
+      2.6 dp stroke — per "make the rings as big as possible so the pace mark is clear on
+      both windows".</li>
+      <li><b>Severity: S1</b> — a notch opens at 12 o'clock at ≥100, so a closed ring reads
+      as closed.</li>
+      <li><b>Pace mark: the cut</b>, erased through the band (PorterDuff.CLEAR), 0.6 × stroke
+      wide.</li>
+      <li><b>Style menu:</b> a fifth chip, <b>Twin</b>. Ring stays the default; nobody's icon
+      changes without them choosing it.</li>
+      <li><b>Quick Settings tile follows the same style</b> — one setting, one look.</li>
+      <li><b>The cut is also added to the existing Ring style</b> (it has a band to cut);
+      Pie / Battery / Number are untouched.</li>
+    </ol>
+  </div>
+</div>
+
+<script>
+/* =======================================================================
+   The icon is an ALPHA MASK. Everything is one ink at varying alpha, and a
+   "cut" is real transparency — here simulated by painting the bar's own
+   background colour, which is exactly what the user would see.
+   ======================================================================= */
+const CANVAS = 24;                 // dp, the status-bar small-icon slot
+const MIN_FILL = 9;                // percent — today's floor so 1-3% still reads
+
+function ink(dark) { return dark ? "#FFFFFF" : "#111112"; }
+function barBg(dark) { return dark ? "#0B0B0C" : "#FFFFFF"; }
+function inkA(dark, a) { return dark ? `rgba(255,255,255,${a})` : `rgba(17,17,18,${a})`; }
+
+/* one ring, as SVG markup inside a 24x24 viewBox */
+function ring(o) {
+  const { cx, cy, d, st, pct, el, dark = false, tick = "cut",
+          track = 0.35, sev = "none", bg } = o;
+  const r = (d - st) / 2;
+  const back = bg || barBg(dark);
+  let s = "";
+  const arc = (color, dash, cap, w) =>
+    `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" ` +
+    `stroke-width="${w || st}" pathLength="100"${dash ? ` stroke-dasharray="${dash}"` : ""}` +
+    `${cap ? ` stroke-linecap="${cap}"` : ""} transform="rotate(-90 ${cx} ${cy})"/>`;
+
+  /* 1 · track */
+  s += arc(inkA(dark, track));
+
+  /* 2 · fill */
+  let p = null;
+  if (pct !== null && pct !== undefined) {
+    p = Math.max(0, Math.min(100, pct));
+    const shown = p > 0 ? Math.max(p, MIN_FILL) : 0;
+    if (shown >= 100) s += arc(ink(dark));
+    else if (shown > 0) s += arc(ink(dark), `${shown} 100`, "round");
+  }
+
+  /* 3 · severity, shape-only (no colour exists on this surface) */
+  if (p !== null && p >= 100) {
+    if (sev === "gap") {
+      /* a notch at 12 o'clock, so a closed ring reads as closed */
+      s += cutAt(cx, cy, r, st, 0, back, st * 0.7);
+    } else if (sev === "dot") {
+      s += `<circle cx="${cx}" cy="${cy}" r="${d * 0.16}" fill="none" stroke="${ink(dark)}" stroke-width="${st * 0.8}"/>`;
+    }
+  }
+
+  /* 4 · pace mark — honesty rule: no percent or no elapsed, no mark at all */
+  if (p !== null && el !== null && el !== undefined && tick !== "none") {
+    const a = (el / 100) * 2 * Math.PI - Math.PI / 2;
+    const at = (rr) => [cx + rr * Math.cos(a), cy + rr * Math.sin(a)];
+    if (tick === "cut") {
+      s += cutAt(cx, cy, r, st, el, back, Math.max(1.3, st * 0.68));
+    } else if (tick === "pip") {
+      const [x, y] = at(r + st / 2 + 1.1);
+      s += `<circle cx="${x}" cy="${y}" r="${Math.max(0.8, st * 0.42)}" fill="${ink(dark)}"/>`;
+    } else if (tick === "draw") {
+      /* the naive port: same ink, drawn over the band — invisible on fill */
+      const [x1, y1] = at(r - st / 2 - 0.3), [x2, y2] = at(r + st / 2 + 0.3);
+      s += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${ink(dark)}" stroke-width="${Math.max(0.9, st * 0.45)}" stroke-linecap="round"/>`;
+    }
+  }
+  return s;
+}
+
+/* a radial slot erased through the band at `pctAngle`, painted in the bar colour */
+function cutAt(cx, cy, r, st, pctAngle, back, width) {
+  const a = (pctAngle / 100) * 2 * Math.PI - Math.PI / 2;
+  const x1 = cx + (r - st / 2 - 0.35) * Math.cos(a), y1 = cy + (r - st / 2 - 0.35) * Math.sin(a);
+  const x2 = cx + (r + st / 2 + 0.35) * Math.cos(a), y2 = cy + (r + st / 2 + 0.35) * Math.sin(a);
+  return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${back}" stroke-width="${width}"/>`;
+}
+
+const STATES = {
+  ok:       { a: { pct: 62, el: 45 }, b: { pct: 44, el: 51 } },
+  nodata7d: { a: { pct: 62, el: 45 }, b: { pct: null, el: null } },
+  notick:   { a: { pct: 62, el: null }, b: { pct: 44, el: null } },
+  empty:    { a: { pct: null, el: null }, b: { pct: null, el: null } },
+  hot:      { a: { pct: 100, el: 78 }, b: { pct: 93, el: 61 } },
+  low:      { a: { pct: 2, el: 12 }, b: { pct: 0, el: 30 } },
+};
+
+/* the whole 24x24 mask, in one of the three layouts */
+function icon(lay, st, dark, sev = "gap", tick = "cut", bg) {
+  const inner = (() => {
+    if (lay === "bang") {
+      return `<text x="12" y="12" text-anchor="middle" dominant-baseline="central" ` +
+             `font-family="-apple-system, system-ui, sans-serif" font-weight="700" ` +
+             `font-size="13" fill="${ink(dark)}">!!</text>`;
+    }
+    if (lay === "single") {
+      return ring({ cx: 12, cy: 12, d: 21, st: 3, pct: st.a.pct, el: st.a.el, dark, tick, sev, bg });
+    }
+    if (lay === "conc") {
+      return ring({ cx: 12, cy: 12, d: 23, st: 2.6, pct: st.b.pct, el: st.b.el, dark, tick, sev, bg }) +
+             ring({ cx: 12, cy: 12, d: 14.5, st: 2.6, pct: st.a.pct, el: st.a.el, dark, tick, sev, bg });
+    }
+    /* twin: two 11 dp rings, 1.5 dp apart, centred in the square */
+    return ring({ cx: 6.25, cy: 12, d: 11, st: 2, pct: st.a.pct, el: st.a.el, dark, tick, sev, bg }) +
+           ring({ cx: 17.75, cy: 12, d: 11, st: 2, pct: st.b.pct, el: st.b.el, dark, tick, sev, bg });
+  })();
+  return `<svg width="${CANVAS}" height="${CANVAS}" viewBox="0 0 ${CANVAS} ${CANVAS}">${inner}</svg>`;
+}
+
+/* ---------- system glyphs, purely for scale ---------- */
+const SYS = `<div class="sys">
+  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21 1 8.5A16 16 0 0 1 23 8.5L12 21z" opacity=".95"/></svg>
+  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 22h3V10H2v12zm5 0h3V6H7v16zm5 0h3V2h-3v20zm5 0h3V14h-3v8z"/></svg>
+  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.7 4H14V2h-4v2H8.3C7.6 4 7 4.6 7 5.3v15.4c0 .7.6 1.3 1.3 1.3h7.4c.7 0 1.3-.6 1.3-1.3V5.3C17 4.6 16.4 4 15.7 4zm-.7 16H9v-8h6v8z"/></svg>
+</div>`;
+
+/* ---------- status-bar strips ---------- */
+document.querySelectorAll("[data-sb]").forEach((el) => {
+  const o = JSON.parse(el.getAttribute("data-sb"));
+  const dark = !!o.dark, st = STATES[o.state || "ok"];
+  el.innerHTML =
+    `<div class="sb ${dark ? "dk" : "lt"}">` +
+      `<span class="clock">9:41</span>` +
+      `<span class="slot">${icon(o.lay, st, dark, o.sev || "gap", o.tick || "cut")}</span>` +
+      `<span class="spacer"></span>${SYS}` +
+    `</div>`;
+});
+
+/* ---------- severity rows: 62 / 84 / 100 side by side ---------- */
+document.querySelectorAll("[data-row]").forEach((el) => {
+  const o = JSON.parse(el.getAttribute("data-row"));
+  const dark = !!o.dark;
+  const trio = [62, 84, 100].map((p) => {
+    const st = { a: { pct: p, el: 45 }, b: { pct: Math.max(0, p - 18), el: 51 } };
+    const lay = (o.lay === "bang" && p >= 100) ? "bang" : (o.lay === "bang" ? "twin" : o.lay);
+    return icon(lay, st, dark, o.sev, "cut");
+  }).join("");
+  el.innerHTML = `<span style="display:inline-flex;gap:3px">${trio}</span>`;
+});
+
+/* ---------- single rings, blown up ---------- */
+document.querySelectorAll("[data-ring]").forEach((el) => {
+  const o = JSON.parse(el.getAttribute("data-ring"));
+  const dark = !!o.dark, box = o.d + 4;
+  el.innerHTML =
+    `<svg width="${box}" height="${box}" viewBox="0 0 ${box} ${box}">` +
+    ring({ cx: box / 2, cy: box / 2, d: o.d, st: o.st, pct: o.pct, el: o.el,
+           dark, tick: o.tick || "cut", track: o.track === undefined ? 0.35 : o.track,
+           sev: "none" }) +
+    `</svg>`;
+});
+
+/* ---------- quick settings tiles ---------- */
+document.querySelectorAll("[data-tile]").forEach((el) => {
+  const o = JSON.parse(el.getAttribute("data-tile"));
+  const on = !!o.on, st = STATES[o.state || "ok"];
+  /* the tile tints like the status bar: dark ink on the light active chip */
+  const dark = !on;
+  const bg = on ? "#D9E2F0" : "#2A2A2E";
+  const svg = icon(o.lay, st, dark, "gap", "cut", bg)
+    .replace(`width="24" height="24"`, `width="26" height="26"`);
+  el.innerHTML =
+    `<div class="tile ${on ? "on" : "off"}">${svg}` +
+      `<span class="tl"><span class="t1">Claude Personal</span>` +
+      `<span class="t2">${on ? "resets 4:15 pm" : "no data"}</span></span>` +
+    `</div>`;
+});
+</script>

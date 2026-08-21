@@ -110,7 +110,14 @@ object PinnedNotification {
         // draws regardless; only the colour past it is optional.
         val showOverPace = cache.paceOverOnNotification()
         val sessionElapsed = elapsedPercent(session, Projection.SESSION_MS)
-        val smallIcon = drawStatusIcon(context, pct, cache.pinnedIconStyle(), left)
+        // CCRM-48 (Status-Bar Gauge): the icon's pace cuts and the twin style's
+        // outer ring. Same elapsed maths as the gauge and bars below it.
+        val smallIcon = drawStatusIcon(
+            context, pct, cache.pinnedIconStyle(), left,
+            sessionElapsed = sessionElapsed,
+            weeklyPct = data?.weekly?.percent,
+            weeklyElapsed = elapsedPercent(data?.weekly, Projection.WEEKLY_MS),
+        )
         val pctText = if (pct == null) "—" else "${Fmt.usageInt(pct, left)}%"
         // The worded form for text slots that have room for the word.
         val pctShort = if (pct == null) "—" else Fmt.usageShort(pct, left)
@@ -457,7 +464,12 @@ object PinnedNotification {
         pct: Double?,
         iconStyle: String,
         left: Boolean,
-    ): IconCompat = IconCompat.createWithBitmap(UsageIcon.draw(context, pct, iconStyle, left))
+        sessionElapsed: Double?,
+        weeklyPct: Double?,
+        weeklyElapsed: Double?,
+    ): IconCompat = IconCompat.createWithBitmap(
+        UsageIcon.draw(context, pct, iconStyle, left, sessionElapsed, weeklyPct, weeklyElapsed)
+    )
 
     /**
      * The collapsed row's condition marker: a coloured dot ahead of the reset line.
