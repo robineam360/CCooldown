@@ -224,6 +224,45 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
   *state* marker (a dot in the ring's hollow, shown only past 80%) would be nearly
   free and is unbuilt — needs a wireframe first.
 
+### CCRM-50 · Weekly Flag — the 7-day window as a pace-state dot in the ring's hollow
+- **Status:** Done and **verified on the Fold 7, 2026-08-21** — with live data doing the
+  arguing: the weekly sat at 16% used but "6 points above even pace", and the yellow dot
+  was flagging it in the status bar while a level-threshold dot would have stayed silent.
+  Theme partner verified by switching to Blue (spring-green line) and back; tile verified
+  showing the mono collapse (full-alpha disc for the yellow rung).
+- **Why:** CCRM-49 (Glyph Legibility) left the 7-day window off the status-bar glyph
+  because a second *level* can only be bought out of the 5-hour ring's size — the exact
+  thing measured unreadable. A **state** needs far fewer pixels, and the ring's hollow
+  is empty space already paid for.
+- **What:** a 7.5 dp dot (≈4.4 dp on screen) dead-centre in the ring, keyed on **pace,
+  not level** — review's call, and the right one: a weekly that crosses 80 on day 6 is
+  beyond correcting, while "above pace on day 2" is actionable. The rungs are the app's
+  existing pace verdicts, drawn (`RingGeometry.weeklyFlag`, sharing `PACE_DEAD_ZONE`):
+  **no dot** below even pace (good news is silence) · **grey** on even pace (±3, the
+  sentence's own band) · **yellow** above even pace · **red** at a truncated 100 —
+  level, not pace, so it fires even with no reset clock. Orange deliberately absent:
+  indistinguishable from yellow at 4.4 dp, and the Amber theme's accent *is* the yellow
+  rung already. Honesty: no weekly reading → no dot; no reset clock → no pace verdict,
+  never a guessed one (only red possible).
+- **Pace line themed too:** each `ThemeOption` now carries a **pace partner**
+  (`paceLight`/`paceDark`, read via `Palette.paceColor`) — cyan-blue for warm/neutral
+  themes, spring green for Blue/Indigo, violet for Cyan/Teal. Always cool, never a true
+  complement: past 80 the fill is the fixed warm ladder whatever the theme, so a warm
+  line dies exactly where the glyph matters (demonstrated in the wireframe). "Material
+  You" resolves through `byName` to Claude Orange on this surface, so its partner
+  follows the same path. Also recorded: the ring fill already followed the theme —
+  `Palette.barColor` returns the accent below 80; no change was needed there.
+- **Monochrome surfaces** (QS tile, tinting OEMs) collapse the rungs to alpha: grey →
+  a 45% disc, yellow/red → full. Which rung is lost; "the weekly needs a look" is kept.
+- **Where:** `ui/RingGeometry.kt` (`WeeklyFlag`, pure + tested in `RingGeometryTest`),
+  `ui/UsageIcon.kt`, `ui/Palette.kt` (partner colours), `notify/PinnedNotification.kt`,
+  `tile/UsageTileService.kt`, `SettingsScreen.kt` (caption). Wireframe
+  `design/weekly-flag-dot-wireframe.html` — rev A (usage-threshold) superseded by
+  rev B (pace-relative) after review; rev C records the as-built decisions.
+- **Accepted knowingly:** steady use rides "on even pace", so the grey dot is often
+  present. Grey is deliberately the quietest mark; if it proves noisy the fix is a
+  band strictly below the line, not a wider ladder.
+
 ### CCRM-20 · Wide Chart — one profile at full width, and a chart you can touch
 - **Status:** Done (2026-08-04) · successor to CCRM-12
 - **Verified on the Fold 7's inner screen** (1968×2184 @ 420dpi = **750×832dp**, which

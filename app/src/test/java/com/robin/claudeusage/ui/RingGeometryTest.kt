@@ -69,4 +69,49 @@ class RingGeometryTest {
         assertEquals(360f, RingGeometry.fillSweep(100.0), 0f)
         assertEquals(360f, RingGeometry.fillSweep(120.0), 0f) // over-100 payloads clamp
     }
+
+    // --- CCRM-50 (Weekly Flag): the dot's rungs are the pace verdicts ---
+
+    @Test
+    fun `weekly flag mirrors the pace sentence verdicts`() {
+        // Below even pace → silence: good news is no dot.
+        assertNull(RingGeometry.weeklyFlag(30.0, 60.0))
+        // The on-pace band is the sentence's own ±PACE_DEAD_ZONE, both sides.
+        assertEquals(RingGeometry.WeeklyFlag.ON_PACE, RingGeometry.weeklyFlag(55.0, 57.0))
+        assertEquals(RingGeometry.WeeklyFlag.ON_PACE, RingGeometry.weeklyFlag(58.0, 56.0))
+        assertEquals(
+            RingGeometry.WeeklyFlag.ON_PACE,
+            RingGeometry.weeklyFlag(50.0 - PACE_DEAD_ZONE, 50.0),
+        )
+        // The gate must be PACE_DEAD_ZONE itself, not a copy that can drift — the
+        // dot goes yellow at the exact poll the sentence flips to "above".
+        assertEquals(
+            RingGeometry.WeeklyFlag.ON_PACE,
+            RingGeometry.weeklyFlag(50.0 + PACE_DEAD_ZONE, 50.0),
+        )
+        assertEquals(
+            RingGeometry.WeeklyFlag.ABOVE,
+            RingGeometry.weeklyFlag(50.0 + PACE_DEAD_ZONE + 0.01, 50.0),
+        )
+        assertNull(RingGeometry.weeklyFlag(50.0 - PACE_DEAD_ZONE - 0.01, 50.0))
+    }
+
+    @Test
+    fun `weekly flag SPENT keys on the truncated level and needs no clock`() {
+        // 99.7 truncates to 99 — not spent, and against a pace it is merely above.
+        assertEquals(RingGeometry.WeeklyFlag.ABOVE, RingGeometry.weeklyFlag(99.7, 80.0))
+        assertEquals(RingGeometry.WeeklyFlag.SPENT, RingGeometry.weeklyFlag(100.0, 80.0))
+        // Level is absolute: spent even when elapsed says the window is nearly over…
+        assertEquals(RingGeometry.WeeklyFlag.SPENT, RingGeometry.weeklyFlag(100.0, 99.0))
+        // …and even with no reset clock at all.
+        assertEquals(RingGeometry.WeeklyFlag.SPENT, RingGeometry.weeklyFlag(100.0, null))
+    }
+
+    @Test
+    fun `weekly flag honesty - no reading is silence, no clock allows only SPENT`() {
+        assertNull(RingGeometry.weeklyFlag(null, 50.0))
+        assertNull(RingGeometry.weeklyFlag(null, null))
+        // No clock → no pace verdict, never a guessed one.
+        assertNull(RingGeometry.weeklyFlag(62.0, null))
+    }
 }

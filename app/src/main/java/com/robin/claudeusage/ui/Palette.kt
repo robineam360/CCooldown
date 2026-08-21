@@ -19,7 +19,28 @@ import java.util.Locale
  */
 const val PACE_DEAD_ZONE = 3.0
 
-data class ThemeOption(val name: String, val light: Color, val dark: Color)
+/**
+ * [paceLight]/[paceDark] are the theme's **pace-line partner** (CCRM-50 (Weekly
+ * Flag)): the colour the status-bar icon's pace mark wears on this theme. Always a
+ * cool hue, never a true complement — past 80% the fill is the fixed warm ladder
+ * whatever the theme, so a warm line would vanish exactly in the states that matter.
+ * Cyan-blue for the warm-or-neutral themes; the blue family gets spring green, the
+ * cyan family violet, so the line never sits on its own hue.
+ */
+data class ThemeOption(
+    val name: String,
+    val light: Color,
+    val dark: Color,
+    val paceLight: Color = PACE_BLUE_LIGHT,
+    val paceDark: Color = PACE_BLUE_DARK,
+)
+
+private val PACE_BLUE_LIGHT = Color(0xFF0288D1)
+private val PACE_BLUE_DARK = Color(0xFF5BC8FF)
+private val PACE_SPRING_LIGHT = Color(0xFF00A05C)
+private val PACE_SPRING_DARK = Color(0xFF69F0AE)
+private val PACE_VIOLET_LIGHT = Color(0xFF651FFF)
+private val PACE_VIOLET_DARK = Color(0xFFB388FF)
 
 /** Theme colors + the bar status shift, shared by the app UI and the widget. */
 object Palette {
@@ -30,10 +51,10 @@ object Palette {
 
     val options = listOf(
         ThemeOption("Claude Orange", Color(0xFFD97757), Color(0xFFE59980)),
-        ThemeOption("Blue", Color(0xFF1A73E8), Color(0xFF8AB4F8)),
-        ThemeOption("Indigo", Color(0xFF3949AB), Color(0xFF9FA8DA)),
-        ThemeOption("Cyan", Color(0xFF00ACC1), Color(0xFF4DD0E1)),
-        ThemeOption("Teal", Color(0xFF00897B), Color(0xFF4DB6AC)),
+        ThemeOption("Blue", Color(0xFF1A73E8), Color(0xFF8AB4F8), PACE_SPRING_LIGHT, PACE_SPRING_DARK),
+        ThemeOption("Indigo", Color(0xFF3949AB), Color(0xFF9FA8DA), PACE_SPRING_LIGHT, PACE_SPRING_DARK),
+        ThemeOption("Cyan", Color(0xFF00ACC1), Color(0xFF4DD0E1), PACE_VIOLET_LIGHT, PACE_VIOLET_DARK),
+        ThemeOption("Teal", Color(0xFF00897B), Color(0xFF4DB6AC), PACE_VIOLET_LIGHT, PACE_VIOLET_DARK),
         ThemeOption("Green", Color(0xFF188038), Color(0xFF81C995)),
         ThemeOption("Amber", Color(0xFFF9A825), Color(0xFFFDD663)),
         ThemeOption("Deep Orange", Color(0xFFE64A19), Color(0xFFFF8A65)),
@@ -48,6 +69,14 @@ object Palette {
 
     fun color(name: String, dark: Boolean): Color =
         byName(name).let { if (dark) it.dark else it.light }
+
+    /**
+     * The theme's pace-line partner (CCRM-50 (Weekly Flag)). Resolves through
+     * [byName] like [color] does, so "Material You" lands on Claude Orange's
+     * partner — matching the fill that surface actually draws for it.
+     */
+    fun paceColor(name: String, dark: Boolean): Color =
+        byName(name).let { if (dark) it.paceDark else it.paceLight }
 
     /**
      * Bars only: theme color normally, yellow above 80%, orange above 90%, red

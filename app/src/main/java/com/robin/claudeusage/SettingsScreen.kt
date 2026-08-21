@@ -442,7 +442,7 @@ fun SettingsScreen(
                 }
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    "The colored gauge and bars follow your theme and turn orange, then red, near the limit. Ring shows the 5-hour window and carries a pace mark — a small gap at where you'd be at an even burn, so fill past the gap means you're going faster than even pace. It follows the same colors in the status bar; the Quick Settings tile is monochrome, because Android renders tile icons that way.",
+                    "The colored gauge and bars follow your theme and turn orange, then red, near the limit. Ring shows the 5-hour window and carries a pace mark — a small gap at where you'd be at an even burn, so fill past the gap means you're going faster than even pace. A dot appears in the ring's middle when the 7-day window needs a look: grey on pace, yellow above pace, red spent — no dot means the week is fine. The Quick Settings tile is monochrome, because Android renders tile icons that way.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

@@ -114,12 +114,16 @@ object PinnedNotification {
         val sessionElapsed = elapsedPercent(session, Projection.SESSION_MS)
         // CCRM-49 (Glyph Legibility): the status bar keeps colour, so the glyph wears
         // the same severity colour as the gauge below it — one source of truth, and the
-        // two can never disagree.
+        // two can never disagree. CCRM-50 (Weekly Flag): the pace line wears the
+        // theme's partner colour, and the weekly window rides along as the flag dot.
         val smallIcon = drawStatusIcon(
             context, pct, cache.pinnedIconStyle(), left,
             sessionElapsed = sessionElapsed,
             fillArgb = fill.toArgb(),
             dark = dark,
+            paceArgb = Palette.paceColor(cache.themeColorName(), dark).toArgb(),
+            weeklyPct = data?.weekly?.percent,
+            weeklyElapsed = elapsedPercent(data?.weekly, Projection.WEEKLY_MS),
         )
         val pctText = if (pct == null) "—" else "${Fmt.usageInt(pct, left)}%"
         // The worded form for text slots that have room for the word.
@@ -470,8 +474,14 @@ object PinnedNotification {
         sessionElapsed: Double?,
         fillArgb: Int?,
         dark: Boolean,
+        paceArgb: Int?,
+        weeklyPct: Double?,
+        weeklyElapsed: Double?,
     ): IconCompat = IconCompat.createWithBitmap(
-        UsageIcon.draw(context, pct, iconStyle, left, sessionElapsed, fillArgb, dark)
+        UsageIcon.draw(
+            context, pct, iconStyle, left, sessionElapsed, fillArgb, dark,
+            paceArgb, weeklyPct, weeklyElapsed,
+        )
     )
 
     /**

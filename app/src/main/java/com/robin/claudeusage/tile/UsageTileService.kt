@@ -50,11 +50,17 @@ abstract class BaseUsageTileService(private val profile: Profile) : TileService(
                     // The pace mark rides along (CCRM-48 (Status-Bar Gauge)), but no
                     // colour: this surface flattens a bitmap to one tint, measured in
                     // CCRM-49 (Glyph Legibility), so it gets the alpha-mask rendering.
+                    // The CCRM-50 (Weekly Flag) dot rides along too, collapsed to
+                    // alpha — quiet rung at 45%, loud rungs full.
                     icon = Icon.createWithBitmap(
                         UsageIcon.draw(
                             this@BaseUsageTileService, session.percent,
                             cache.pinnedIconStyle(), cache.usageLeft(),
                             sessionElapsed = elapsedPercent(session, Projection.SESSION_MS),
+                            weeklyPct = snapshot.data?.weekly?.percent,
+                            weeklyElapsed = elapsedPercent(
+                                snapshot.data?.weekly, Projection.WEEKLY_MS,
+                            ),
                         )
                     )
                 }

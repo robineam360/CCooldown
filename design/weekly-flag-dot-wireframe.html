@@ -1,0 +1,477 @@
+<title>Weekly Flag — CCRM-50 (rev C, as built)</title>
+<style>
+  :root {
+    --bg: #FAF8F6; --ink: #26211E; --muted: #6E6660; --accent: #C15F3C;
+    --hair: #E7E1DC; --card: #FFFFFF;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171513; --ink: #EDE8E4; --muted: #9B928B; --accent: #E59980;
+      --hair: #2C2825; --card: #201D1B;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171513; --ink: #EDE8E4; --muted: #9B928B; --accent: #E59980;
+    --hair: #2C2825; --card: #201D1B;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    margin: 0; padding: 48px 24px 96px; line-height: 1.5;
+  }
+  .page { max-width: 1220px; margin: 0 auto; }
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 10px;
+  }
+  h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 8px; text-wrap: balance; }
+  .lede { color: var(--muted); max-width: 74ch; margin: 0 0 12px; font-size: 14px; }
+  h2 { font-size: 19px; font-weight: 650; margin: 52px 0 4px; }
+  h3 { font-size: 14px; font-weight: 650; margin: 28px 0 8px; }
+  .sub { color: var(--muted); font-size: 13px; max-width: 84ch; margin: 0 0 16px; }
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px;
+    background: color-mix(in srgb, var(--hair) 55%, transparent);
+    padding: 1px 5px; border-radius: 4px;
+  }
+  .flag { margin: 14px 0 4px; padding: 13px 17px; border-radius: 10px;
+          background: var(--card); border: 1px solid var(--hair);
+          font-size: 13.5px; max-width: 90ch; }
+  .flag.hot { border-color: color-mix(in srgb, var(--accent) 50%, var(--hair)); }
+  .flag b { font-weight: 650; }
+
+  .board { border-radius: 18px; padding: 20px 22px 22px; border: 1px solid var(--hair);
+           margin-top: 14px; overflow-x: auto; }
+  .board.dk { background: linear-gradient(140deg, #1E2833 0%, #30272C 60%, #382D2F 100%); }
+  .board.lt { background: linear-gradient(140deg, #C6D2E0 0%, #DACEBE 55%, #E6D6C3 100%); }
+  .boardcap { margin: 0 0 16px; font-family: ui-monospace, "SF Mono", Menlo, monospace;
+              font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+  .dk .boardcap { color: rgba(255,255,255,.52); } .lt .boardcap { color: rgba(20,20,30,.62); }
+
+  .sb { display: flex; align-items: center; height: 28px; padding: 0 10px; gap: 7px;
+        border-radius: 4px 4px 0 0; width: 300px; }
+  .sb.dk { background: #0B0B0C; color: #FFFFFF; }
+  .sb.lt { background: #FFFFFF; color: #111112; }
+  .sb .clock { font-size: 12px; font-weight: 600; }
+  .sb .spacer { flex: 1; }
+  .sb .sys { display: flex; align-items: center; gap: 4px; }
+  .sb .sys svg { width: 13px; height: 13px; }
+  .z2 { zoom: 2; }
+
+  table.grid { border-collapse: collapse; }
+  table.grid th, table.grid td { padding: 8px 10px; text-align: center; vertical-align: middle; }
+  table.grid th.rowh, table.grid td.rowh {
+    text-align: left; white-space: nowrap; padding-right: 16px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11px; font-weight: 600;
+  }
+  table.grid th { font-family: ui-monospace, "SF Mono", Menlo, monospace;
+                  font-size: 10px; letter-spacing: .04em; font-weight: 600; max-width: 170px; }
+  .dk table.grid th, .dk table.grid td.rowh { color: rgba(255,255,255,.74); }
+  .lt table.grid th, .lt table.grid td.rowh { color: rgba(20,20,30,.8); }
+  .dk table.grid tbody tr + tr { border-top: 1px solid rgba(255,255,255,.09); }
+  .lt table.grid tbody tr + tr { border-top: 1px solid rgba(20,20,30,.10); }
+  .chipbg { display: inline-flex; align-items: center; justify-content: center;
+            padding: 3px 4px; border-radius: 3px; }
+  .chipbg.dk { background: #0B0B0C; } .chipbg.lt { background: #FFFFFF; }
+  canvas.px { image-rendering: pixelated; display: block; border-radius: 2px; }
+
+  table.geo { border-collapse: collapse; font-size: 13px; margin-top: 10px; }
+  table.geo th, table.geo td { text-align: left; padding: 7px 18px 7px 0;
+                               border-bottom: 1px solid var(--hair); vertical-align: top; }
+  table.geo th { font-weight: 650; }
+  table.geo td.n { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11.5px; }
+  table.geo tr.win td { background: color-mix(in srgb, var(--accent) 9%, transparent); }
+  .sw { display: inline-block; width: 10px; height: 10px; border-radius: 5px; vertical-align: -1px; }
+
+  ul.dec { margin: 10px 0 0; padding-left: 20px; font-size: 13.5px; max-width: 92ch; }
+  ul.dec li { margin-bottom: 9px; }
+  ul.dec b { font-weight: 650; }
+  .q { margin-top: 14px; padding: 15px 19px; border-radius: 12px;
+       background: var(--card); border: 1px solid var(--hair); font-size: 13.5px; max-width: 92ch; }
+  .q ol { padding-left: 20px; margin: 8px 0 0; }
+  .q li { margin-bottom: 10px; }
+  .rec { color: var(--accent); font-weight: 650; }
+  .cap2 { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 10px;
+          margin-top: 7px; line-height: 1.5; }
+  .dk .cap2 { color: rgba(255,255,255,.7); } .lt .cap2 { color: rgba(20,20,30,.78); }
+</style>
+
+<div class="page">
+  <p class="eyebrow">CCRM-50 (Weekly Flag) &middot; rev C (as built) &middot; approved and shipped 2026-08-21</p>
+  <h1>The weekly dot says <i>pace</i>, not level</h1>
+  <p class="lede">
+    Rev A keyed the dot on the 7-day's usage crossing 80%. Review redefined it: for a window
+    a week long, <b>nearness to the pace line matters more than the level</b> — by the time a
+    weekly crosses 80 it may be day 6 and there is nothing left to do about it, whereas
+    "above pace on day 2" is the moment a correction is still cheap. Rev A's silence lasted
+    exactly through the actionable period. Rev B fixes that.
+  </p>
+  <p class="lede">
+    Carried forward as already decided: dot diameter <b>7.5 dp</b> (≈4.4 dp on screen), dead
+    centre of the hollow, no dot when the weekly has no reading (honesty option A), Ring
+    style only, no animation.
+  </p>
+
+  <div class="flag hot">
+    <b>The strongest form of this idea: the dot is the app's pace sentence, drawn.</b>
+    The app already speaks a three-verdict pace vocabulary — <i>"N points above even pace"</i>,
+    <i>"On even pace"</i>, <i>"N points below even pace"</i> — computed with the shared
+    ±<code>PACE_DEAD_ZONE</code> (3 points) so surfaces can't flap or disagree. The dot's rungs
+    bind to those verdicts <b>exactly</b>, plus one absolute rung on top:
+    <table class="geo">
+      <tr><th>Dot</th><th>Predicate (delta = used − elapsed)</th><th>The sentence it mirrors</th></tr>
+      <tr><td><b>Red</b> <span class="sw" style="background:#FF5252"></span></td>
+        <td class="n">weekly used ≥ 100 (truncated; needs no reset clock)</td>
+        <td class="n">the window is spent — level, not pace</td></tr>
+      <tr><td><b>Yellow</b> <span class="sw" style="background:#FDD663"></span></td>
+        <td class="n">delta &gt; 3</td><td class="n">"N points above even pace"</td></tr>
+      <tr><td><b>Grey</b> <span class="sw" style="background:#BDBDBD"></span></td>
+        <td class="n">−3 ≤ delta ≤ 3</td><td class="n">"On even pace"</td></tr>
+      <tr><td><b>No dot</b></td><td class="n">delta &lt; −3</td>
+        <td class="n">"N points below even pace" — good news is silence</td></tr>
+    </table>
+    No new constants, no new thresholds: the dot goes yellow at the exact poll the in-app
+    sentence flips to "above", so the two can never disagree. Review's "near the line but
+    below" becomes the app's existing on-pace band, which includes a hair above the line —
+    the same ±3 the sentence already treats as "on".
+  </div>
+
+  <div class="flag">
+    <b>Dropping orange: agreed, with receipts.</b> At 4.4 dp rendered, #FDD663 vs #FFA726 is
+    a coin flip; and the Amber theme's accent <i>is literally the yellow rung colour</i>
+    (both #FDD663/#F9A825), so warm-on-warm ambiguity already exists in this palette. Three
+    rungs with three different meanings beat four hues two of which look alike. (The Amber
+    quirk itself predates this work — noted in §6d.)
+  </div>
+
+  <!-- ================================================================= -->
+  <h2>1 · The ladder — every rung, at the size it will really be</h2>
+  <p class="sub">
+    The 5-hour ring is held at <b>46% used / 37% elapsed</b> in every cell; only the weekly
+    changes. True size first, then the real 37 px magnified 4×.
+  </p>
+  <div class="board dk"><p class="boardcap">Dark bar</p><table class="grid" id="ladder-dk"></table></div>
+  <div class="board lt"><p class="boardcap">Light bar</p><table class="grid" id="ladder-lt"></table></div>
+
+  <h3>1a · In the bar, at true size</h3>
+  <div class="board dk"><p class="boardcap">Dark bar &middot; 1 px = 1 dp</p><div id="strips"></div></div>
+
+  <!-- ================================================================= -->
+  <h2>2 · The day-2 story — why this beats rev A</h2>
+  <p class="sub">
+    Same week, three moments. Rev A's usage-threshold dot is silent in the first two frames —
+    it would only speak on day 6, after the money is spent.
+  </p>
+  <div class="board dk"><p class="boardcap">Dark bar &middot; real pixels at 4×</p><table class="grid" id="story"></table></div>
+
+  <!-- ================================================================= -->
+  <h2>3 · Both loud at once</h2>
+  <p class="sub">
+    The 5-hour ring across its severity states, the dot across its rungs. The two must read
+    as two facts — they differ in <i>shape</i> (band vs disc) before they differ in hue.
+  </p>
+  <div class="board dk"><p class="boardcap">Dark bar &middot; 5-hour across the top, weekly rung down the side &middot; 4×</p>
+    <table class="grid" id="matrix"></table></div>
+
+  <!-- ================================================================= -->
+  <h2>4 · Flattened — the tile, and any OEM that tints</h2>
+  <p class="sub">
+    Colour is stripped there (measured, CCRM-49 (Glyph Legibility)), so the rungs collapse to
+    alpha: grey → a 45%-alpha disc, yellow and red → a full disc. "Which rung" is lost;
+    "the weekly needs a look" is kept, which was always the message.
+  </p>
+  <div class="board dk"><p class="boardcap">Monochrome rendering &middot; 4×</p><table class="grid" id="mono"></table></div>
+
+  <!-- ================================================================= -->
+  <h2>5 · Honesty rules</h2>
+  <ul class="dec">
+    <li><b>No weekly reading → no dot.</b> Decided in rev A and unchanged: the dot is an
+    alert, and no alerting system claims silence proves health. The panel one swipe away
+    says "7-day no data" in words.</li>
+    <li><b>No reset clock → grey and yellow are impossible</b> (there is no elapsed to
+    compare against, and this app never guesses a pace). <b>Red still fires</b>, because it
+    keys on the level alone. Shown in the ladder above.</li>
+    <li><b>No flicker games.</b> The dot flips exactly when the pace sentence flips, on the
+    same shared dead zone — consistency across surfaces over hysteresis on one of them.
+    Flapping is already bounded by the ±3 band and the poll cadence.</li>
+    <li><b>One frequency consequence to accept knowingly:</b> a steady user rides "on even
+    pace" a lot, so the grey dot will be <i>present more often than absent</i> for them.
+    That is the design: grey is deliberately the quietest mark — the loud claim is reserved
+    for colour. If it proves noisy in practice, the fix is narrowing grey to a band strictly
+    below the line, not widening the ladder.</li>
+  </ul>
+
+  <!-- ================================================================= -->
+  <h2>6 · Theme — what already works, and the one real question</h2>
+
+  <h3>6a · The ring already follows your theme setting</h3>
+  <p class="sub">
+    <code>Palette.barColor</code> returns the <b>theme accent</b> below 80 — the terracotta
+    on your phone is "Claude Orange", not a hardcode. Pick Blue in Settings today and the
+    ring is blue. All twelve options, as the icon draws them:
+  </p>
+  <div class="board dk"><p class="boardcap">Dark bar &middot; 46% used, weekly quiet &middot; 4×</p><table class="grid" id="themes"></table></div>
+
+  <h3>6b · The pace line — three rules, judged on the hard themes</h3>
+  <p class="sub">
+    Today the line is a fixed cool blue. That was chosen against a terracotta fill; the
+    palette also contains <b>Blue, Indigo, Cyan and Teal</b>, where a fixed blue line sits on
+    a blue fill. Three candidate rules, on the themes that stress them (62% used, line at 45):
+  </p>
+  <div class="board dk"><p class="boardcap">Dark bar &middot; rules down the side, themes across &middot; 4×</p><table class="grid" id="rules"></table></div>
+
+  <h3>6c · Why a true complement is off the table</h3>
+  <p class="sub">
+    Past 80 the fill is <b>always the fixed warm ladder</b>, whatever the theme — that
+    override is the whole point of the ladder. A Blue theme's true complement is orange, and
+    here is that line in the states where the glyph matters most:
+  </p>
+  <div class="board dk"><p class="boardcap">Blue theme at 93% and 100% &middot; each rule's line &middot; 4×</p><table class="grid" id="override"></table></div>
+  <div class="flag">
+    <b>Reading of 6b/6c.</b> Rule X (true complement) dies exactly at 93 and 100 — a warm
+    line on the warm ladder. Rule A (fixed blue) is fine on warm themes and merely mediocre
+    on the blue family: position always survives (the erased slot guarantees that), hue
+    coding doesn't. <b>Rule B — a hand-tuned cool partner per theme — keeps hue coding alive
+    everywhere</b>: cyan-blue for the eight warm-or-neutral themes, spring green for Blue and
+    Indigo, violet for Cyan and Teal. All three partners are cool, so all three survive the
+    ladder override. Material You computes it: rotate the accent's hue 180°, then clamp out
+    of the warm band the ladder owns. The partner lives as a third field on
+    <code>ThemeOption</code>, next to the light/dark pair that already exists.
+  </div>
+
+  <h3>6d · Noted while here — the Amber quirk</h3>
+  <p class="sub">
+    Amber's accent equals the &gt;80 yellow rung exactly, so on every bar in the app an Amber
+    user cannot see the first ladder step (46% and 84% are the same colour). Pre-existing,
+    palette-wide, not made worse by anything here — but if it deserves fixing, that is its
+    own tracker item, not a rider on this one.
+  </p>
+
+  <!-- ================================================================= -->
+  <h2>7 · Rules recap</h2>
+  <table class="geo">
+    <tr><th>Thing</th><th>Value</th></tr>
+    <tr><td>Dot</td><td class="n">7.5 dp in the 24 dp bitmap → ~4.4 dp on screen, dead centre</td></tr>
+    <tr><td>Red</td><td class="n"><span class="sw" style="background:#FF5252"></span> #FF5252 / #C62828 · weekly ≥ 100, truncated · no clock needed</td></tr>
+    <tr><td>Yellow</td><td class="n"><span class="sw" style="background:#FDD663"></span> #FDD663 / #F9A825 · delta &gt; PACE_DEAD_ZONE — the "above even pace" verdict</td></tr>
+    <tr><td>Grey</td><td class="n"><span class="sw" style="background:#BDBDBD"></span> #BDBDBD / #757575 · |delta| ≤ PACE_DEAD_ZONE — the "on even pace" verdict · brighter than the track so it reads as deliberate</td></tr>
+    <tr><td>No dot</td><td class="n">below even pace · or no weekly reading · or (no reset clock and weekly &lt; 100)</td></tr>
+    <tr><td>Monochrome</td><td class="n">grey → 45% alpha disc · yellow/red → full disc</td></tr>
+    <tr><td>Ring fill</td><td class="n">unchanged — theme accent via <code>Palette.barColor</code>, ladder past 80 (already live)</td></tr>
+    <tr><td>Pace line</td><td class="n">rule B proposed: per-theme cool partner on <code>ThemeOption</code>; Material You computed with a warm-band clamp</td></tr>
+    <tr><td>Scope</td><td class="n">Ring style only · no animation · no new setting</td></tr>
+  </table>
+
+  <div class="q">
+    <b>Decisions — approved 2026-08-21, built the same day:</b>
+    <ol>
+      <li><b>Grey binds to the on-pace verdict</b>, |delta| ≤ PACE_DEAD_ZONE — the dot is
+      the pace sentence, drawn; zero new constants (`RingGeometry.weeklyFlag`, pinned by
+      `RingGeometryTest`). The frequency consequence in §5 accepted knowingly.</li>
+      <li><b>Pace line: rule B</b> — a cool partner per theme, as `paceLight`/`paceDark` on
+      `ThemeOption`: cyan-blue for the eight warm-or-neutral themes, spring green for
+      Blue/Indigo, violet for Cyan/Teal. Material You resolves through `byName` to Claude
+      Orange on this surface, so its partner follows the same path — the computed-complement
+      rule sketched in 6c is not needed until that surface learns true dynamic accents.</li>
+      <li><b>Tile: grey at 45% alpha</b>, yellow/red full — the rungs collapse to alpha,
+      the message survives.</li>
+    </ol>
+  </div>
+</div>
+
+<script>
+/* The as-built CCRM-49 ring + the rev B dot. Authored in 24 dp, judged at the real
+   37 px raster — never a vector zoom. */
+const BOX = 24, EFF = 14.1, DENS = 2.625, PXW = Math.round(EFF * DENS);
+const R = 9.2, SW = 4, MIN_FILL = 9, DOT = 7.5, DEAD = 3;
+const BG = (d) => d ? "#0B0B0C" : "#FFFFFF";
+const SEV = (d) => d
+  ? { warn: "#FDD663", hot: "#FFA726", over: "#FF5252" }
+  : { warn: "#F9A825", hot: "#F57C00", over: "#C62828" };
+const DOTGREY = (d) => d ? "#BDBDBD" : "#757575";
+const TRACK = "rgba(150,150,150,0.59)";
+
+const THEMES = [
+  { n: "Claude Orange", a: "#E59980", al: "#D97757", pace: "#5BC8FF" },
+  { n: "Blue",          a: "#8AB4F8", al: "#1A73E8", pace: "#69F0AE" },
+  { n: "Indigo",        a: "#9FA8DA", al: "#3949AB", pace: "#69F0AE" },
+  { n: "Cyan",          a: "#4DD0E1", al: "#00ACC1", pace: "#B388FF" },
+  { n: "Teal",          a: "#4DB6AC", al: "#00897B", pace: "#B388FF" },
+  { n: "Green",         a: "#81C995", al: "#188038", pace: "#5BC8FF" },
+  { n: "Amber",         a: "#FDD663", al: "#F9A825", pace: "#5BC8FF" },
+  { n: "Deep Orange",   a: "#FF8A65", al: "#E64A19", pace: "#5BC8FF" },
+  { n: "Red",           a: "#F28B82", al: "#D93025", pace: "#5BC8FF" },
+  { n: "Pink",          a: "#F48FB1", al: "#D81B60", pace: "#5BC8FF" },
+  { n: "Purple",        a: "#CE93D8", al: "#8E24AA", pace: "#5BC8FF" },
+  { n: "Brown",         a: "#BCAAA4", al: "#6D4C41", pace: "#5BC8FF" },
+];
+const CO = THEMES[0];
+
+function fillColor(p, theme, dark) {
+  const S = SEV(dark), t = Math.trunc(p);
+  return t >= 100 ? S.over : t > 90 ? S.hot : t > 80 ? S.warn : (dark ? theme.a : theme.al);
+}
+/* the rev B rung: red on level, yellow/grey on the shared pace verdicts */
+function dotRung(wUsed, wEl) {
+  if (wUsed == null) return null;
+  if (Math.trunc(wUsed) >= 100) return "red";
+  if (wEl == null) return null;                    // no clock → no guessed pace
+  const delta = wUsed - wEl;
+  if (delta > DEAD) return "yellow";
+  if (delta >= -DEAD) return "grey";
+  return null;                                     // below pace: silence
+}
+
+function ringSvg(o) {
+  const { pct, el, wUsed = null, wEl = null, theme = CO, paceCol, dark = true, mono = false } = o;
+  const cx = 12, back = BG(dark), line = paceCol || theme.pace;
+  let s = `<circle cx="${cx}" cy="${cx}" r="${R}" fill="none" stroke="${mono ? "rgba(255,255,255,0.35)" : TRACK}" stroke-width="${SW}"/>`;
+  if (pct != null) {
+    const p = Math.min(100, Math.max(0, pct)), v = p > 0 ? Math.max(p, MIN_FILL) : 0;
+    const col = mono ? "#FFFFFF" : fillColor(p, theme, dark);
+    if (v >= 100) s += `<circle cx="${cx}" cy="${cx}" r="${R}" fill="none" stroke="${col}" stroke-width="${SW}"/>`;
+    else if (v > 0) s += `<circle cx="${cx}" cy="${cx}" r="${R}" fill="none" stroke="${col}" stroke-width="${SW}"
+        pathLength="100" stroke-dasharray="${v} 100" stroke-linecap="round" transform="rotate(-90 ${cx} ${cx})"/>`;
+    if (p >= 100) s += radial(cx, 0, back, SW * 0.7);
+  }
+  if (pct != null && el != null) {
+    const w = 0.40 * SW;
+    s += radial(cx, el, back, w + 0.5 * SW);
+    if (!mono) s += radial(cx, el, line, w, true);
+  }
+  const rung = dotRung(wUsed, wEl);
+  if (rung) {
+    const S = SEV(dark);
+    const fillc = rung === "red" ? S.over : rung === "yellow" ? S.warn : DOTGREY(dark);
+    if (mono) s += `<circle cx="${cx}" cy="${cx}" r="${DOT / 2}" fill="#FFFFFF" opacity="${rung === "grey" ? 0.45 : 1}"/>`;
+    else s += `<circle cx="${cx}" cy="${cx}" r="${DOT / 2}" fill="${fillc}"/>`;
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${BOX} ${BOX}" width="${BOX}" height="${BOX}">${s}</svg>`;
+}
+function radial(cx, pctAngle, color, width, round) {
+  const a = (pctAngle / 100) * 2 * Math.PI - Math.PI / 2, o = 0.12 * SW;
+  const r1 = R - SW/2 - o, r2 = R + SW/2 + o;
+  return `<line x1="${cx + r1 * Math.cos(a)}" y1="${cx + r1 * Math.sin(a)}" x2="${cx + r2 * Math.cos(a)}" y2="${cx + r2 * Math.sin(a)}"
+     stroke="${color}" stroke-width="${width}"${round ? ' stroke-linecap="round"' : ''}/>`;
+}
+const trueSize = (o) =>
+  ringSvg(o).replace(`width="${BOX}" height="${BOX}"`, `width="${EFF}" height="${EFF}"`);
+function pixelBlock(td, o, mag, dark) {
+  const wrap = document.createElement("div");
+  wrap.className = "chipbg " + (dark ? "dk" : "lt");
+  wrap.style.display = "inline-flex";
+  const cv = document.createElement("canvas");
+  cv.className = "px"; cv.width = PXW * mag; cv.height = PXW * mag;
+  cv.style.width = (PXW * mag) + "px"; cv.style.height = (PXW * mag) + "px";
+  wrap.appendChild(cv); td.appendChild(wrap);
+  const ctx = cv.getContext("2d"), img = new Image();
+  img.onload = () => {
+    const off = document.createElement("canvas");
+    off.width = PXW; off.height = PXW;
+    const oc = off.getContext("2d");
+    oc.fillStyle = BG(dark); oc.fillRect(0, 0, PXW, PXW);
+    oc.drawImage(img, 0, 0, PXW, PXW);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(off, 0, 0, PXW * mag, PXW * mag);
+  };
+  img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(ringSvg(o));
+}
+function grid(id, cols, rows, cell) {
+  const host = document.getElementById(id);
+  host.innerHTML =
+    `<thead><tr>${rows.length > 1 ? '<th class="rowh"></th>' : ''}${cols.map((c) => `<th>${c.t}</th>`).join("")}</tr></thead>` +
+    `<tbody>${rows.map((r) => `<tr>${rows.length > 1 ? `<td class="rowh">${r.t}</td>` : ''}` +
+      cols.map(() => "<td></td>").join("") + `</tr>`).join("")}</tbody>`;
+  host.querySelectorAll("tbody tr").forEach((tr, ri) => {
+    tr.querySelectorAll("td:not(.rowh)").forEach((td, ci) => cell(td, cols[ci], rows[ri]));
+  });
+}
+
+const BASE = { pct: 46, el: 37 };
+const LADDER = [
+  { t: "far below · 30 at 60", wUsed: 30, wEl: 60 },
+  { t: "on pace, just under · 55 at 57", wUsed: 55, wEl: 57 },
+  { t: "on pace, hair over · 58 at 56", wUsed: 58, wEl: 56 },
+  { t: "above · 62 at 45", wUsed: 62, wEl: 45 },
+  { t: "spent · 100", wUsed: 100, wEl: 70 },
+  { t: "no reading", wUsed: null, wEl: null },
+  { t: "no reset clock · 62", wUsed: 62, wEl: null },
+];
+
+/* 1 · ladder, dark + light */
+[["ladder-dk", true], ["ladder-lt", false]].forEach(([id, dark]) => {
+  grid(id, LADDER, [{ t: "true size" }, { t: "real pixels, 4×" }], (td, c, r) => {
+    if (r.t === "true size") {
+      td.innerHTML = `<span class="chipbg ${dark ? "dk" : "lt"}">` +
+        trueSize({ ...BASE, wUsed: c.wUsed, wEl: c.wEl, dark }) + `</span>`;
+    } else pixelBlock(td, { ...BASE, wUsed: c.wUsed, wEl: c.wEl, dark }, 4, dark);
+  });
+});
+
+/* 1a · strips */
+const SYS = `<div class="sys">
+  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21 1 8.5A16 16 0 0 1 23 8.5L12 21z"/></svg>
+  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 22h3V10H2v12zm5 0h3V6H7v16zm5 0h3V2h-3v20zm5 0h3V14h-3v8z"/></svg>
+  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.7 4H14V2h-4v2H8.3C7.6 4 7 4.6 7 5.3v15.4c0 .7.6 1.3 1.3 1.3h7.4c.7 0 1.3-.6 1.3-1.3V5.3C17 4.6 16.4 4 15.7 4zm-.7 16H9v-8h6v8z"/></svg>
+</div>`;
+document.getElementById("strips").innerHTML = LADDER.slice(0, 5).map((l) => `
+  <div style="margin-bottom:14px">
+    <div class="z2"><div class="sb dk">
+      <span class="clock">9:41</span>
+      <span style="display:flex;align-items:center">${trueSize({ ...BASE, wUsed: l.wUsed, wEl: l.wEl, dark: true })}</span>
+      <span class="spacer"></span>${SYS}
+    </div></div>
+    <div class="cap2">weekly ${l.t}</div>
+  </div>`).join("");
+
+/* 2 · the day-2 story */
+grid("story", [
+  { t: "day 2 · 40 used, 24 elapsed — above pace, rev A silent", wUsed: 40, wEl: 24 },
+  { t: "day 4 · 62 at 55 — still above, rev A still silent", wUsed: 62, wEl: 55 },
+  { t: "day 6 · 87 at 82 — rev A finally speaks", wUsed: 87, wEl: 82 },
+], [{ t: "" }], (td, c) => pixelBlock(td, { ...BASE, wUsed: c.wUsed, wEl: c.wEl, dark: true }, 4, true));
+
+/* 3 · both loud */
+grid("matrix",
+  [62, 84, 93, 100].map((p) => ({ t: `5-hour ${p}%`, p })),
+  [
+    { t: "weekly grey · on pace", wUsed: 55, wEl: 57 },
+    { t: "weekly yellow · above", wUsed: 70, wEl: 50 },
+    { t: "weekly red · spent", wUsed: 100, wEl: 70 },
+  ],
+  (td, c, r) => pixelBlock(td, { pct: c.p, el: 70, wUsed: r.wUsed, wEl: r.wEl, dark: true }, 4, true));
+
+/* 4 · mono */
+grid("mono", LADDER.slice(0, 6), [{ t: "monochrome" }], (td, c) =>
+  pixelBlock(td, { ...BASE, wUsed: c.wUsed, wEl: c.wEl, dark: true, mono: true }, 4, true));
+
+/* 6a · themes */
+grid("themes", THEMES.map((th) => ({ t: th.n, th })), [{ t: "" }], (td, c) =>
+  pixelBlock(td, { ...BASE, theme: c.th, dark: true }, 4, true));
+
+/* 6b · pace-line rules */
+const HARD = ["Claude Orange", "Blue", "Indigo", "Cyan", "Teal", "Green", "Amber"]
+  .map((n) => THEMES.find((t) => t.n === n));
+grid("rules",
+  HARD.map((th) => ({ t: th.n, th })),
+  [
+    { t: "A · fixed blue", col: () => "#5BC8FF" },
+    { t: "B · per-theme partner", col: (th) => th.pace },
+    { t: "C · neutral ink", col: () => "#FFFFFF" },
+  ],
+  (td, c, r) => pixelBlock(td, { pct: 62, el: 45, theme: c.th, paceCol: r.col(c.th), dark: true }, 4, true));
+
+/* 6c · ladder override, Blue theme */
+const BLUE = THEMES.find((t) => t.n === "Blue");
+grid("override",
+  [{ t: "93% — orange fill", p: 93 }, { t: "100% — red fill", p: 100 }],
+  [
+    { t: "X · true complement (orange)", col: "#FFB74D" },
+    { t: "A · fixed blue", col: "#5BC8FF" },
+    { t: "B · partner (spring green)", col: "#69F0AE" },
+    { t: "C · neutral ink", col: "#FFFFFF" },
+  ],
+  (td, c, r) => pixelBlock(td, { pct: c.p, el: 60, theme: BLUE, paceCol: r.col, dark: true }, 4, true));
+</script>

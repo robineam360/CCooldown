@@ -50,6 +50,33 @@ object RingGeometry {
      * Pace Marks)); it gates the segment only, never the tick. Defaulted, so every
      * existing call site keeps today's behaviour.
      */
+    /**
+     * The weekly flag dot's rungs (CCRM-50 (Weekly Flag)) — the app's pace verdicts,
+     * drawn. [ABOVE] and [ON_PACE] are the *identical* ±[PACE_DEAD_ZONE] comparisons
+     * behind the "above / on / below even pace" sentence, so the dot flips at the
+     * exact poll the sentence does. [SPENT] keys on the level alone, truncated like
+     * every ladder comparison.
+     */
+    enum class WeeklyFlag { ON_PACE, ABOVE, SPENT }
+
+    /**
+     * Null = no dot: the weekly is below pace (good news is silence), has no reading
+     * (an alert never claims silence proves health — the panel says "no data" in
+     * words), or has no reset clock to derive a pace from (never a guessed verdict —
+     * though [SPENT] still fires then, because it needs no clock).
+     */
+    fun weeklyFlag(percent: Double?, elapsedPercent: Double?): WeeklyFlag? {
+        percent ?: return null
+        if (percent.toInt() >= 100) return WeeklyFlag.SPENT
+        elapsedPercent ?: return null
+        val delta = percent - elapsedPercent
+        return when {
+            delta > PACE_DEAD_ZONE -> WeeklyFlag.ABOVE
+            delta >= -PACE_DEAD_ZONE -> WeeklyFlag.ON_PACE
+            else -> null
+        }
+    }
+
     fun redSegment(
         percent: Double?,
         elapsedPercent: Double?,

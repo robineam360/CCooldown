@@ -48,8 +48,11 @@ object UsageIcon {
      * [sessionElapsed] positions the ring's pace mark. [fillArgb] is the resolved
      * severity colour — pass `Palette.barColor(...)` so the glyph and the
      * notification's own gauge can never disagree — or null for the monochrome
-     * alpha-mask rendering a tinting surface needs. Both defaulted, so call sites
-     * that predate CCRM-49 keep compiling and keep the monochrome drawing.
+     * alpha-mask rendering a tinting surface needs. [paceArgb] is the theme's
+     * pace-line partner (`Palette.paceColor(...)`, CCRM-50 (Weekly Flag)); null
+     * keeps the historical blue. [weeklyPct]/[weeklyElapsed] feed the weekly flag
+     * dot in the ring's hollow — the pace verdicts, drawn ([RingGeometry.weeklyFlag]).
+     * All defaulted, so older call sites keep compiling and keep their drawing.
      */
     fun draw(
         context: Context,
@@ -59,6 +62,9 @@ object UsageIcon {
         sessionElapsed: Double? = null,
         fillArgb: Int? = null,
         dark: Boolean = true,
+        paceArgb: Int? = null,
+        weeklyPct: Double? = null,
+        weeklyElapsed: Double? = null,
     ): Bitmap {
         val size = dp(context, 24f).toInt().coerceAtLeast(24)
         val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
@@ -121,7 +127,32 @@ object UsageIcon {
                 // is the size that actually has to be readable.
                 val cx = size / 2f
                 val u = size / 24f
-                windowRing(c, cx, 9.2f * u, 4f * u, pct, sessionElapsed, fillArgb, dark)
+                windowRing(c, cx, 9.2f * u, 4f * u, pct, sessionElapsed, fillArgb, dark, paceArgb)
+                // CCRM-50 (Weekly Flag): the 7-day window as a *state*, not a level —
+                // a 7.5 dp dot in the hollow the ring already leaves empty. Absent
+                // when the weekly is below pace; a second level was measured
+                // unreadable at this size, a flag costs the 5-hour ring nothing.
+                RingGeometry.weeklyFlag(weeklyPct, weeklyElapsed)?.let { flag ->
+                    val dot = Paint(Paint.ANTI_ALIAS_FLAG)
+                    if (fillArgb == null) {
+                        // Monochrome surfaces collapse the rungs to alpha: the quiet
+                        // rung stays visibly quieter than the loud ones.
+                        dot.color = Color.WHITE
+                        dot.alpha = if (flag == RingGeometry.WeeklyFlag.ON_PACE) 115 else 255
+                    } else {
+                        // Rung hues match Palette.barColor's ladder; grey sits a step
+                        // brighter than the ring track so it reads as deliberate.
+                        dot.color = when (flag) {
+                            RingGeometry.WeeklyFlag.SPENT ->
+                                if (dark) 0xFFFF5252.toInt() else 0xFFC62828.toInt()
+                            RingGeometry.WeeklyFlag.ABOVE ->
+                                if (dark) 0xFFFDD663.toInt() else 0xFFF9A825.toInt()
+                            RingGeometry.WeeklyFlag.ON_PACE ->
+                                if (dark) 0xFFBDBDBD.toInt() else 0xFF757575.toInt()
+                        }
+                    }
+                    c.drawCircle(cx, cx, 3.75f * u, dot)
+                }
             }
         }
         return bmp
@@ -147,6 +178,7 @@ object UsageIcon {
         elapsed: Double?,
         fillArgb: Int?,
         dark: Boolean,
+        paceArgb: Int? = null,
     ) {
         val colour = fillArgb != null
         val trackColor = if (colour) TRACK_NEUTRAL else Color.WHITE
@@ -187,12 +219,16 @@ object UsageIcon {
                 // window" and never becomes "how bad is it". The slot is deliberately
                 // wider than the line: that transparent margin is what still reads as
                 // a mark on a surface that flattens us to one tint.
-                drawRadial(c, cx, r, sw, at, PACE_COOL, line)
+                drawRadial(c, cx, r, sw, at, paceArgb ?: PACE_COOL, line)
             }
         }
     }
 
-    /** The pace mark's cool hue — deliberately outside the warm severity ladder. */
+    /**
+     * The pace mark's fallback hue when no theme partner is passed — Claude Orange's
+     * partner, kept so older call sites draw what they always drew. Themed callers
+     * pass `Palette.paceColor(...)` instead (CCRM-50 (Weekly Flag)).
+     */
     private const val PACE_COOL = 0xFF5BC8FF.toInt()
 
     /** Remaining, in colour mode: a mid neutral that holds up on a light or dark bar. */
