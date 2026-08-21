@@ -12,7 +12,7 @@ to see how close you are.
 
 **📱 Android only (for now)** — an iOS version is on the roadmap. iPhone folks, watch this space.
 
-📄 **Docs:** [User Guide (PDF)](release/docs/CCooldown-User-Guide-v1.2.pdf) — the full
+📄 **Docs:** [User Guide (PDF)](release/docs/CCooldown-User-Guide-v1.3.pdf) — the full
 install → sign-in → widgets walkthrough · [Brochure (PDF)](release/docs/CCooldown-Brochure.pdf) —
 a 2-page overview.
 
@@ -240,7 +240,7 @@ About section (it emails <robin@eam360.com>).
 ## Version history
 
 A quick, plain-English tour of what each update added (newest first). The full technical
-changelog lives in the [User Guide](release/docs/CCooldown-User-Guide-v1.2.pdf).
+changelog lives in the [User Guide](release/docs/CCooldown-User-Guide-v1.3.pdf).
 
 - **1.0** — First official release — everything below, polished into one build and shared with the team.
 - **0.14** — Feedback now opens an email (was WhatsApp); added a **Check for updates** button; the app downloads from GitHub Releases.
