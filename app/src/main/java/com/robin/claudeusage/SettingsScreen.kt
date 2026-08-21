@@ -702,6 +702,9 @@ fun SettingsScreen(
                 onTheme(it)
                 repo.cacheSettings().setThemeColorName(it)
                 refreshWidgets()
+                // CCBG-14 (Stale Notification Theme): the pinned notification's gauge
+                // and status-bar glyph wear the theme too — redraw now, not next poll.
+                com.robin.claudeusage.notify.PinnedNotification.update(context, repo.cacheSettings())
             }
         }
         Spacer(Modifier.height(24.dp))

@@ -183,7 +183,9 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
   revision if wanted), and its "clock hand" variant — illegible at 11–14 dp.
 
 ### CCRM-49 · Glyph Legibility — one ring, in colour, at the size it is really drawn
-- **Status:** Done and **verified on the Fold 7, 2026-08-21**.
+- **Status:** Done and **verified on the Fold 7, 2026-08-21** — dark bar same day,
+  light bar in the CCBG-13 (Light Status Bar) verification pass (light accent fill and
+  the darker light-mode pace partner sampled exact).
 - **Why:** CCRM-48 (Status-Bar Gauge) shipped and could not be read. The cause was a
   wrong assumption about the canvas, found by measuring: the bitmap is 24 dp but the
   status bar fits it into a **~15 dp slot, by width**, so it lands at ~14 dp. Two

@@ -11,6 +11,21 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
 
 ## Open
 
+### CCBG-15 · Amber Ladder Blindness — the Amber theme's accent is the yellow warning rung
+- **Status:** Open
+- **Severity:** Low (one theme, and the orange/red rungs still land)
+- **Symptom:** Noticed 2026-08-21 during CCRM-50 (Weekly Flag) design. The Amber
+  theme's accent pair (#F9A825 / #FDD663) is **identical** to `Palette.barColor`'s
+  >80 yellow rung, so for an Amber user the first ladder step is invisible on every
+  coloured surface — a bar or ring at 46% and at 84% are the same colour. The >90
+  orange and ≥100 red rungs still read.
+- **Where:** `Palette.barColor` vs the `Amber` entry in `Palette.options` — palette-wide,
+  affecting the in-app bars, the widgets, the notification gauge and the status-bar glyph.
+- **Fix options, undecided:** shift Amber's accent off the rung colour (visible change
+  for Amber users, needs a wireframe per working agreement 2), or give the yellow rung a
+  distinguishing shape on Amber only (inconsistent), or document it as a known trait of
+  choosing Amber. Not a rider on any current work.
+
 ### CCBG-3 · Credits Visibility — credits card ignores extra-usage being switched off
 - **Status:** Open
 - **Severity:** Low (misleading display, no data loss) — and possibly unreachable
@@ -32,8 +47,26 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
 
 ## Fixed
 
+### CCBG-14 · Stale Notification Theme — theme colour changes don't reach the pinned notification until the next poll
+- **Status:** Fixed (2026-08-21) · verified on the Fold 7 the same day (the fix is the
+  same `refreshPinned()` the icon-style chips already use, whose immediacy was verified
+  during CCRM-48 (Status-Bar Gauge) testing).
+- **Severity:** Low (cosmetic staleness, self-heals on the next poll)
+- **Symptom:** Observed on the Fold 7, 2026-08-21, during CCRM-50 (Weekly Flag)
+  verification. Picking a new theme colour in Settings recolours the app and the
+  widgets immediately (`refreshWidgets()`), but the pinned notification — its gauge,
+  bars and the CCRM-49 (Glyph Legibility) status-bar glyph — keeps the old theme until
+  the next poll redraws it, up to 15 minutes later.
+- **Where:** the theme-swatch `onClick` in `SettingsScreen` called
+  `setThemeColorName` + `refreshWidgets()` but not `refreshPinned()`, which the
+  status-bar icon style chips right next to it already call.
+- **Fix:** add `refreshPinned()` alongside `refreshWidgets()` in the swatch click.
+
 ### CCBG-13 · Light Status Bar — status-bar icons stay white on the light theme's pale background
-- **Status:** Fixed (2026-08-19) · needs on-device verification (light theme, any screen)
+- **Status:** Fixed (2026-08-19) · **verified on the Fold 7, 2026-08-21** — system set to
+  light mode, app open: dark clock and dark system icons on the pale bar, main screen.
+  (The same pass verified CCRM-49/CCRM-50's light-mode icon rendering — light accent
+  fill, the darker light-mode pace partner, light yellow flag dot — all sampled exact.)
 - **Severity:** Low (poor contrast, nothing wrong with the data)
 - **Symptom:** Observed on the Fold 7 (outer screen), 2026-08-18, during the release
   device pass. With the device in light theme, the app's screens draw their pale
