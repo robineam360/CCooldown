@@ -970,29 +970,256 @@ keys) would still make this a different product. Not filed, not an open question
 - **Note:** issue templates should ask for the app version and the phone/skin, since CCRM-3
   phase 1 already flagged the `big` notification style as skin-dependent.
 
+### CCRM-6 · Multi-Account — more than two accounts
+- **Status:** **In progress — built 2026-08-21, wireframe approved the same day. The Fold 7
+  pass is largely confirmed across two runs, the second with a real third account signed in;
+  the four-account tab strip and the alert-collision case are still unobserved.**
+  Moved up from *Later* on 2026-08-19 because the user needs a **third Claude account**
+  tracked, making it the first item after the batch of
+  CCBG-13 (Light Status Bar), CCRM-22 (Used or Left), CCRM-23 (Reset Display), CCRM-29
+  (Display Mode), CCRM-27 (Error Taxonomy), CCRM-30 (Estimate Honesty), CCRM-34
+  (Diagnostics Log) and CCRM-33 (App Shortcuts).
+- **Why:** `Profile` was a hard-coded `PERSONAL`/`WORK` enum, wired through credentials,
+  cache keys, notification IDs, widgets and alerts. Users with 3+ accounts (multiple work
+  orgs, side projects) couldn't be served — and the driver was real, not hypothetical.
+- **The fork is settled: a proper registry**, not a cheap third enum slot. It costs more now
+  and is the version that doesn't get rebuilt when account four arrives — the reading CCBG-1
+  (History Retention)'s note on history ownership already pointed at.
+- **How it landed.** `Profile` became a value type — `data class Profile(key, slot, label)`
+  ([Profile.kt](app/src/main/java/com/robin/claudeusage/data/Profile.kt)) — owned by the new
+  [ProfileRegistry](app/src/main/java/com/robin/claudeusage/data/ProfileRegistry.kt) on its
+  own `"profiles"` prefs file. The three fields are deliberately different kinds of thing:
+  - **`key`** namespaces every store (`"personal"`, `"work"`, `"p2"`…). Never reused.
+  - **`slot`** is the integer identity Android surfaces need — notification-ID offset,
+    PendingIntent and alarm request codes, tile binding — allocated from a persisted
+    monotonic counter and **never reused**, so a stale placed widget or tile can never
+    inherit a new account's data. **Slots 0 and 1 stay pinned to `personal`/`work`**:
+    existing installs have widgets, alarms and posted notifications keyed off those ints.
+  - **`label`** is the user's 16-character name, and therefore *not* identity — `Profile`
+    equality is the key alone, so a rename can't turn `pinnedProfile == p` false.
+- **No data migration.** Persistence was already profile-count-agnostic: every store
+  namespaces by `profile.key` and there is no Room/DataStore/proto schema anywhere.
+  `CredentialStore.k()` and `UsageCache.k()` keep the legacy unprefixed-Personal exception,
+  restated as `profile.key == Profile.LEGACY_KEY`. The seed migration emits both slots
+  unconditionally, carrying the old `customLabel` values across, and is gated on a stored
+  flag rather than on presence — gated on presence, a deliberately removed Personal would
+  resurrect on the next launch.
+- **`notifId` is now `kind + slot * 100`.** Kinds top out at 31 (`PACE_WEEKLY_KIND`), so the
+  ×100 stride is safe for any slot, and slots 0/1 reproduce the pre-CCRM-6 IDs exactly — no
+  notification churn on upgrade. It replaces a `+100 only for WORK` test under which every
+  third account silently overwrote Personal's notifications.
+- **Unconfigured accounts lose their tab** (settled on the wireframe): `ProfileTabs` and
+  `HistoryScreen` read `configuredProfiles()`, so one account shows no tab strip at all and
+  a new one appears the moment its token lands. Signing in stays in Settings. Both strips
+  stay a fixed `TabRow` up to three accounts and become scrollable at four — three tabs get
+  ~133 dp on a 400 dp screen and a 16-character label needs ~110, but four would get 82 dp
+  on the cover screen and every label would truncate. One rule at both widths, so the strip
+  doesn't change shape when the phone unfolds.
+- **`Conditions.panelFor` folds every other account**, not exactly one: each one's
+  re-auth/stale/expiry strips carry its label and its folded events merge into the same
+  newest-first sort. CCRM-44 (One Surface)'s ordering contract is untouched — faults ·
+  events · warnings · update last — and `MAX_STRIPS` **stays 3**: the shown account's own
+  faults come first so it can never be crowded out of its own panel, and the panel's height
+  is finite however many accounts exist.
+- **Rename folded into the account card**, behind a ⋮ overflow alongside **Remove account**,
+  and the separate "Profile names" section was deleted — names are registry-owned, so it had
+  become a second editor for the same field with no way to grow a row for an account that
+  doesn't exist yet. ⋮ also keeps Remove well away from **Clear**: Clear signs out and keeps
+  the history (CCBG-1), Remove destroys it, and side by side that is a fat-finger disaster.
+- **Two documented caps.** A **fifth account works on every surface except a Quick Settings
+  tile** — a tile is a statically declared `<service>` and Android will not let the list be
+  driven at runtime, so there is a fixed pool of four bound to *slots* 0–3. The two original
+  class names (`PersonalTileService`/`WorkTileService`) are kept and rebound, because
+  renaming a declared service breaks tiles the user has already placed; `Slot2TileService`
+  and `Slot3TileService` are new, and a tile whose slot has no account reports
+  `Tile.STATE_UNAVAILABLE`. `android:label` is static and cannot follow a rename, so the two
+  new picker entries read "Claude account 3"/"Claude account 4" while the placed tile shows
+  the live label. Separately, **launcher shortcuts are capped** at
+  `ShortcutManagerCompat.getMaxShortcutCountPerActivity` (typically 5): accounts fill the
+  list in order and "Refresh now" always keeps the last slot. Today's unbounded
+  `entries.map` silently overflowed at four accounts.
+- **Removal is the only destructive path**, and its ordering is load-bearing: cancel the
+  ping and verify alarms → cancel the slot's whole notification ID range → clear credentials
+  → clear the cache keys → delete the two JSONL files → *only then* drop it from the registry
+  → repoint `pinnedProfile` and any `WidgetPrefs` entry → republish shortcuts → redraw the
+  widgets and the pinned panel. Everything above the registry step needs to resolve the key.
+  Behind a confirmation naming exactly what goes, including the year-long session log.
+  Because slots are never reused there is no window in which a surface can read a *new*
+  account's numbers; the worst case is a surface showing nothing, which is correct.
+- **Wireframe:** `design/multi-account-wireframe.html` (approved 2026-08-21), with all six
+  decisions recorded at the foot of it. Keep until the device pass is signed off.
+- **Tests:** `ProfileRegistryTest` — 25 cases covering seed idempotence and the slot-0/1
+  pinning, `nextSlot` never reissuing after a remove, rename/lookup/fallback, the JSON
+  round-trip and its stale-counter clamp, and `notifId` colliding for no kind in use across
+  four slots while reproducing today's IDs for slots 0 and 1.
+- **Device pass, Fold 7 cover screen, 2026-08-21 — four of seven steps confirmed** on a
+  release-signed build installed over the live 2-account install (labels **Pro**/**Teams**):
+  - **Upgrade — pass.** Both accounts intact, both custom labels carried across by the seed
+    migration, identical usage (5-hour 34%, 7-day 24%) and an unbroken 12-point weekly
+    curve, the pinned notification still posted at id 9100, no crash. Window pings (CCRM-17)
+    are ToS-disabled (`pingEnabled` returns a hard `false`), so "armed pings still armed"
+    was vacuous on this build — nothing to observe, not something that passed.
+  - **Accounts screen — pass.** Two cards unchanged bar the ⋮; **+ Add account** below them;
+    the "Profile names" section gone, with POLLING following directly. ⋮ opens
+    Rename… / Remove account, the latter in the error colour.
+  - **Add + rename — pass.** The third card appeared as "Account 3 · Not signed in", the
+    per-account **Account 3 alerts** toggle appeared in the notifications list (proving that
+    loop is registry-driven), and ⋮ → Rename… rendered as wireframed — 9/16 counter, and
+    the "clear the field to go back to *Account 3*" line naming the real restore value.
+    Renamed to "Side project" and the label propagated.
+  - **Pinned "Show profile" chips — pass at four.** `Pro · Teams · Side project` on line one
+    and `Account 4` wrapped onto line two: the `FlowRow` change works and nothing is clipped
+    out of reach, which the old non-wrapping `Row` did. The new copy — "all alerts, from
+    every account, fold into this panel" — reads correctly, in the **Huge number** style.
+  - **Quick Settings tiles — pass.** All four services declared and queryable with the exact
+    picker labels "Claude Personal" / "Claude Work" / "Claude account 3" / "Claude
+    account 4", the two original class names preserved.
+  - **Removal — pass, including the slot invariant.** The confirmation rendered exactly as
+    wireframed and named **Pro** as the fallback. Removing the fourth account logged
+    `[account][p3] removed — slot 3 retired, data deleted`; adding another and removing it
+    logged `[account][p4] removed — slot 4 retired`. **Slot 3 was not reissued** — the
+    on-device confirmation that a stale widget or tile cannot inherit a new account's data,
+    and that the fifth-slot account correctly gets no QS tile. No crash either time.
+- **Second device pass with a real third account signed in, same evening** (the user signed
+  it in; the three accounts are now labelled **Personal**, **Work** and **Product**, keys
+  `personal`/`work`/`p2`):
+  - **Third tab and its data — pass.** Three tabs in a **fixed `TabRow`** at 411 dp, all
+    labels legible at full width, confirming the fixed-up-to-three half of the strip rule.
+    The Product tab shows its own fetched 5-hour and 7-day figures, its own window
+    boundaries (19–26 Aug against Personal's 21–28), and its own **per-model Fable cap** —
+    so the `limits[]` walk works on a registry-minted account.
+  - **Storage key — pass.** With the diagnostics log at Debug, a manual refresh logged
+    `[poll][personal] manual → OK`, `[poll][work] manual → OK` and **`[poll][p2] manual →
+    OK`** — one sweep covering all three, and direct confirmation that the third account's
+    key is `p2`, hence `usage-history-p2.jsonl` and `usage-sessions-p2.jsonl`. Automatic
+    polls show the same three keys.
+  - **History screen — pass.** Three tabs, and Product's tab shows only its own session log
+    (one window) against Personal's thirteen, so the per-account file split is real.
+  - **Pinned panel folding another account — pass, in the Huge number style.** With the
+    panel switched to Product, the headline carried **Product's** own 5-hour figure, reset
+    and bar, its 7-day bar and its Fable bar — while the strip between them was
+    **another account's** folded pace event. That is the generalised `panelFor` working:
+    under the old code "the other profile" was a single arbitrary pick, and it is now every
+    other account merged newest-first.
+  - **Quick Settings tiles — pass, all four runtime states.** The two pre-existing placed
+    tiles kept working after being rebound from enum constants to slots 0/1 —
+    `Personal 44%` and `Work 0% · not started`. Adding the two new entries gave
+    **`Product 20% · resets in 3h 30m`** on `Slot2TileService` (live label, not the static
+    "Claude account 3") and **`Claude account 4 · no account`** on `Slot3TileService` —
+    the `STATE_UNAVAILABLE` state, greyed and inert, because slot 3 was retired earlier in
+    the pass. The picker listed all four with the exact static labels, the two placed ones
+    greyed out.
+  - **Shortcuts — pass.** Exactly four dynamic shortcuts: three accounts plus "Refresh now".
+    (This device reports `maxShortcutsPerActivity: 15`, so the cap did not bind here — the
+    ordering rule is verified, the truncation branch is not.)
+  - **Zero crashes** across both passes.
+- **Filed off this pass: CCBG-16 (Stale Strip Label)** — a folded event strip keeps the
+  account name it fired under, so the panel read `Personal · 5-hour window` above a
+  `Pro: 7-day window will run out early` strip. Pre-dates CCRM-6 (the frozen-text store came
+  in with CCRM-44 (One Surface)), but CCRM-6 made renaming one tap and gave accounts default
+  names people will change, so a near-unreachable state is now easy to hit. Cosmetic.
+- **Still unverified, with reasons:**
+  - **The `ScrollableTabRow` switch at four accounts.** Needs a fourth real token. Both tab
+    strips are still unobserved above three, so this stays a CCRM-15 (Above-Pace
+    Verification) risk — the single most important thing to look at next.
+  - **An alert on the third account posting standalone without cancelling Personal's** (the
+    old ID collision). Not producible on demand: every alert kind needs a real trigger, and
+    Product sat at 17–20% of a 5-hour window against 80/90/95 thresholds, with staleness
+    six hours away and no expiry inside the seven-day horizon. What *is* established is the
+    premise the fix rests on — `Slot2TileService` rendering Product's data proves
+    `Product.slot == 2` on device, which is exactly the input `notifId` multiplies — plus
+    the unit test covering every kind in use across four slots and slots 0/1 reproducing
+    today's IDs.
+  - **`MAX_STRIPS` overflow and the "+ n more" line at three accounts.** Only one condition
+    was live across all three, so the cap was never approached.
+  - **Signing out of Work only.** Skipped at the user's direction: Work is a live account and
+    the test costs a re-sign-in.
+  - **The widget config picker and widget repointing.** No widgets are placed on this device
+    (confirmed by `dumpsys appwidget` and by the user), so there was nothing to observe —
+    which also makes step 1's "placed widgets still point at the right account" vacuous here
+    rather than passed. The picker's list source (`configuredProfiles()`) is exercised live
+    by the tab strip and History, and its `FlowRow` by the pinned chips at four, but the
+    screen itself was not opened.
+  - **The inner screen's two-column accounts layout.** The phone stayed folded; the inner
+    display is powered off then, so it captures black over adb.
+- Worth completing before CCRM-7 so iOS inherits the flexible model instead of the 2-slot one.
+
 ---
 
 ## Needs design — decide the shape before building
 
-### CCRM-6 · Multi-Account — more than two accounts
-- **Status:** Needs design · **scheduled next after the current small-items batch**
-  (decided 2026-08-19). Moved up from *Later*: the user needs a **third Claude
-  account** tracked, so this is now the first item after the batch of CCBG-13
-  (Light Status Bar), CCRM-22 (Used or Left), CCRM-23 (Reset Display), CCRM-29
-  (Display Mode), CCRM-27 (Error Taxonomy), CCRM-30 (Estimate Honesty), CCRM-34
-  (Diagnostics Log) and CCRM-33 (App Shortcuts).
-- **Why:** `Profile` is a hard-coded `PERSONAL`/`WORK` enum ([Profile.kt](app/src/main/java/com/robin/claudeusage/data/Profile.kt)),
-  wired through credentials, cache keys, notification IDs, widgets and alerts. Users
-  with 3+ accounts (multiple work orgs, side projects) can't be served — and the
-  concrete driver is now real, not hypothetical.
-- **Approach:** Move from a fixed enum to a dynamic profile registry (stable
-  string keys + user labels). Touches `CredentialStore`, `UsageCache`, `HistoryStore`,
-  the `+100` notification-ID scheme, widget config, and every `Profile.entries` loop.
-  Non-trivial — scope it as its own milestone, ideally before CCRM-7 so iOS inherits
-  the flexible model instead of the 2-slot one. The design question to settle first:
-  a proper registry (preferred here and by CCBG-1 (History Retention)'s note on
-  history ownership) versus a cheap third enum slot — the registry costs more now but
-  is the version that doesn't get rebuilt when account four arrives.
+### CCRM-51 · Rails Gauge — the Mac's Rails instrument on the status-bar icon
+- **Status:** **Built 2026-08-26. Design fully approved (wireframe rev J), 251 unit tests
+  green, debug APK assembles. NOT yet verified on the Fold 7** — no device was reachable
+  when it was built, so this is not done until it has been looked at. First states to check:
+  **no data** (the hairline alone), the **empty** rung on a light bar, and **100%** (the
+  spent post over a closed red ring).
+- **Why:** CCooldownMac shipped the **Rails** gauge (CCM-59/CCM-60 [Menu Bar]) and handed
+  over the spec plus four follow-ups. Rails reads usage as a *length against marks* rather
+  than a filled band, so the port puts both apps on one grammar — as CCRM-49 (Glyph
+  Legibility) and CCRM-50 (Weekly Flag) already shared the ladder and the weekly flag.
+- **Scope:** the status-bar / notification small icon only, in both round styles — **Ring**
+  and **Pie**, reusing the existing `pinnedIconStyle()` setting rather than adding a
+  preference (also the Mac's K2 decision, reached independently). Pie previously carried **no
+  pace mark at all**, so this makes the chip a look rather than a choice between an
+  informative icon and an uninformative one. **Bars unchanged** — both specs agree they keep
+  the pace post — so the expanded panel is untouched. Battery and Number untouched. The
+  rails *bar* cannot go in the status bar: CCRM-49's probe established the slot fits bitmaps
+  by width, so a 22 × 4 bar would render at about 15 × 2.7 dp.
+- **What it draws**, in order — extent · usage · red slice · hub · needle · spent post:
+  - **Hairline** tracing the extent (ring) or a **faint 18% disc** (pie), at Ring's own
+    11.2 dp footprint. The Mac's Ø/2−1 inset was rejected: a style chip should not cost 13%
+    of the glyph.
+  - **Usage** in the severity-ladder colour — the very same `Palette.barColor` value the
+    notification's own gauge uses, so glyph and gauge can never disagree. 9% floor so 1%
+    still reads as "started".
+  - **A clock-hand needle** at the pace position, **pinned at the hub** — 1.79 dp at 85%
+    with a 4.48 dp cleared halo (the Mac's J2 weights). This replaced the Mac's radial band
+    tick, which at **7.6 px** was the weakest mark on the glyph. Their needle runs from the
+    *centre*, but our hollow holds the weekly dot, firing their own degrade rule; pinning it
+    at the dot keeps both features and makes the dot read as the pin a hand turns on.
+  - **The 12 o'clock post only at a truncated 100**, as the sole "spent" cue. Chosen over an
+    erased notch: a post is a cleared halo *with* an ink line in it, so a gap **and** a mark
+    survive the QS tile's tinting. Drawn last, so when the needle lands near 12 the spent cue
+    wins the overlap.
+  - **Marks are neutral ink** — "time has no severity". This reverts CCRM-50's themed cool
+    pace line here: the fill already carries the colour, so a coloured mark spends the glyph's
+    one colour budget twice. `Palette.paceColor` and the partner table are retained,
+    undrawn, as the shared contract the Mac still consumes.
+  - **Red slice over the severity fill** — deliberately the opposite of the Mac's "never two
+    alarms on one gauge": severity and pace answer different questions. **This meant no
+    renderer change at all**: `RingRenderer`/`BarRenderer` already drew the pace-red
+    regardless of severity, so what was filed as a defect became the specification.
+- **7-day dot: four rungs, and a tightened contract.** **empty → grey → yellow → red**, one
+  shape step then three colour steps, so the ladder survives the tile.
+  - `EMPTY` (no usage) and `SPENT` (truncated ≥ 100) key on level alone and need no clock;
+    `ABOVE`/`WITHIN` split on the shared `PACE_DEAD_ZONE`, so the dot flips at the exact poll
+    the pace sentence does.
+  - **`WITHIN` is wider than CCRM-50's `ON_PACE`** — it covers below pace too, where CCRM-50
+    drew nothing. That made "no dot" mean either *healthy* or *no reading*; **"no dot" now
+    means exactly one thing: no weekly reading.**
+  - Which fixed a real flaw: a week with usage but **no reset clock** used to draw nothing,
+    which under this ladder would have falsely claimed "no reading". It rests on `WITHIN` —
+    there is usage so not empty, pace unjudgeable so never `ABOVE`.
+  - **Why `EMPTY` is an outline, not a black dot** (recorded because it will be re-proposed):
+    on a dark bar black ink reads as a hole and vanishes on true-black AMOLED — but the
+    disqualifier is the **QS tile**, which tints every non-transparent pixel one colour, so a
+    filled dot arrives fully inked and **becomes the `SPENT` rung**. "You have used nothing"
+    would render as "your week is gone". An outline survives because it is a *shape*.
+- **The honesty contract, now testable:** no reading → the extent alone, never 0%; **no usage
+  → no needle even with a known clock** (a mark on an unused gauge measures nothing and reads
+  as "just opened"); no clock → no needle and no red. The first two render **byte-identically**
+  — the wireframe rasterises both and compares all 37 × 37 pixels in-page.
+- **Alphas lifted for the 37 px canvas:** hairline 50% (Mac 35%), spent post 70% (Mac 55%),
+  needle 85% (the Mac's own). Not a disagreement about the design — a smaller canvas. The
+  hairline's weight matters most in the one state where it is the entire glyph.
+- **Where:** `ui/UsageIcon.kt` (drawing), `ui/RingGeometry.kt` (`WeeklyFlag`, pure and
+  unit-tested in `RingGeometryTest`), `ui/Palette.kt` (retained-contract note),
+  `notify/PinnedNotification.kt` and `tile/UsageTileService.kt` (call sites; the notification's
+  red toggle now reaches the glyph), `SettingsScreen.kt` (caption). Wireframe
+  `design/rails-gauge-wireframe.html` (rev J, as built) — mocks at the true 14.1 dp and
+  **rasterises to the real 37 px**, the discipline CCRM-49 established after CCRM-48 shipped
+  unreadable. Findings flowed back to the Mac in `MAC-GAUGE-HANDOVER.md` ("Round two").
 
 ### CCRM-44 · One Surface — every alert folds into the pinned notification
 - **Status:** **Done — built 2026-08-18, verified on the Fold 7 (pass completed
@@ -1382,11 +1609,19 @@ keys) would still make this a different product. Not filed, not an open question
     their content (CCRM-1 notes the notification is "already tight on space").
   - Bundle `DensityPreference::{Default, Compact}` — a compact mode is a one-token answer to
     the same complaint and doesn't need the reorder UI to ship first.
-- **Interacts with CCRM-6:** a dynamic profile registry would change what "per profile"
-  means here. Cheaper to build this on the two-slot model and migrate than to wait.
+- **Interacts with CCRM-6 (Multi-Account) — resolved 2026-08-21:** the registry exists, so
+  "build it on the two-slot model and migrate later" is moot. "Per profile" now means per
+  registered account, and any ordering/visibility token has to be stored per `profile.key`
+  and read through `registry.all()` from the start. It also raises the stakes on the pinned
+  notification and the tile: `MAX_PINS_PER_PROVIDER` was a two-account question, and four
+  accounts' worth of readings competing for the same space-starved surfaces is a harder one.
 
-### CCRM-31 · Combined Total — one aggregate reading across both accounts
+### CCRM-31 · Combined Total — one aggregate reading across every account
 - **Status:** Needs design · medium
+- **Note (CCRM-6 (Multi-Account), 2026-08-21):** "both accounts" below is now "every
+  account". The ring's slice count comes from `configuredProfiles()`, not from two, and
+  `MINIMUM_SPEND_SLICE_SHARE` earns its keep at four slices rather than being nearly
+  redundant at two.
 - **Why:** Nothing in the app answers "how much have I spent in total". Personal and Work are
   always shown separately — and CCRM-20 deliberately went further, giving each profile the
   full width and pointing at the widgets for both-at-once. That decision was about *windows*,
@@ -1478,6 +1713,12 @@ keys) would still make this a different product. Not filed, not an open question
   confirmation naming what goes (the 8-day sample history *and* the year-long session log,
   which must be cleared together or the bars and the sparkline disagree).
 - **Deliberately not:** wiring it back into "Clear credentials". That's what CCBG-1 was.
+- **Overlaps CCRM-6 (Multi-Account), 2026-08-21 — but does not close.** Account removal gave
+  `HistoryStore.clear()` and `SessionLog.clear()` their **first callers**, and the
+  "switching the account behind a profile slot" case above is now served by remove-then-add:
+  the new account gets a fresh key and slot, so it cannot inherit the old one's trend line.
+  What is still missing is clearing history *without* dropping the account — the same
+  confirmed action, on a card that stays. That is what this entry is now for.
 
 ### CCRM-15 · Above-Pace Verification — verify the above-pace chart state on a device
 - **Status:** **Observed 2026-08-04** · synthetic-series override still worth building
@@ -1568,6 +1809,16 @@ keys) would still make this a different product. Not filed, not an open question
   Work (`+100`); extend the pinned notification to run one instance per enabled
   profile, each with its own channel/icon/style so they're distinguishable in the
   status bar. Add per-profile "pin this" toggles in settings.
+- **Rewritten by CCRM-6 (Multi-Account), 2026-08-21.** "Only Personal can be pinned" is now
+  "only one account at a time can be pinned" — the picker lists every registered account.
+  The ID namespacing this leaned on is no longer `+100` for Work but `kind + slot * 100` for
+  any slot, so a per-account pinned notification has a collision-free ID scheme waiting for
+  it. The per-profile toggles become a per-account list rather than a second checkbox, and
+  the feature now has to answer a question two accounts hid: **how many pinned
+  notifications is too many**. Note also that CCRM-44 (One Surface) already carries every
+  account's condition strips inside the single panel, prefixed with their labels, which is
+  most of what "both windows live at a glance" was asking for — so the case for this needs
+  re-making before it is built.
 
 ### CCRM-24 · Share Card — share a usage snapshot as an image
 - **Status:** Planned · medium · **gated on the Canvas-to-bitmap extraction**

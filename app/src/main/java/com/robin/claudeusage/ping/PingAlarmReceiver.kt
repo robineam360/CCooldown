@@ -30,7 +30,7 @@ class PingAlarmReceiver : BroadcastReceiver() {
 
     @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
     override fun onReceive(context: Context, intent: Intent) {
-        val profile = PingScheduler.profileOf(intent)
+        val profile = PingScheduler.profileOf(context, intent)
         val intendedAt = PingScheduler.intendedAt(intent)
         val verifying = intent.action == PingScheduler.ACTION_VERIFY
         val app = context.applicationContext

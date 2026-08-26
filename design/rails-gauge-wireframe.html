@@ -1,0 +1,807 @@
+<title>Rails Gauge on the status-bar icon — CCRM-51 (rev J, as built)</title>
+<style>
+  :root {
+    --bg: #FAF8F6; --ink: #26211E; --muted: #6E6660; --accent: #C15F3C;
+    --hair: #E7E1DC; --card: #FFFFFF; --good: #2E7D52; --bad: #C62828;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171513; --ink: #EDE8E4; --muted: #9B928B; --accent: #E59980;
+      --hair: #2C2825; --card: #201D1B; --good: #7BC49A; --bad: #FF8A80;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171513; --ink: #EDE8E4; --muted: #9B928B; --accent: #E59980;
+    --hair: #2C2825; --card: #201D1B; --good: #7BC49A; --bad: #FF8A80;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    margin: 0; padding: 48px 24px 96px; line-height: 1.5;
+  }
+  .page { max-width: 1280px; margin: 0 auto; }
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 10px;
+  }
+  h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 8px; text-wrap: balance; }
+  .lede { color: var(--muted); max-width: 76ch; margin: 0 0 12px; font-size: 14px; }
+  h2 { font-size: 19px; font-weight: 650; margin: 54px 0 4px; }
+  h3 { font-size: 14px; font-weight: 650; margin: 30px 0 8px; }
+  .sub { color: var(--muted); font-size: 13px; max-width: 86ch; margin: 0 0 16px; }
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px;
+    background: color-mix(in srgb, var(--hair) 55%, transparent);
+    padding: 1px 5px; border-radius: 4px;
+  }
+  .flag {
+    margin: 14px 0 4px; padding: 13px 17px; border-radius: 10px;
+    background: var(--card); border: 1px solid var(--hair);
+    font-size: 13.5px; max-width: 94ch;
+  }
+  .flag.hot { border-color: color-mix(in srgb, var(--bad) 55%, var(--hair)); }
+  .flag.new { border-color: color-mix(in srgb, var(--good) 60%, var(--hair)); }
+  .flag b { font-weight: 650; }
+  .flag ul { margin: 8px 0 0; padding-left: 20px; }
+  .flag li { margin: 5px 0; }
+  .board {
+    border-radius: 18px; padding: 20px 22px 22px; border: 1px solid var(--hair);
+    margin-top: 14px; overflow-x: auto;
+  }
+  .board.lt { background: linear-gradient(140deg, #C6D2E0 0%, #DACEBE 55%, #E6D6C3 100%); }
+  .board.dk { background: linear-gradient(140deg, #1E2833 0%, #30272C 60%, #382D2F 100%); }
+  .boardcap {
+    margin: 0 0 16px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+  }
+  .lt .boardcap { color: rgba(20,20,30,.62); } .dk .boardcap { color: rgba(255,255,255,.52); }
+  .sb { display: flex; align-items: center; height: 28px; padding: 0 10px; gap: 7px;
+        border-radius: 4px 4px 0 0; width: 330px; }
+  .sb.dk { background: #0B0B0C; color: #FFFFFF; }
+  .sb.lt { background: #FFFFFF; color: #111112; }
+  .sb .clock { font-size: 12px; font-weight: 600; }
+  .sb .spacer { flex: 1; }
+  .sb .sys { display: flex; align-items: center; gap: 4px; }
+  .sb .sys svg { width: 13px; height: 13px; }
+  .z2 { zoom: 2; }
+  canvas.px { image-rendering: pixelated; display: block; border-radius: 2px; }
+  table.grid { border-collapse: collapse; width: 100%; }
+  table.grid th, table.grid td { padding: 9px 10px; text-align: center; vertical-align: middle; }
+  table.grid th.rowh, table.grid td.rowh {
+    text-align: left; white-space: nowrap; padding-right: 18px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11px; font-weight: 600;
+  }
+  table.grid th {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 10px;
+    letter-spacing: .06em; text-transform: uppercase; font-weight: 600;
+  }
+  .lt table.grid th, .lt table.grid td.rowh { color: rgba(20,20,30,.72); }
+  .dk table.grid th, .dk table.grid td.rowh { color: rgba(255,255,255,.66); }
+  .chipbg { display: inline-flex; align-items: center; justify-content: center;
+            padding: 3px; border-radius: 3px; }
+  .chipbg.dk { background: #0B0B0C; } .chipbg.lt { background: #FFFFFF; }
+  .cap2 { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 10.5px;
+          letter-spacing: .05em; margin-top: 6px; }
+  .lt .cap2 { color: rgba(20,20,30,.6); } .dk .cap2 { color: rgba(255,255,255,.52); }
+  table.spec { border-collapse: collapse; margin-top: 14px; font-size: 13px; max-width: 100%; }
+  table.spec th, table.spec td { border: 1px solid var(--hair); padding: 7px 11px;
+                                 text-align: left; vertical-align: top; }
+  table.spec th { background: var(--card); font-weight: 650; font-size: 11.5px;
+                  text-transform: uppercase; letter-spacing: .05em; }
+  table.spec td.n { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; }
+  .ok { color: var(--good); font-weight: 650; }
+  .no { color: var(--bad); font-weight: 650; }
+  .q { border-left: 3px solid var(--accent); padding: 4px 0 4px 14px; margin: 18px 0;
+       max-width: 92ch; }
+  .q.blocking { border-left-color: var(--bad); }
+  .q .qn { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11px;
+           color: var(--accent); letter-spacing: .08em; text-transform: uppercase; }
+  .q.blocking .qn { color: var(--bad); }
+  .rec { font-weight: 650; color: var(--accent); }
+  .nb { background: color-mix(in srgb, var(--accent) 12%, transparent);
+        border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--hair));
+        border-radius: 10px; padding: 13px 17px; margin: 20px 0; font-size: 13.5px; max-width: 94ch; }
+  .swatch { display: inline-block; width: 11px; height: 11px; border-radius: 50%;
+            vertical-align: -1px; margin-right: 4px; border: 1px solid rgba(128,128,128,.45); }
+</style>
+
+<div class="page">
+<p class="eyebrow">CCRM-51 · Rails Gauge · rev J · as built</p>
+<h1>The Rails gauge on the status-bar icon</h1>
+<p class="lede">
+  Your decisions are in: <b>needle pinned at the hub</b>, <b>red slice over the severity fill</b>, the
+  <b>four-rung 7-day dot</b> whose no-usage rung is drawn <b>empty</b> (an outlined dot), and the
+  <b>12 o'clock post gone below 100% but returning at 100%</b> as the spent marker. Pie is a
+  <b>faint disc at Ring's footprint</b>, the needle carries the Mac's own weight, and the marks are
+  <b>neutral ink</b> — the gauges already spend their colour on the fill. Everything is drawn in a
+  24&nbsp;dp box and rasterised to the real <b>37&nbsp;px</b> the status bar renders.
+  <b>Every question is answered; this is the as-built record.</b>
+</p>
+
+<div class="nb">
+  <b>Still nothing built.</b> No Kotlin touched. Two of your answers reduce the work: "red slice over
+  severity" means <code>RingRenderer</code>/<code>BarRenderer</code> are <i>already</i> correct and
+  the widgets need no change at all.
+</div>
+
+<h2>1 · Where we stand</h2>
+<table class="spec">
+  <tr><th>Decision</th><th>Status</th><th>Consequence</th></tr>
+  <tr><td>Needle pinned at the hub (option A)</td><td class="ok">Settled</td>
+      <td>The weekly dot is the needle's pin. When there is no weekly reading the needle falls back
+          to the Mac's own 2.69&nbsp;dp hub dot, so the instrument never loses its centre.</td></tr>
+  <tr><td>12 o'clock post: gone below 100%, <b>returns at 100%</b></td><td class="ok">Settled</td>
+      <td>Better than the notch I had proposed: the post <i>becomes</i> the spent marker instead of a
+          gap standing in for one. Below 100 the gauge stays clean; at a truncated 100 the post
+          appears — a cleared gap <i>with</i> an ink line in it, so both a shape and a mark survive
+          the tile. §4.</td></tr>
+  <tr><td>Red slice wins over the severity fill</td><td class="ok">Settled</td>
+      <td>Diverges from the Mac's "never two alarms on one gauge" — worth sending back to them.
+          Android's widgets already behave this way, so <b>no renderer change is needed</b>.</td></tr>
+  <tr><td>7-day dot: 4 rungs, no-usage drawn <b>empty</b></td><td class="ok">Settled</td>
+      <td>empty → grey → yellow → red. One shape step then three colour steps, so the ladder
+          survives the QS tile's tinting. It also tightens the contract: <b>"no dot" now means
+          exactly one thing — no weekly reading</b> (§3).</td></tr>
+  <tr><td>Needle weight</td><td class="ok">Settled</td>
+      <td>The Mac's J2 value — <b>1.79&nbsp;dp at 85%</b> — so both apps stay on one number and the
+          handover remains a single spec. §6 keeps the comparison as the record.</td></tr>
+  <tr><td>Pie track &amp; footprint</td><td class="ok">Settled</td>
+      <td><b>Faint 18% disc at Ring's 11.2&nbsp;dp footprint.</b> Gives the glyph a body, which matters
+          more now the post only draws at 100%; and a style chip no longer costs 13% of the glyph.
+          §7 keeps all four as the record.</td></tr>
+  <tr><td>The needle's colour</td><td class="ok">Settled</td>
+      <td><b>Neutral ink at 85%</b>, per both Mac specs — "time has no severity". This reverts
+          CCRM-50's themed cool pace line on this surface: the gauge already spends its colour on
+          the fill, so a coloured mark spends it twice. §8 keeps the comparison as the record.</td></tr>
+</table>
+
+<h2>2 · The gauge as decided, in a real status bar</h2>
+<p class="sub">
+  1&nbsp;px = 1&nbsp;dp for the bar chrome; the icon is at its true 14.1&nbsp;dp and the strip is
+  magnified 2×. Scenario: 5-hour <b>62%</b> used at <b>45%</b> elapsed (over pace, so the red slice
+  shows); 7-day <b>40%</b> at <b>31%</b> elapsed (above pace → yellow dot). No 12 o'clock post.
+</p>
+<div class="board dk"><p class="boardcap">Dark bar — as decided</p><div data-strips="dark"></div></div>
+<div class="board lt"><p class="boardcap">Light bar — same numbers</p><div data-strips="light"></div></div>
+<h3>2b · Rasterised to 37 px, magnified 6×, no smoothing</h3>
+<div class="board dk"><p class="boardcap">Dark · real pixels</p><table class="grid" data-pxrow="dark"></table></div>
+<div class="board lt"><p class="boardcap">Light · real pixels</p><table class="grid" data-pxrow="light"></table></div>
+
+<h2>3 · The 7-day dot — four rungs, as decided</h2>
+<p class="sub">
+  <b>Empty → grey → yellow → red.</b> The no-usage rung is drawn as an <b>outlined dot</b>: empty is
+  both what it means and how it looks. The moment any usage lands the dot fills — grey while there is
+  nothing to flag, yellow above pace, red at a truncated 100. Because "empty" is a <i>shape</i> and
+  not a colour, the whole ladder survives the Quick Settings tile, which throws colour away.
+</p>
+<p class="sub">
+  The grid below is the record of why <i>literal</i> black was ruled out, kept because it is the kind
+  of thing that gets re-proposed later. Columns walk the weekly window, including the two states that
+  need no clock at all and the one that draws nothing.
+</p>
+<div class="board dk"><p class="boardcap">Dark bar · real pixels · 6×</p>
+  <table class="grid" data-rungs="dark"></table></div>
+<div class="board lt"><p class="boardcap">Light bar · real pixels · 6×</p>
+  <table class="grid" data-rungs="light"></table></div>
+<table class="spec">
+  <tr><th>Candidate</th><th>No usage renders as</th><th>Dark bar</th><th>Light bar</th><th>QS tile (tinted)</th></tr>
+  <tr><td class="n">B1 · literal black</td><td><span class="swatch" style="background:#000"></span><code>#000000</code> filled</td>
+      <td class="no">reads as a hole; gone on true black</td><td class="ok">strongest mark on the glyph</td><td class="no">lost — tile tints it to the ink colour, so it becomes a <i>full</i> dot and reads as "spent"</td></tr>
+  <tr><td class="n">B2 · whisper</td><td>ink at 30% filled</td>
+      <td class="ok">dim but present</td><td class="ok">light grey</td><td class="ok">30% disc — quietest rung</td></tr>
+  <tr><td class="n">B3 · outline <b>(decided)</b></td><td>a ring, no fill — an <i>empty</i> dot</td>
+      <td class="ok">present</td><td class="ok">present</td><td class="ok">survives: it is a <b>shape</b>, not an alpha</td></tr>
+</table>
+<div class="flag hot">
+  <b>B1's second failure is the disqualifying one.</b> On the Quick Settings tile Android throws the
+  bitmap's colour away and tints every non-transparent pixel one colour — so a black <i>filled</i>
+  dot arrives as a <b>fully-inked dot</b>, which in this ladder means <i>spent</i>. The rung meaning
+  "you have used nothing this week" would render identically to "your week is gone" — an inversion,
+  not just a loss. §12's middle row draws it. This is invisible from the Mac, whose template mode
+  behaves differently, so it is not something their spec could have caught.
+</div>
+<div class="flag">
+  <b>One thing this decision fixed for free.</b> With "empty" now a rung of its own, <b>no dot</b>
+  narrows to a single meaning: <i>no weekly reading</i>. That let me correct a real flaw in the
+  earlier draft — a week with usage but <b>no reset clock</b> used to draw nothing, which under the
+  new ladder would have falsely claimed "no reading". It now rests on <b>grey</b>: we know there is
+  usage, so it is not empty, and we cannot claim it is above pace, so it is not yellow. Grey means
+  "nothing to flag", which is exactly true. The <code>no clock</code> column above shows it.
+</div>
+
+<h2>4 · The 12 o'clock post as the spent marker</h2>
+<p class="sub">
+  The post now earns its place by carrying one meaning only: <b>this window is spent</b>. Below 100
+  it does not draw, so the gauge stays as clean as you asked. At a truncated 100 it appears at 12
+  o'clock — and because it is a cleared halo with an ink line inside it, both the gap and the mark
+  survive the Quick Settings tile's tinting, which a bare notch only half managed. Compare the
+  <code>95%</code> and <code>100%</code> columns; the bottom row is the same gauge without it.
+</p>
+<div class="board dk"><p class="boardcap">Dark · with the spent post vs without · real pixels · 6×</p>
+  <table class="grid" data-post="dark"></table></div>
+<div class="board lt"><p class="boardcap">Light · same · real pixels · 6×</p>
+  <table class="grid" data-post="light"></table></div>
+<div class="flag hot">
+  <b>One edge case, drawn in the last column.</b> At 100% the needle still draws, and if elapsed is
+  near 0 or near 100 — a window burned almost instantly, or one about to reset — the needle lands at
+  roughly 12 o'clock and merges with the post. The spent post is therefore drawn <b>last</b>, so the
+  "spent" cue always wins the overlap. The two marks reading as one there is acceptable: at 100% used,
+  the pace verdict is moot anyway.
+</div>
+
+<h2>5 · Red slice over the severity fill — your call, drawn</h2>
+<p class="sub">
+  Rows are the three ladder rungs; columns are on-pace vs ahead-of-pace. Under your rule the red
+  slice draws in every ahead-of-pace cell, on top of whatever the ladder painted. At ≥100 the fill
+  is already the same red, so the slice is invisible there — no conflict, just nothing to see.
+</p>
+<div class="board dk"><p class="boardcap">Dark · severity × pace · real pixels · 6×</p>
+  <table class="grid" data-sev="dark"></table></div>
+<div class="board lt"><p class="boardcap">Light · severity × pace · real pixels · 6×</p>
+  <table class="grid" data-sev="light"></table></div>
+<div class="flag">
+  <b>One thing to look at before this is final:</b> the <code>&gt;90</code> row. Orange
+  <code>#FFA726</code> fill with a red <code>#FF5252</code> slice is the tightest pair in the ladder,
+  and at 37&nbsp;px on a dark bar they are close. Yellow-plus-red (the <code>&gt;80</code> row) is
+  unambiguous. If the orange row reads as one colour to you, the fix is not to reinstate "severity
+  wins" — it is that the orange rung is doing little work here anyway, which is worth a separate
+  look rather than folding into this change.
+</div>
+
+<h2>6 · Needle weight — decided: the Mac's J2 value</h2>
+<p class="sub">
+  <b>1.2&nbsp;pt at 85% alpha → 1.79&nbsp;dp / 2.8&nbsp;px here.</b> Kept as the record against the
+  earlier 2.0&nbsp;dp @ 75% draft: narrower but brighter won, and it keeps both apps on one number.
+</p>
+<div class="board dk"><p class="boardcap">Dark · needle weights · real pixels · 6×</p>
+  <table class="grid" data-weights="dark"></table></div>
+<div class="board lt"><p class="boardcap">Light · needle weights · real pixels · 6×</p>
+  <table class="grid" data-weights="light"></table></div>
+
+<h2>7 · The pie — decided: faint disc at Ring's footprint</h2>
+<p class="sub">
+  <b>An 18% ink disc behind the wedge, at Ring's own 11.2&nbsp;dp radius.</b> The four combinations
+  stay below as the record — note how much smaller the Mac's Ø/2−1 inset rows render, and how much
+  thinner the hairline rows are in the <code>no data</code> column. One detail worth knowing: the
+  Mac's needle length is <b>2/3 of the half-width</b>, which lands on 7.47&nbsp;dp at this footprint,
+  so the needle deliberately stops short of the rim — as a real clock hand does.
+</p>
+<div class="board dk"><p class="boardcap">Dark · pie track × footprint · real pixels · 6×</p>
+  <table class="grid" data-pie="dark"></table></div>
+<div class="board lt"><p class="boardcap">Light · same · real pixels · 6×</p>
+  <table class="grid" data-pie="light"></table></div>
+<div class="flag">
+  <b>The pie keeps needing a punched hub</b> for the weekly dot — a disc has no hollow, so a cleared
+  9.8&nbsp;dp circle is stamped into the fill. Worth noticing in the mocks how much of a "filled"
+  look that costs: at low percentages the pie is mostly hub.
+</div>
+
+<h2>8 · The needle's colour — decided: neutral ink</h2>
+<p class="sub">
+  <b>Neutral ink at 85%.</b> Kept as the record against CCRM-50 (Weekly Flag)'s themed cool partner,
+  which this reverts on the status-bar icon — the fill already carries the colour, so a coloured mark
+  spends the glyph's one colour budget twice. <code>Palette.paceColor</code> and the per-theme partner
+  table stay in the code: no Android surface draws with them now, but they remain a shared contract
+  the Mac consumes. Left: as built. Right: what was given up.
+</p>
+<div class="board dk"><p class="boardcap">Dark · neutral vs themed needle, across the ladder · real pixels · 6×</p>
+  <table class="grid" data-markcol="dark"></table></div>
+<div class="board lt"><p class="boardcap">Light · same · real pixels · 6×</p>
+  <table class="grid" data-markcol="light"></table></div>
+
+<h2>9 · Does the verdict read?</h2>
+<div class="board dk"><p class="boardcap">Dark · real pixels · 6×</p><table class="grid" data-verdict="dark"></table></div>
+<div class="board lt"><p class="boardcap">Light · real pixels · 6×</p><table class="grid" data-verdict="light"></table></div>
+
+<h2>10 · The discrimination ladder</h2>
+<div class="board dk"><p class="boardcap">Dark · real pixels · 5×</p><table class="grid" data-ladder="dark"></table></div>
+<div class="board lt"><p class="boardcap">Light · real pixels · 5×</p><table class="grid" data-ladder="light"></table></div>
+
+<h2>11 · The honesty states, and the byte-identical contract</h2>
+<p class="sub">
+  Each column is a rule, drawn. The contract from the Mac's decision 1: <b>0% used with a clock</b>
+  must render byte-identically to <b>0% used with no clock</b> — no guessed mark, and no mark on an
+  unused gauge either.
+</p>
+<div class="board dk"><p class="boardcap">Dark · real pixels · 6×</p><table class="grid" data-states="dark"></table></div>
+<div class="board lt"><p class="boardcap">Light · real pixels · 6×</p><table class="grid" data-states="light"></table></div>
+<div class="flag" data-proof>Checking byte-identity…</div>
+<table class="spec">
+  <tr><th>State</th><th>What draws</th><th>Rule</th></tr>
+  <tr><td class="n">no data</td><td>the hairline circle. Nothing else.</td>
+      <td>Never draw 0% for missing. Thinner than before, post now dropped.</td></tr>
+  <tr><td class="n">0% used, clock known</td><td>hairline only. <b>No needle.</b></td>
+      <td>A mark on an unused gauge measures nothing.</td></tr>
+  <tr><td class="n">55% used, no clock</td><td>hairline + arc. <b>No needle, no red.</b></td>
+      <td>Never a guessed position.</td></tr>
+  <tr><td class="n">1% used</td><td>arc floored at 9% of the circle; needle appears.</td>
+      <td>"Never narrower than its own cap"; 9% is the shipped floor.</td></tr>
+  <tr><td class="n">100%</td><td>closed ring + the <b>12 o'clock post</b>, which draws only here.</td>
+      <td>"Spent" needs a cue that survives tinting. Truncated, so 99.7 is not spent.</td></tr>
+  <tr><td class="n">86% ahead of pace</td><td>yellow fill, <b>red slice</b> from the needle to the tip.</td>
+      <td>Your call: red slice over severity.</td></tr>
+  <tr><td class="n">weekly, no clock</td><td>a <b>grey</b> dot — usage exists, no flag raised.</td>
+      <td>"No dot" is reserved for "no weekly reading". Grey never over-claims.</td></tr>
+</table>
+
+<h2>12 · The Quick Settings tile — alpha and shape only</h2>
+<p class="sub">
+  The tile flattens the bitmap to one tint. This is where B1's black dot broke (§3) and where the
+  spent post earns its place (§4) — compare the last two columns. Rails ranks cleanly by alpha:
+  needle 85%, post 70%, hairline 50%.
+</p>
+<div class="board dk"><p class="boardcap">Monochrome (tile) · real pixels · 6×</p>
+  <table class="grid" data-mono="dark"></table></div>
+
+<h2>13 · Geometry — as decided</h2>
+<table class="spec">
+  <tr><th>Element</th><th>Mac @ 15 pt</th><th>Ratio of Ø</th><th>Android @ 22.4 dp</th><th>Rendered px</th></tr>
+  <tr><td>Diameter</td><td class="n">15</td><td class="n">1.000</td><td class="n">22.4 dp</td><td class="n">34.5</td></tr>
+  <tr><td>Band / arc stroke</td><td class="n">2.5</td><td class="n">0.167</td><td class="n">4.0 dp</td><td class="n">6.2</td></tr>
+  <tr><td>Hairline</td><td class="n">1.0</td><td class="n">0.067</td><td class="n">1.49 dp</td><td class="n">2.3</td></tr>
+  <tr><td>12 o'clock post — <b>only at 100%</b></td><td class="n">1.0 · 3.9→7.4</td><td class="n">0.067 · 0.30→0.521</td><td class="n">1.49 dp @ 70% · 6.72→11.68</td><td class="n">2.3 · 10.4→18.0</td></tr>
+  <tr><td>Needle width (Mac J2)</td><td class="n">1.2</td><td class="n">0.080</td><td class="n">1.79 dp</td><td class="n">2.8</td></tr>
+  <tr><td>Needle alpha</td><td class="n">85%</td><td class="n">—</td><td class="n">85%</td><td class="n">—</td></tr>
+  <tr><td>Needle span (pinned, A)</td><td class="n">0 → 7.5</td><td class="n">0.167 → 0.500</td><td class="n">3.75 → 11.2 dp</td><td class="n">5.8 → 17.3</td></tr>
+  <tr><td>Needle cleared halo</td><td class="n">3.0</td><td class="n">0.200</td><td class="n">4.48 dp</td><td class="n">6.9</td></tr>
+  <tr><td>Fallback hub dot (no weekly reading)</td><td class="n">1.8 Ø</td><td class="n">0.120</td><td class="n">2.69 dp Ø</td><td class="n">4.1</td></tr>
+  <tr><td>Weekly flag dot</td><td class="n">—</td><td class="n">0.335</td><td class="n">7.5 dp Ø</td><td class="n">11.6</td></tr>
+  <tr><td>Pie disc — Mac inset</td><td class="n">6.5</td><td class="n">0.433</td><td class="n">9.71 dp</td><td class="n">15.0 r</td></tr>
+  <tr><td>Pie disc — footprint-matched</td><td class="n">—</td><td class="n">0.500</td><td class="n">11.2 dp</td><td class="n">17.3 r</td></tr>
+  <tr><td>Pie punched hub</td><td class="n">—</td><td class="n">0.438</td><td class="n">9.8 dp Ø</td><td class="n">15.1</td></tr>
+</table>
+
+<h2>14 · The record — and what is still unverified</h2>
+<div class="flag new">
+  <b>Q1 (the no-usage rung) is settled — outlined "empty".</b> Recorded in §3, along with why literal
+  black was rejected and the no-clock correction it surfaced.
+</div>
+<div class="flag new">
+  <b>Q1 is settled — the 12 o'clock post returns at 100% and only there</b>, replacing the notch I had
+  proposed. Recorded in §4.
+</div>
+<div class="flag new">
+  <b>Q1 and Q2 are settled</b> — the Mac's needle weight (§6) and the faint-disc pie at Ring's
+  footprint (§7). Both sections keep their comparison grids as the record.
+</div>
+<div class="flag new">
+  <b>Nothing is open.</b> Every question in this document is answered and the design is built —
+  <code>ui/UsageIcon.kt</code> (drawing) and <code>ui/RingGeometry.kt</code> (the rung ladder, pure
+  and unit-tested). The comparison grids above are kept deliberately: they are the record of what was
+  ruled out and why, so the same proposals do not come back around.
+  <br><br>
+  <b>One thing still outstanding:</b> this has <b>not been verified on the Fold 7</b> — no device was
+  reachable when it was built. Every number here is rasterised to the real 37&nbsp;px, which is what
+  caught CCRM-48 (Status-Bar Gauge)'s failure, but that is not the same as looking at the phone. The
+  states worth checking first are <b>no data</b> (the hairline alone, at 50%), the <b>empty</b> rung
+  on a light bar, and <b>100%</b> — the spent post over a closed red ring.
+</div>
+<h2>15 · Accessibility — unchanged</h2>
+<p class="sub">
+  The gauge says nothing to a screen reader; the notification's content text carries every window in
+  words, with "no data" and "not signed in" spelled out. None of these decisions touch that, and Q1's
+  answer does not either — the dot never was the carrier.
+</p>
+
+</div>
+
+<script>
+/* ---------- canvas facts, measured in CCRM-49 ---------- */
+const BOX = 24, EFF = 14.1, DENS = 2.625;
+const PXW = Math.round(EFF * DENS);          // 37
+const MIN_FILL = 9;
+const PACE_DEAD_ZONE = 3.0;
+
+/* ---------- geometry ---------- */
+const D = 22.4, ST = 4, R = (D - ST) / 2;    // 9.2
+const RIM = R + ST / 2;                      // 11.2
+const HAIR = D * (1 / 15);                   // 1.493
+const OVH = 0.12 * ST;
+const T_IN = R - ST / 2 - OVH, T_OUT = R + ST / 2 + OVH;
+const N_W = D * (1.2 / 15), N_HALO = D * (3.0 / 15), N_HUB = D * (1.8 / 15) / 2;
+const WK_R = 7.5 / 2;                        // 3.75
+const NOTCH = ST * 0.7;                      // 2.8 — the SHIPPED ≥100 notch, kept only so the
+                                             // "shipped ring" comparison renders truthfully.
+                                             // The new design marks spent with the 12 o'clock post.
+const PIE_MAC = D * (6.5 / 15), PIE_MATCH = RIM;
+const PIE_TRACK_A = 0.18, PIE_NEEDLE_LEN = D * (5 / 15), PIE_HUB = 4.9;
+
+/* ---------- colour ---------- */
+const ACC  = { d: "#E59980", l: "#D97757" };
+const WARN = { d: "#FDD663", l: "#F9A825" };
+const HOTC = { d: "#FFA726", l: "#F57C00" };
+const OVER = { d: "#FF5252", l: "#C62828" };
+const PACEC= { d: "#5BC8FF", l: "#0288D1" };
+const GREY = { d: "#BDBDBD", l: "#757575" };
+const ink = (d) => d ? "#FFFFFF" : "#111112";
+const bg  = (d) => d ? "#0B0B0C" : "#FFFFFF";
+const inkA = (d, a) => d ? `rgba(255,255,255,${a})` : `rgba(17,17,18,${a})`;
+const pick = (c, d) => d ? c.d : c.l;
+const sevColor = (p, d) => {
+  const t = Math.trunc(p);
+  return t >= 100 ? pick(OVER, d) : t > 90 ? pick(HOTC, d) : t > 80 ? pick(WARN, d) : pick(ACC, d);
+};
+const overPace = (p, e) => p != null && e != null && p > e + PACE_DEAD_ZONE;
+const shown = (p) => p > 0 ? Math.max(p, MIN_FILL) : 0;
+/* a mark needs a reading, a clock, AND usage actually started */
+const showMark = (p, e) => p != null && e != null && p > 0;
+
+/* ---------- the 7-day dot: four rungs ---------- */
+/* empty (no usage) · below (grey) · above (yellow) · spent (red) · null (no reading / no clock) */
+function rung(p, e) {
+  if (p == null) return null;                    // no weekly reading → no dot. The ONLY null.
+  if (Math.trunc(p) >= 100) return "spent";      // level — needs no clock
+  if (p <= 0) return "empty";                    // level — needs no clock
+  // Usage exists but there is no clock to judge pace by: it is not empty, and we may not
+  // claim it is above pace, so it rests on the quiet rung. Grey = "nothing to flag".
+  if (e == null) return "below";
+  return (p - e) > PACE_DEAD_ZONE ? "above" : "below";
+}
+/* how the "empty" rung is painted — the open question in §3 */
+function dotSvg(cx, cy, rg, dark, mono, emptyMode) {
+  if (rg == null) return "";
+  const fill = (c) => `<circle cx="${cx}" cy="${cy}" r="${WK_R}" fill="${c}"/>`;
+  if (rg === "spent") return fill(mono ? inkA(dark, 1) : pick(OVER, dark));
+  if (rg === "above") return fill(mono ? inkA(dark, 1) : pick(WARN, dark));
+  if (rg === "below") return fill(mono ? inkA(dark, 0.45) : pick(GREY, dark));
+  /* empty */
+  if (emptyMode === "black") return fill(mono ? inkA(dark, 1) : "#000000");
+  if (emptyMode === "whisper") return fill(inkA(dark, 0.30));
+  return `<circle cx="${cx}" cy="${cy}" r="${WK_R - 0.65}" fill="none"
+           stroke="${inkA(dark, mono ? 0.75 : 0.65)}" stroke-width="1.3"/>`;   // outline
+}
+
+/* ---------- one radial mark in a cleared halo ---------- */
+function radialMark(cx, cy, pctAlong, ri, ro, w, col, dark, haloW, haloFrom, cap) {
+  const a = (Math.min(100, Math.max(0, pctAlong)) / 100) * 2 * Math.PI - Math.PI / 2;
+  const ux = Math.cos(a), uy = Math.sin(a);
+  const hf = haloFrom == null ? ri : haloFrom;
+  const x2 = cx + ro * ux, y2 = cy + ro * uy;
+  return `<line x1="${cx + hf * ux}" y1="${cy + hf * uy}" x2="${x2}" y2="${y2}"
+           stroke="${bg(dark)}" stroke-width="${haloW}"/>` +
+         `<line x1="${cx + ri * ux}" y1="${cy + ri * uy}" x2="${x2}" y2="${y2}"
+           stroke="${col}" stroke-width="${w}"${cap ? ` stroke-linecap="${cap}"` : ""}/>`;
+}
+/* the needle, pinned at the hub (option A) */
+function needle(cx, cy, el, dark, o, tipR, hasDot) {
+  const col = o.markCol === "pace" ? pick(PACEC, dark) : inkA(dark, o.needleA);
+  let s = radialMark(cx, cy, el, WK_R, tipR, o.needleW, col, dark, N_HALO, WK_R + 0.7, "round");
+  /* no weekly dot to pin to → the Mac's own hub dot keeps the centre */
+  if (!hasDot) s += `<circle cx="${cx}" cy="${cy}" r="${N_HUB}" fill="${col}"/>`;
+  return s;
+}
+
+/* ---------- the RING ---------- */
+function ringDraw(cx, cy, pct, el, dark, o) {
+  let s = `<circle cx="${cx}" cy="${cy}" r="${R}" fill="none"
+            stroke="${inkA(dark, o.hairA)}" stroke-width="${o.hairW}"/>`;
+  /* your call: the red slice draws whenever ahead of pace, over whatever the ladder painted */
+  const red = pct != null && overPace(pct, el) && o.showRed !== false;
+  if (pct != null) {
+    const p = Math.min(100, Math.max(0, pct)), v = shown(p);
+    const fc = o.colour ? sevColor(p, dark) : ink(dark);
+    if (v >= 100) s += `<circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="${fc}" stroke-width="${ST}"/>`;
+    else if (v > 0) s += `<circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="${fc}" stroke-width="${ST}"
+        pathLength="100" stroke-dasharray="${v} 100" stroke-linecap="${red ? "butt" : "round"}"
+        transform="rotate(-90 ${cx} ${cy})"/>`;
+    if (red) s += `<circle cx="${cx}" cy="${cy}" r="${R}" fill="none"
+        stroke="${o.colour ? pick(OVER, dark) : ink(dark)}" stroke-width="${ST}"
+        pathLength="100" stroke-dasharray="0 ${Math.min(100, el)} ${v - Math.min(100, el)} 100"
+        stroke-linecap="butt" transform="rotate(-90 ${cx} ${cy})"/>`;
+  }
+  const rg = o.rung === undefined ? rung(WK.p, WK.e) : o.rung;
+  const dot = dotSvg(cx, cy, rg, dark, !o.colour, o.emptyMode);
+  s += dot;
+  if (showMark(pct, el)) s += needle(cx, cy, el, dark, o, RIM, dot !== "");
+  /* SPENT POST: the 12 o'clock post exists only at a truncated 100 — it *is* the "spent"
+     marker. Sub-100 the ring stays clean. Drawn LAST, so if the needle happens to land at
+     12 (a window burned instantly, or one about to reset) the spent cue still wins. Its
+     cleared halo plus the ink line inside it means both a gap and a mark survive the tile. */
+  if (o.spentPost !== false && pct != null && Math.trunc(pct) >= 100) {
+    s += radialMark(cx, cy, 0, T_IN, T_OUT, o.postW, inkA(dark, o.postA), dark, N_HALO);
+  }
+  return s;
+}
+
+/* ---------- the PIE ---------- */
+function wedge(cx, cy, r, a, b) {
+  const a0 = a / 100 * 2 * Math.PI - Math.PI / 2, a1 = b / 100 * 2 * Math.PI - Math.PI / 2;
+  return `M ${cx} ${cy} L ${cx + r * Math.cos(a0)} ${cy + r * Math.sin(a0)}
+          A ${r} ${r} 0 ${(b - a) > 50 ? 1 : 0} 1 ${cx + r * Math.cos(a1)} ${cy + r * Math.sin(a1)} Z`;
+}
+function pieDraw(cx, cy, pct, el, dark, o) {
+  const rr = o.discR;
+  let s = o.track === "disc"
+    ? `<circle cx="${cx}" cy="${cy}" r="${rr}" fill="${inkA(dark, PIE_TRACK_A)}"/>`
+    : `<circle cx="${cx}" cy="${cy}" r="${rr}" fill="none"
+        stroke="${inkA(dark, o.hairA)}" stroke-width="${o.hairW}"/>`;
+  const red = pct != null && overPace(pct, el) && o.showRed !== false;
+  if (pct != null) {
+    const p = Math.min(100, Math.max(0, pct)), v = shown(p);
+    const fc = o.colour ? sevColor(p, dark) : ink(dark);
+    if (v >= 100) s += `<circle cx="${cx}" cy="${cy}" r="${rr}" fill="${fc}"/>`;
+    else if (v > 0) s += `<path d="${wedge(cx, cy, rr, 0, v)}" fill="${fc}"/>`;
+    if (red) s += `<path d="${wedge(cx, cy, rr, Math.min(100, el), v)}"
+                    fill="${o.colour ? pick(OVER, dark) : ink(dark)}"/>`;
+  }
+  const rg = o.rung === undefined ? rung(WK.p, WK.e) : o.rung;
+  let dot = "";
+  if (rg != null) {
+    dot = `<circle cx="${cx}" cy="${cy}" r="${PIE_HUB}" fill="${bg(dark)}"/>` +
+          dotSvg(cx, cy, rg, dark, !o.colour, o.emptyMode);
+    s += dot;
+  }
+  if (showMark(pct, el)) {
+    s += needle(cx, cy, el, dark, o, o.track === "disc" ? PIE_NEEDLE_LEN : rr, dot !== "");
+  }
+  if (o.spentPost !== false && pct != null && Math.trunc(pct) >= 100) {
+    s += radialMark(cx, cy, 0, rr - 4.96, rr + OVH, o.postW, inkA(dark, o.postA), dark, N_HALO);
+  }
+  return s;
+}
+
+/* ---------- what ships today ---------- */
+function shipRingDraw(cx, cy, pct, el, dark, colour) {
+  const back = bg(dark), r = 9.2;
+  let s = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none"
+            stroke="${colour ? "rgba(150,150,150,0.59)" : inkA(dark, 0.35)}" stroke-width="${ST}"/>`;
+  if (pct != null) {
+    const p = Math.min(100, Math.max(0, pct)), v = shown(p);
+    const fc = colour ? sevColor(p, dark) : ink(dark);
+    if (v >= 100) s += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${fc}" stroke-width="${ST}"/>`;
+    else if (v > 0) s += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${fc}" stroke-width="${ST}"
+        pathLength="100" stroke-dasharray="${v} 100" stroke-linecap="round" transform="rotate(-90 ${cx} ${cy})"/>`;
+    if (p >= 100) s += radialMark(cx, cy, 0, T_IN, T_OUT, 0, back, dark, NOTCH);
+  }
+  const rg = rung(WK.p, WK.e);
+  if (rg && rg !== "empty") s += dotSvg(cx, cy, rg, dark, !colour, "whisper");
+  if (pct != null && el != null) {
+    const line = 0.40 * ST;
+    s += radialMark(cx, cy, el, T_IN, T_OUT, 0, back, dark, colour ? line + 0.5 * ST : 0.6 * ST);
+    if (colour) s += radialMark(cx, cy, el, T_IN, T_OUT, line, pick(PACEC, dark), dark, 0.01, null, "round");
+  }
+  return s;
+}
+
+/* ---------- option sets ---------- */
+const WEIGHT = {
+  R1: { label: "R1 hairline 35%", hairA: 0.35, hairW: HAIR },
+  R2: { label: "R2 hairline 50%", hairA: 0.50, hairW: HAIR },
+  R3: { label: "R3 hairline 2.2 dp @ 40%", hairA: 0.40, hairW: 2.2 },
+};
+const NEEDLE = {
+  MAC:  { label: "Mac J2 · 1.79 dp @ 85%", needleW: N_W, needleA: 0.85 },
+  REVD: { label: "earlier · 2.0 dp @ 75%", needleW: 2.0, needleA: 0.75 },
+};
+const REC_W = "R2", REC_N = "MAC", REC_EMPTY = "outline";
+const HOT = { p: 62, e: 45 };
+const WK  = { p: 40, e: 31 };                 // weekly above pace → yellow
+
+function O(extra) {
+  /* DECIDED: pie = faint disc track at Ring's own footprint. Needle stays at the Mac's ratio
+     (2/3 of the half-width = 7.47 dp), so it stops short of the rim like a real clock hand. */
+  return Object.assign({ colour: true, markCol: "ink", discR: PIE_MATCH, track: "disc",
+                         postW: HAIR, postA: 0.70, emptyMode: REC_EMPTY },
+                       WEIGHT[REC_W], NEEDLE[REC_N], extra || {});
+}
+const ringOf = (p, e, d, extra) => ringDraw(12, 12, p, e, d, O(extra));
+const pieOf  = (p, e, d, extra) => pieDraw(12, 12, p, e, d, O(extra));
+
+/* ---------- render plumbing ---------- */
+const svg = (b) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${BOX} ${BOX}"
+  width="${BOX}" height="${BOX}">${b}</svg>`;
+const trueSize = (b) => svg(b).replace(`width="${BOX}" height="${BOX}"`, `width="${EFF}" height="${EFF}"`);
+function pixelBlock(el, body, dark, mag, done) {
+  const cv = document.createElement("canvas");
+  cv.className = "px"; cv.width = PXW * mag; cv.height = PXW * mag;
+  cv.style.width = (PXW * mag) + "px"; cv.style.height = (PXW * mag) + "px";
+  const ctx = cv.getContext("2d"), img = new Image();
+  img.onload = () => {
+    const off = document.createElement("canvas");
+    off.width = PXW; off.height = PXW;
+    const oc = off.getContext("2d");
+    oc.fillStyle = bg(dark); oc.fillRect(0, 0, PXW, PXW);
+    oc.drawImage(img, 0, 0, PXW, PXW);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(off, 0, 0, PXW * mag, PXW * mag);
+    if (done) done(oc.getImageData(0, 0, PXW, PXW).data);
+  };
+  img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg(body));
+  el.appendChild(cv);
+}
+function cell(td, body, dark, mag) {
+  const w = document.createElement("div");
+  w.className = "chipbg " + (dark ? "dk" : "lt");
+  w.style.display = "inline-flex"; td.appendChild(w);
+  pixelBlock(w, body, dark, mag);
+}
+function table(host, cols, rows, fn, dark, mag) {
+  host.innerHTML =
+    `<thead><tr><th class="rowh"></th>${cols.map((c) => `<th>${c}</th>`).join("")}</tr></thead>` +
+    `<tbody>${rows.map((r) => `<tr><td class="rowh">${r}</td>` +
+      cols.map(() => "<td></td>").join("") + `</tr>`).join("")}</tbody>`;
+  host.querySelectorAll("tbody tr").forEach((tr, ri) => {
+    tr.querySelectorAll("td:not(.rowh)").forEach((td, ci) => cell(td, fn(ri, ci, dark), dark, mag));
+  });
+}
+const SYS = `<div class="sys">
+  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21 1 8.5A16 16 0 0 1 23 8.5L12 21z"/></svg>
+  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 22h3V10H2v12zm5 0h3V6H7v16zm5 0h3V2h-3v20zm5 0h3V14h-3v8z"/></svg>
+  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.7 4H14V2h-4v2H8.3C7.6 4 7 4.6 7 5.3v15.4c0 .7.6 1.3 1.3 1.3h7.4c.7 0 1.3-.6 1.3-1.3V5.3C17 4.6 16.4 4 15.7 4zm-.7 16H9v-8h6v8z"/></svg>
+</div>`;
+
+/* ---------- 2 · strips ---------- */
+const STRIP = [
+  ["rails ring — as decided", (d) => ringOf(HOT.p, HOT.e, d)],
+  ["rails pie — as decided",  (d) => pieOf(HOT.p, HOT.e, d)],
+  ["shipped ring — on your phone now", (d) => shipRingDraw(12, 12, HOT.p, HOT.e, d, true)],
+];
+document.querySelectorAll("[data-strips]").forEach((host) => {
+  const dark = host.getAttribute("data-strips") === "dark";
+  host.innerHTML = STRIP.map(([cap, fn]) => `<div style="margin-bottom:16px">
+    <div class="z2"><div class="sb ${dark ? "dk" : "lt"}"><span class="clock">9:41</span>
+      <span style="display:flex;align-items:center">${trueSize(fn(dark))}</span>
+      <span class="spacer"></span>${SYS}</div></div>
+    <div class="cap2">${cap}</div></div>`).join("");
+});
+document.querySelectorAll("[data-pxrow]").forEach((host) => {
+  const dark = host.getAttribute("data-pxrow") === "dark";
+  host.innerHTML = `<thead><tr>${STRIP.map(([c]) => `<th>${c.split(" — ")[0]}</th>`).join("")}</tr></thead>` +
+                   `<tbody><tr>${STRIP.map(() => "<td></td>").join("")}</tr></tbody>`;
+  host.querySelectorAll("tbody td").forEach((td, i) => cell(td, STRIP[i][1](dark), dark, 6));
+});
+
+/* ---------- 3 · the rungs ---------- */
+const RUNGCASE = [
+  ["no usage<br>0% / 30%", 0, 30], ["below pace<br>18% / 30%", 18, 30],
+  ["on pace<br>31% / 30%", 31, 30], ["above pace<br>44% / 30%", 44, 30],
+  ["spent<br>100% / 80%", 100, 80],
+  ["no clock<br>18% / —", 18, null], ["no weekly<br>reading", null, 30],
+];
+document.querySelectorAll("[data-rungs]").forEach((host) => {
+  const dark = host.getAttribute("data-rungs") === "dark";
+  const modes = [["B1 · literal black — ruled out", "black"], ["B2 · whisper 30% — alternative", "whisper"],
+                 ["B3 · outline — DECIDED", "outline"]];
+  table(host, RUNGCASE.map((c) => c[0]), modes.map((m) => m[0]), (ri, ci, d) => {
+    const [, wp, we] = RUNGCASE[ci];
+    return ringOf(HOT.p, HOT.e, d, { rung: rung(wp, we), emptyMode: modes[ri][1] });
+  }, dark, 6);
+});
+
+/* ---------- 4 · the post and the notch ---------- */
+const POSTCASE = [
+  ["no data", null, null], ["0% used", 0, 22], ["62% over", 62, 45], ["95%", 95, 90],
+  ["100% — post", 100, 90], ["104%", 104, 60],
+  ["100%, needle<br>at 12 (edge)", 100, 2],
+];
+document.querySelectorAll("[data-post]").forEach((host) => {
+  const dark = host.getAttribute("data-post") === "dark";
+  const rows = [["spent post (decided)", {}], ["without it, for contrast", { spentPost: false }]];
+  table(host, POSTCASE.map((c) => c[0]), rows.map((r) => r[0]), (ri, ci, d) => {
+    const [, p, e] = POSTCASE[ci];
+    return ringOf(p, e, d, rows[ri][1]);
+  }, dark, 6);
+});
+
+/* ---------- 5 · severity × pace ---------- */
+const SEVROW = [[">80 · yellow", 86], [">90 · orange", 95], ["≥100 · red", 104]];
+document.querySelectorAll("[data-sev]").forEach((host) => {
+  const dark = host.getAttribute("data-sev") === "dark";
+  table(host, ["on pace<br>(elapsed 84%)", "ahead of pace<br>(elapsed 55%)"],
+        SEVROW.map((r) => r[0]), (ri, ci, d) =>
+    ringOf(SEVROW[ri][1], ci === 0 ? 84 : 55, d), dark, 6);
+});
+
+/* ---------- 6 · needle weights ---------- */
+const WCASE = [["coasting", 30, 55], ["on pace", 48, 50], ["over pace", 62, 45], ["86% over", 86, 55]];
+document.querySelectorAll("[data-weights]").forEach((host) => {
+  const dark = host.getAttribute("data-weights") === "dark";
+  table(host, WCASE.map((v) => `${v[0]}<br>${v[1]}% / ${v[2]}%`),
+        [NEEDLE.MAC.label, NEEDLE.REVD.label], (ri, ci, d) => {
+    const [, p, e] = WCASE[ci];
+    return ringOf(p, e, d, ri === 0 ? NEEDLE.MAC : NEEDLE.REVD);
+  }, dark, 6);
+});
+
+/* ---------- 7 · the pie ---------- */
+document.querySelectorAll("[data-pie]").forEach((host) => {
+  const dark = host.getAttribute("data-pie") === "dark";
+  const cols = WCASE.concat([["no data", null, null]]);
+  const rows = [
+    ["faint disc · matched — DECIDED", { track: "disc", discR: PIE_MATCH }],
+    ["faint disc · Mac inset", { track: "disc", discR: PIE_MAC }],
+    ["hairline rim · matched", { track: "hair", discR: PIE_MATCH }],
+    ["hairline rim · Mac inset", { track: "hair", discR: PIE_MAC }],
+  ];
+  table(host, cols.map((v) => v[1] == null ? v[0] : `${v[0]}<br>${v[1]}% / ${v[2]}%`),
+        rows.map((r) => r[0]), (ri, ci, d) => {
+    const [, p, e] = cols[ci];
+    return pieOf(p, e, d, rows[ri][1]);
+  }, dark, 6);
+});
+
+/* ---------- 8 · the needle's colour ---------- */
+document.querySelectorAll("[data-markcol]").forEach((host) => {
+  const dark = host.getAttribute("data-markcol") === "dark";
+  const cols = [["50% coast", 50, 60], ["62% over", 62, 45], ["86% over", 86, 55], ["104% over", 104, 70]];
+  table(host, cols.map((v) => `${v[0]}<br>${v[1]}% / ${v[2]}%`),
+        ["neutral ink @ 85%", "themed cool partner"], (ri, ci, d) => {
+    const [, p, e] = cols[ci];
+    return ringOf(p, e, d, { markCol: ri === 0 ? "ink" : "pace" });
+  }, dark, 6);
+});
+
+/* ---------- 9 · the verdict ---------- */
+const VERD = [["coasting", 30, 55], ["on pace (±3)", 48, 50], ["over pace", 62, 45], ["far over", 78, 40]];
+document.querySelectorAll("[data-verdict]").forEach((host) => {
+  const dark = host.getAttribute("data-verdict") === "dark";
+  table(host, VERD.map((v) => `${v[0]}<br>${v[1]}% / ${v[2]}%`),
+        ["rails ring", "rails pie", "shipped ring"], (ri, ci, d) => {
+    const [, p, e] = VERD[ci];
+    return ri === 0 ? ringOf(p, e, d) : ri === 1 ? pieOf(p, e, d)
+                                                 : shipRingDraw(12, 12, p, e, d, true);
+  }, dark, 6);
+});
+
+/* ---------- 10 · the ladder ---------- */
+const LEVELS = [10, 30, 50, 70, 90, 100];
+document.querySelectorAll("[data-ladder]").forEach((host) => {
+  const dark = host.getAttribute("data-ladder") === "dark";
+  table(host, LEVELS.map((l) => l + "%"), ["rails ring", "rails pie", "shipped ring"], (ri, ci, d) => {
+    const p = LEVELS[ci], e = 50;
+    return ri === 0 ? ringOf(p, e, d) : ri === 1 ? pieOf(p, e, d)
+                                                 : shipRingDraw(12, 12, p, e, d, true);
+  }, dark, 5);
+});
+
+/* ---------- 11 · honesty states ---------- */
+const STATES = [["no data", null, null], ["0%, clock", 0, 22], ["55%, no clock", 55, null],
+                ["1% used", 1, 22], ["100%", 100, 90], ["86% ahead", 86, 55], ["104% ahead", 104, 70]];
+document.querySelectorAll("[data-states]").forEach((host) => {
+  const dark = host.getAttribute("data-states") === "dark";
+  table(host, STATES.map((s) => s[0]), ["rails ring", "rails pie"], (ri, ci, d) => {
+    const [, p, e] = STATES[ci];
+    return ri === 0 ? ringOf(p, e, d) : pieOf(p, e, d);
+  }, dark, 6);
+});
+document.querySelectorAll("[data-proof]").forEach((host) => {
+  const hidden = document.createElement("div");
+  hidden.style.cssText = "position:absolute;left:-9999px;top:0";
+  document.body.appendChild(hidden);
+  const got = [];
+  const check = () => {
+    if (got.filter(Boolean).length < 4) return;
+    const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+    const rOK = same(got[0], got[1]), pOK = same(got[2], got[3]);
+    host.innerHTML = `<b>Byte-identity check, run live in this page:</b> the
+      <code>0% used, clock known</code> render is
+      ${rOK ? '<span class="ok">pixel-identical</span>' : '<span class="no">DIFFERENT</span>'}
+      to <code>0% used, no clock</code> on the ring, and
+      ${pOK ? '<span class="ok">pixel-identical</span>' : '<span class="no">DIFFERENT</span>'}
+      on the pie — all ${PXW}×${PXW} pixels of the rasterised bitmap compared. Verified, not asserted.`;
+  };
+  pixelBlock(hidden, ringOf(0, 22, true), true, 1, (d) => { got[0] = [...d]; check(); });
+  pixelBlock(hidden, ringOf(0, null, true), true, 1, (d) => { got[1] = [...d]; check(); });
+  pixelBlock(hidden, pieOf(0, 22, true), true, 1, (d) => { got[2] = [...d]; check(); });
+  pixelBlock(hidden, pieOf(0, null, true), true, 1, (d) => { got[3] = [...d]; check(); });
+});
+
+/* ---------- 12 · monochrome ---------- */
+document.querySelectorAll("[data-mono]").forEach((host) => {
+  const cols = [["no usage wk<br>62% / 45%", 62, 45, rung(0, 30)],
+                ["above wk<br>62% / 45%", 62, 45, rung(44, 30)],
+                ["spent wk<br>62% / 45%", 62, 45, rung(100, 80)],
+                ["95% — no post", 95, 90, rung(44, 30)],
+                ["100% — post", 100, 90, rung(44, 30)]];
+  table(host, cols.map((c) => c[0]),
+        ["rails ring · mono, B3 outline", "rails ring · mono, B1 black", "rails pie · mono"],
+        (ri, ci, d) => {
+    const [, p, e, rg] = cols[ci];
+    const extra = { colour: false, rung: rg, emptyMode: ri === 1 ? "black" : "outline" };
+    return ri === 2 ? pieOf(p, e, d, extra) : ringOf(p, e, d, extra);
+  }, true, 6);
+});
+</script>

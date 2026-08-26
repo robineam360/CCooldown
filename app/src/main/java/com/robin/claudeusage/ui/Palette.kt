@@ -74,6 +74,14 @@ object Palette {
      * The theme's pace-line partner (CCRM-50 (Weekly Flag)). Resolves through
      * [byName] like [color] does, so "Material You" lands on Claude Orange's
      * partner — matching the fill that surface actually draws for it.
+     *
+     * **No Android surface draws with this since CCRM-51 (Rails Gauge)**, which made
+     * the gauge marks neutral ink on review ("time has no severity") — the status-bar
+     * icon was its only caller. Kept because the partner table is a *shared* contract:
+     * CCooldownMac consumes it (MAC-GAUGE-HANDOVER.md §3), including the rule it cost
+     * us a wireframe to learn — the partner must always be cool, because past 80 the
+     * fill is the fixed warm ladder whatever the theme, so a warm partner dies exactly
+     * where the mark matters most.
      */
     fun paceColor(name: String, dark: Boolean): Color =
         byName(name).let { if (dark) it.paceDark else it.paceLight }

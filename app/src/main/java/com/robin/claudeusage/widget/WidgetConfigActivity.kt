@@ -9,6 +9,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -181,8 +182,16 @@ private fun ConfigScreen(
 
         Text("Profile", style = MaterialTheme.typography.titleSmall)
         Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            for (p in Profile.entries) {
+        // CCRM-6 (Multi-Account): configured accounts only — a widget aimed at an account
+        // with no token has nothing to draw — falling back to the full list when none are
+        // configured, so the picker is never empty. FlowRow because four 16-character
+        // labels do not fit one line at any phone width.
+        val repo = remember { com.robin.claudeusage.data.UsageRepository(context) }
+        val pickable = remember {
+            repo.configuredProfiles().ifEmpty { repo.profiles() }
+        }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            for (p in pickable) {
                 FilterChip(
                     selected = profile == p,
                     onClick = { profile = p },

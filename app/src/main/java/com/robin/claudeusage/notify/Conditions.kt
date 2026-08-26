@@ -48,8 +48,8 @@ object Conditions {
      * Whether the pinned notification is in a position to carry a profile's alerts.
      *
      * Simply "is it on" (CCRM-44 (One Surface), revised 2026-08-18 on user feedback):
-     * the panel carries BOTH profiles — the one it isn't showing gets its strips
-     * prefixed with its name — so no profile ever posts a standalone notification
+     * the panel carries EVERY profile — the ones it isn't showing get their strips
+     * prefixed with their names — so no profile ever posts a standalone notification
      * while the panel exists. Off, everything posts exactly as before.
      */
     fun foldedInto(cache: UsageCache): Boolean = cache.pinnedEnabled()
@@ -75,28 +75,88 @@ object Conditions {
     data class Panel(val strips: List<Condition>, val overflow: Int, val stale: Boolean)
 
     fun panelFor(context: Context, cache: UsageCache, profile: Profile): Panel {
-        // The panel carries the other profile too (revised 2026-08-18): its strips are
-        // prefixed with its name, since the header only names the shown profile. Event
+        // The panel carries the other profiles too (revised 2026-08-18): their strips are
+        // prefixed with their names, since the header only names the shown profile. Event
         // titles already carry their profile's label from the alert copy.
-        val other = Profile.entries.first { it != profile }
-        val otherLabel = cache.profileLabel(other)
+        //
+        // CCRM-6 (Multi-Account) generalised this from exactly one "other" to every other
+        // registered account. Ordering is unchanged and deliberate: the *shown* profile's
+        // faults come first, so it can never be crowded out of its own panel, then the
+        // others in registry order. MAX_STRIPS stays 3 — the panel's height is finite
+        // however many accounts exist, and "+ n more" is the honest answer.
+        val others = cache.registry().all().filter { it != profile }
         val staleCondition = stale(cache, profile)
-        val events = (cache.foldedEvents(profile) + cache.foldedEvents(other))
+        val events = (listOf(profile) + others)
+            .flatMap { p -> cache.foldedEvents(p).filter { revocable(cache, p, it.kind) } }
             .sortedByDescending { it.firedAt }
             .map { Condition(short = it.title, title = it.title, detail = it.detail, error = false) }
-        val all = listOfNotNull(
-            reauth(cache, profile), staleCondition,
-            reauth(cache, other)?.labelled(otherLabel), stale(cache, other)?.labelled(otherLabel),
-        ) + events + listOfNotNull(
-            expiry(cache, profile), expiry(cache, other)?.labelled(otherLabel),
-            update(context, cache),
-        )
+        val all = listOfNotNull(reauth(cache, profile), staleCondition) +
+            others.flatMap { other ->
+                val label = cache.profileLabel(other)
+                listOfNotNull(
+                    reauth(cache, other)?.labelled(label),
+                    stale(cache, other)?.labelled(label),
+                )
+            } + events + listOfNotNull(expiry(cache, profile)) +
+            others.mapNotNull { other ->
+                expiry(cache, other)?.labelled(cache.profileLabel(other))
+            } + listOfNotNull(update(context, cache))
         return Panel(
             strips = all.take(MAX_STRIPS),
             overflow = (all.size - MAX_STRIPS).coerceAtLeast(0),
             // Only the shown profile's staleness dims the shown number.
             stale = staleCondition != null,
         )
+    }
+
+    /**
+     * CCBG-17 (Strip Revocation): whether the toggle that *governs* this event kind is
+     * still on.
+     *
+     * A folded strip is a persisted record of a past alert, not a live one, so switching
+     * its alert off in Settings did nothing to it — the panel kept drawing an alert the
+     * user had explicitly silenced, for as long as CCBG-18 (Strip Lifetime Stamp) let the
+     * record live. The gate belongs here, at draw time, alongside the fire-time gates in
+     * [Alerts.evaluate] rather than instead of them: filtering (rather than clearing the
+     * store on toggle-off) is reversible, so switching a toggle back on brings a strip
+     * that is still within its lifetime back, which is what a toggle should mean.
+     *
+     * Which *threshold* fired isn't recorded on the event, so a threshold strip is only
+     * revoked when the whole set empties — Settings' own "Nothing selected = silent".
+     * The kind-to-toggle mapping itself lives in [StripRules.gateFor]; this does the
+     * preference reads.
+     */
+    private fun revocable(cache: UsageCache, profile: Profile, kind: String): Boolean {
+        if (!cache.profileAlertsEnabled(profile)) return false
+        return when (StripRules.gateFor(kind)) {
+            StripRules.Gate.PROFILE -> true
+            StripRules.Gate.PACE -> cache.paceAlertsEnabled()
+            StripRules.Gate.SESSION_THRESHOLD -> cache.sessionAlertThresholds().isNotEmpty()
+            StripRules.Gate.WEEKLY_THRESHOLD -> cache.weeklyAlertThresholds().isNotEmpty()
+            StripRules.Gate.MODEL_CAP_THRESHOLD -> cache.modelCapAlertThresholds().isNotEmpty()
+            StripRules.Gate.RESET -> {
+                val window = StripRules.resetWindow(kind) ?: return true
+                cache.resetPingMode(window) != UsageCache.RESET_OFF
+            }
+        }
+    }
+
+    /**
+     * CCBG-18 (Strip Lifetime Stamp): the soonest a strip the panel is *currently drawing*
+     * is due to leave, or 0 if none is. What the pinned notification arms its expiry alarm
+     * for — without it a strip survives until the next poll, so a 15-minute lifetime could
+     * mean half an hour on screen.
+     *
+     * Deliberately mirrors [panelFor]'s revocation filter: a strip already revoked by
+     * CCBG-17 (Strip Revocation) isn't drawn, so it needs no alarm to remove it.
+     */
+    fun nextExpiry(cache: UsageCache, profile: Profile): Long {
+        val profiles = listOf(profile) + cache.registry().all().filter { it != profile }
+        return profiles.flatMap { p ->
+            cache.foldedEvents(p)
+                .filter { revocable(cache, p, it.kind) }
+                .map { cache.effectiveExpiry(it) }
+        }.minOrNull() ?: 0L
     }
 
     private fun Condition.labelled(label: String): Condition =

@@ -11,6 +11,35 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
 
 ## Open
 
+### CCBG-16 · Stale Strip Label — a folded event keeps the account name it fired under
+- **Status:** Open
+- **Severity:** Low (cosmetic; the numbers and the routing are right)
+- **Symptom:** **Observed on the Fold 7, 2026-08-21**, during the CCRM-6 (Multi-Account)
+  device pass. The pinned panel's header read `Personal · 5-hour window` while the folded
+  event strip below it read **`Pro: 7-day window will run out early`** — "Pro" being what
+  that same account was called when the event fired, minutes earlier. Both the collapsed
+  row and the expanded panel show the old name.
+- **Cause:** `UsageCache.FoldedEvent` stores `title` and `detail` as **finished text**,
+  composed at fire time by the alert copy (`"$label: $windowLabel window will run out
+  early"`). A rename updates the registry, so every *live* read of `profileLabel` follows
+  it — but the strings already sitting in the `foldedEvents` pref are frozen. The strip is
+  not re-derived, so it cannot follow.
+- **Where:** `Alerts.foldEvent` / `UsageCache.FoldedEvent` (the store), rendered by
+  `Conditions.panelFor`. Note this is **not** the CCRM-6 label-prefix path
+  (`Condition.labelled`), which reads `cache.profileLabel` live and is correct — the two
+  look identical in the panel, which is what makes this confusing to read.
+- **Pre-dates CCRM-6**, which is why it is filed separately: the frozen-text design came in
+  with CCRM-44 (One Surface). But CCRM-6 made renaming a one-tap action on the account card
+  and gave accounts default names people will want to change, so a state that was
+  near-unreachable is now easy to hit.
+- **Fix options, undecided:** store the profile key on `FoldedEvent` and the *unprefixed*
+  title, then compose the label at render time like `labelled` already does (correct, and
+  needs a migration for events stored by older builds — or just let them age out through
+  the existing prune); or re-title stored events on rename (cheaper, but it has to
+  string-match the old label out of a sentence, which is fragile); or accept it, since
+  events are short-lived by design — the longest is `alertLifetime`, and reset strips live
+  30 minutes.
+
 ### CCBG-15 · Amber Ladder Blindness — the Amber theme's accent is the yellow warning rung
 - **Status:** Open
 - **Severity:** Low (one theme, and the orange/red rungs still land)
@@ -46,6 +75,84 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
 ---
 
 ## Fixed
+
+### CCBG-18 · Strip Lifetime Stamp — "keep alerts for" is frozen at fire time and never re-read
+- **Status:** Fixed (2026-08-26) · unit-tested (`StripRulesTest`); **not yet verified on
+  a device** — the reported strips were stamped days out under `auto`, so confirming the
+  fix means watching a fresh strip leave on time on the Fold 7.
+- **Severity:** Medium (an alert the user has time-limited stays on screen for days)
+- **Symptom:** **Observed on the Fold 7, 2026-08-26.** "Keep alerts in the shade for" is
+  set to **15m**, yet two pace strips — `Product: 7-day window will run out early` and
+  `Pro: 7-day window will run out early` — had been sitting in the pinned panel far
+  longer than that, and were still there. Nothing the user can do in Settings shifts them.
+- **Cause:** `FoldedEvent.expiresAt` is computed **once**, at fold time, from whatever
+  `alertLifetime()` read at that moment (`Alerts.eventTimeout`). The store is then pruned
+  against that frozen stamp (`UsageCache.foldedEvents`). Changing the chip afterwards
+  changes nothing for events already folded. The setting reads like a display rule — "keep
+  alerts in the shade for this long" — but behaves like a one-time stamp.
+  The default is `auto`, and under `auto` a 7-day-window event is stamped to live **until
+  that window resets**. So the strips the user was looking at were folded under `auto`,
+  given a multi-day expiry, and are unreachable by the 15m they later chose.
+- **Second half of the same defect:** expiry is only pruned **lazily, on read**, and
+  nothing schedules a redraw when a strip is due to go. The panel re-renders on a poll
+  (`UsageRepository`), at the end of `Alerts.evaluate`, or on a Settings change — so even a
+  correctly-stamped 15m strip survives until the next poll, up to a further 15 minutes.
+- **Where:** `Alerts.eventTimeout` / `Alerts.foldEvent` (the stamp),
+  `UsageCache.foldedEvents` (the prune), `PinnedNotification.update` (no expiry alarm).
+- **Fixed by** making the lifetime a **read-time** rule. `foldedEvents` computes an effective
+  expiry of `min(stamped expiresAt, firedAt + alertLifetime)` — it can only ever *shorten*,
+  so `auto` keeps the stamped window-reset ceiling and the deliberate 30-minute reset strip
+  (`RESET_STRIP_MS`) is never *extended* by a longer chip. Persistent pruning still uses
+  the hard stamp, so flipping back to `auto` doesn't find the events deleted. Then arm a
+  one-shot alarm at the earliest live strip's effective expiry so it actually leaves on
+  time rather than at the next poll.
+- **Related:** [CCBG-17](#ccbg-17--strip-revocation--turning-an-alert-off-doesn-t-retract-strips-already-folded),
+  found in the same session and the same store; both are consequences of CCRM-44
+  (One Surface) treating a folded strip as a finished artefact rather than a live
+  derivation. Same root as CCBG-16 (Stale Strip Label).
+
+### CCBG-17 · Strip Revocation — turning an alert off doesn't retract strips already folded
+- **Status:** Fixed (2026-08-26) · unit-tested (`StripRulesTest`); **not yet verified on
+  a device**.
+- **Severity:** Medium (the app shows alerts the user has explicitly switched off)
+- **Symptom:** **Observed on the Fold 7, 2026-08-26.** Every notification toggle off —
+  "Pace alerts" off, its three milestones off, Personal/Work/Product alerts all off, only
+  the always-on notification on — and the pinned panel still showed two pace alerts:
+  `Product: 7-day window will run out early` and `Pro: 7-day window will run out early`.
+- **Cause:** with the pinned notification on, `Conditions.foldedInto` is true and alerts
+  are written to the `foldedEvents` pref instead of being posted (`Alerts.foldEvent`). The
+  panel then re-renders them from that store on every draw (`Conditions.panelFor`). They
+  are not notifications; they are persisted records of past ones.
+  *Generation* is gated correctly — `Alerts.evaluate` checks `paceAlertsEnabled()` before
+  `checkPace` and returns early on `!profileAlertsEnabled(profile)` — so no new strips are
+  being made. But `setPaceAlertsEnabled` / `setProfileAlertsEnabled` only write a boolean.
+  Nothing clears the store, and nothing consults those toggles at draw time, so strips
+  folded while a toggle was on outlive it — for as long as CCBG-18 (Strip Lifetime Stamp)
+  lets them, which under `auto` on a 7-day window is days.
+- **Applies to every folded kind**, not just pace: threshold strips survive their
+  thresholds being deselected, reset strips survive their ping mode going to Off, and any
+  profile's strips survive that profile's alerts being switched off.
+- **Where:** `Conditions.panelFor` (draws unconditionally from the store),
+  `UsageCache.setPaceAlertsEnabled` / `setProfileAlertsEnabled` (write-and-forget).
+- **Fixed by** filtering at **draw** time, not only at fire time. `panelFor` drops an event whose
+  governing toggle is now off — `pace.*` under `paceAlertsEnabled()`, `reset.<window>`
+  under that window's ping mode, `sessionAlert`/`weeklyAlert`/`modelAlert.*` under a
+  non-empty threshold set, and everything under the owning profile's
+  `profileAlertsEnabled`. Clearing the store on toggle-off would work too, but filtering is
+  reversible: switch a toggle back on and a still-live strip returns, which is what a
+  toggle should mean. Which *threshold* fired isn't recorded on the event, so a strip for a
+  single deselected rung is only caught when the whole set empties — the honest limit of
+  this fix, and not worth widening the stored record for.
+- **Related:** [CCBG-18](#ccbg-18--strip-lifetime-stamp--keep-alerts-for-is-frozen-at-fire-time-and-never-re-read).
+- **Also changed:** every alert control in Settings' Notifications card now redraws the
+  pinned panel on change (`refreshPanel()` / the two segmented rows), the way the theme
+  swatches were taught to by CCBG-14 (Stale Notification Theme). Without it both fixes were
+  correct but invisible until the next poll.
+- **Where the rules live now:** `notify/StripRules.kt` — the lifetime arithmetic and the
+  kind-to-toggle mapping as pure functions, apart from the preference reads in `Conditions`
+  and `UsageCache`, following the `Projection.paceStep` split. `Alerts.eventTimeout` shares
+  the same lifetime table, so a standalone notification's `setTimeoutAfter` and a folded
+  strip can never disagree about what "15m" means.
 
 ### CCBG-14 · Stale Notification Theme — theme colour changes don't reach the pinned notification until the next poll
 - **Status:** Fixed (2026-08-21) · **verified live on the Fold 7 the same day, v1.3

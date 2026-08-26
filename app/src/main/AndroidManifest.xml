@@ -82,6 +82,35 @@
             </intent-filter>
         </service>
 
+        <!--
+            CCRM-6 (Multi-Account): tiles are statically declared, so the pool is fixed at
+            four and bound to slots rather than to accounts. android:label cannot follow a
+            rename (already true of "Claude Personal" above), so the picker reads
+            "Claude account 3/4" while the placed tile shows the live label. A slot with no
+            account reports STATE_UNAVAILABLE.
+        -->
+        <service
+            android:name=".tile.Slot2TileService"
+            android:label="Claude account 3"
+            android:icon="@drawable/ic_stat_bars"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".tile.Slot3TileService"
+            android:label="Claude account 4"
+            android:icon="@drawable/ic_stat_bars"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
         <receiver
             android:name=".widget.UsageWidgetReceiver"
             android:exported="true">

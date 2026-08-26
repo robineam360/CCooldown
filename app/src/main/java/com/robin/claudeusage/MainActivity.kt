@@ -42,6 +42,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -85,6 +86,7 @@ import androidx.glance.appwidget.updateAll
 import android.text.format.DateFormat
 import com.robin.claudeusage.data.ErrorKind
 import com.robin.claudeusage.data.Profile
+import com.robin.claudeusage.data.ProfileRegistry
 import com.robin.claudeusage.ping.PingScheduler
 import com.robin.claudeusage.data.Projection
 import com.robin.claudeusage.data.UsageRepository
@@ -128,7 +130,8 @@ class MainActivity : ComponentActivity() {
         // reschedule here so an alarm armed by an older build is cancelled on first
         // open instead of waiting for the next poll.
         PingScheduler.rescheduleAll(this)
-        val startProfile = Profile.fromKey(intent?.getStringExtra("profile"))
+        val startProfile =
+            ProfileRegistry(this).resolve(intent?.getStringExtra("profile"))
         // CCRM-33 (App Shortcuts): the "Refresh now" shortcut opens the app with
         // this extra — a manual poll of every signed-in account, the same path
         // the widgets' ↻ takes.
@@ -145,6 +148,14 @@ class MainActivity : ComponentActivity() {
 }
 
 private enum class Screen { MAIN, SETTINGS, GUIDE, HISTORY }
+
+/**
+ * CCRM-6 (Multi-Account): profile tab strips stay a fixed [TabRow] up to this many accounts
+ * and become a [ScrollableTabRow] beyond it. Shared by the main screen and the History
+ * screen so the two strips can never disagree. See the wireframe's state 5d–5f for the
+ * measurement this comes from.
+ */
+internal const val FIXED_TAB_LIMIT = 3
 
 /**
  * Window lengths, used both to scale the chart's x axis and to bind history to it.
@@ -361,7 +372,11 @@ private fun ProfileTabs(
     onOpenSettings: () -> Unit,
     modifier: Modifier,
 ) {
-    val profiles = Profile.entries
+    // CCRM-6 (Multi-Account): only accounts with a token get a tab. Someone with one
+    // account sees no strip at all and gains its ~48 dp; a new account appears the moment
+    // its token lands. Signing in stays in Settings, so a tab is never the route to it.
+    // At zero we fall back to the registry's first account, which shows its own empty state.
+    val profiles = repo.configuredProfiles().ifEmpty { listOf(repo.registry().first()) }
     // One profile at a time at every width, tabs and swipe included. A wide window used
     // to split into two side-by-side profile panes, on the theory that both accounts at
     // once was the point — but each pane then drew a chart no wider than the one on the
@@ -373,6 +388,13 @@ private fun ProfileTabs(
         initialPage = profiles.indexOf(startProfile).coerceAtLeast(0),
         pageCount = { profiles.size },
     )
+    // The list shrinks when an account is signed out or removed, and the pager's remembered
+    // page outlives it. Clamp rather than index past the end.
+    LaunchedEffect(profiles.size) {
+        if (pagerState.currentPage > profiles.lastIndex) {
+            pagerState.scrollToPage(profiles.lastIndex.coerceAtLeast(0))
+        }
+    }
     val scope = rememberCoroutineScope()
     // Read inside the click, never captured at composition: the user can flip the
     // system animation setting while the app is open, and the very next tab press
@@ -380,23 +402,42 @@ private fun ProfileTabs(
     val motionContext = LocalContext.current
 
     Column(modifier = modifier.fillMaxSize()) {
-        TabRow(selectedTabIndex = pagerState.currentPage) {
-            profiles.forEachIndexed { index, profile ->
-                Tab(
-                    selected = pagerState.currentPage == index,
-                    onClick = {
-                        scope.launch {
-                            // The zero-duration limit of the same page turn — identical
-                            // landing, no travel — per CCRM-32 (Reduce Motion).
-                            if (Motion.reduced(Motion.scale(motionContext))) {
-                                pagerState.scrollToPage(index)
-                            } else {
-                                pagerState.animateScrollToPage(index)
+        // One tab is no choice, so the strip disappears entirely rather than showing a lone
+        // tab with nothing to switch to.
+        if (profiles.size > 1) {
+            // Clamped at the call site as well as in the effect above: the effect runs
+            // after this composition, so for one frame after an account disappears the
+            // pager's page can still be past the end — and TabRow's indicator indexes
+            // straight into its tab positions with whatever it is handed.
+            val selected = pagerState.currentPage.coerceIn(0, profiles.lastIndex)
+            val tabs: @Composable () -> Unit = {
+                profiles.forEachIndexed { index, profile ->
+                    Tab(
+                        selected = selected == index,
+                        onClick = {
+                            scope.launch {
+                                // The zero-duration limit of the same page turn — identical
+                                // landing, no travel — per CCRM-32 (Reduce Motion).
+                                if (Motion.reduced(Motion.scale(motionContext))) {
+                                    pagerState.scrollToPage(index)
+                                } else {
+                                    pagerState.animateScrollToPage(index)
+                                }
                             }
-                        }
-                    },
-                    text = { Text(repo.cacheSettings().profileLabel(profile)) },
-                )
+                        },
+                        text = { Text(repo.cacheSettings().profileLabel(profile)) },
+                    )
+                }
+            }
+            // CCRM-6 (Multi-Account): fixed up to three, scrollable at four or more, at
+            // every width. Three tabs get ~133 dp on a 400 dp screen and a 16-character
+            // label needs ~110, so it fits; four would get 82 dp on the cover screen and
+            // every label — including the selected one — would truncate. One rule at both
+            // widths deliberately, so the strip doesn't change shape when the phone unfolds.
+            if (profiles.size <= FIXED_TAB_LIMIT) {
+                TabRow(selectedTabIndex = selected) { tabs() }
+            } else {
+                ScrollableTabRow(selectedTabIndex = selected, edgePadding = 0.dp) { tabs() }
             }
         }
         HorizontalPager(

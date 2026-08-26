@@ -16,6 +16,7 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.robin.claudeusage.data.FetchResult
 import com.robin.claudeusage.data.Profile
+import com.robin.claudeusage.data.ProfileRegistry
 import com.robin.claudeusage.data.UsageCache
 import com.robin.claudeusage.data.UsageRepository
 import com.robin.claudeusage.diag.AppLog
@@ -33,7 +34,8 @@ class UsagePollWorker(context: Context, params: WorkerParameters) :
 
     override suspend fun doWork(): Result {
         val manual = inputData.getBoolean("manual", false)
-        val onlyProfile = inputData.getString("profile")?.let { Profile.fromKey(it) }
+        val onlyProfile = inputData.getString("profile")
+            ?.let { ProfileRegistry(applicationContext).resolve(it) }
         val repo = UsageRepository(applicationContext)
 
         val byProfile: Map<Profile, FetchResult> =
@@ -190,7 +192,7 @@ object Polling {
      */
     fun scheduleResetChecks(context: Context, cache: UsageCache) {
         val now = Instant.now()
-        for (profile in Profile.entries) {
+        for (profile in cache.registry().all()) {
             val data = cache.snapshot(profile).data ?: continue
             val targets = listOf(
                 "session" to data.session?.resetsAt,

@@ -95,7 +95,7 @@ object OAuthSignIn {
         val p = prefs(context)
         val v = p.getString("verifier", null) ?: return null
         val s = p.getString("state", null) ?: return null
-        return Pending(v, s, Profile.fromKey(p.getString("profile", null)))
+        return Pending(v, s, ProfileRegistry(context).resolve(p.getString("profile", null)))
     }
 
     fun clearPending(context: Context) {

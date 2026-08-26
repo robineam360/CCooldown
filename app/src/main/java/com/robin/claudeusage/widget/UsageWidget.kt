@@ -47,6 +47,7 @@ import com.robin.claudeusage.R
 import com.robin.claudeusage.data.AuthState
 import com.robin.claudeusage.data.ErrorKind
 import com.robin.claudeusage.data.Profile
+import com.robin.claudeusage.data.ProfileRegistry
 import com.robin.claudeusage.data.Projection
 import com.robin.claudeusage.data.Snapshot
 import com.robin.claudeusage.data.UsageCache
@@ -79,7 +80,7 @@ class RefreshAction : ActionCallback {
         glanceId: GlanceId,
         parameters: ActionParameters,
     ) {
-        val profile = Profile.fromKey(parameters[PROFILE_PARAM])
+        val profile = ProfileRegistry(context).resolve(parameters[PROFILE_PARAM])
         Polling.refreshOnce(context, manual = true, profile = profile)
     }
 }

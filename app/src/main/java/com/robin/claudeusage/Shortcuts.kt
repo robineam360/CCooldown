@@ -5,12 +5,12 @@ import android.content.Intent
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
-import com.robin.claudeusage.data.Profile
+import com.robin.claudeusage.data.CredentialStore
 import com.robin.claudeusage.data.UsageCache
 
 /**
- * CCRM-33 (App Shortcuts): launcher long-press entries — one per profile, plus
- * "Refresh now". Dynamic rather than static XML, because the labels follow the
+ * CCRM-33 (App Shortcuts): launcher long-press entries — one per signed-in account,
+ * plus "Refresh now", capped at the launcher's own limit (CCRM-6 (Multi-Account)). Dynamic rather than static XML, because the labels follow the
  * user's renamed profile labels (`UsageCache.profileLabel`); republished on
  * every app launch and after a rename. Complements the Quick Settings tile
  * (CCRM-11 (Tile Reset Time)) rather than duplicating it: the tile is for the
@@ -25,7 +25,18 @@ object Shortcuts {
     fun publish(context: Context) {
         try {
             val cache = UsageCache(context)
-            val shortcuts = Profile.entries.map { profile ->
+            // CCRM-6 (Multi-Account): configured accounts only, and capped. The launcher
+            // rations these (typically 5 per activity) and today's unbounded list silently
+            // overflowed past four accounts. "Refresh now" always keeps the last slot —
+            // with five accounts you get four of them plus Refresh, not five and no
+            // Refresh, because Refresh is the only entry the accounts can't substitute for.
+            val cap = ShortcutManagerCompat.getMaxShortcutCountPerActivity(context)
+                .coerceAtLeast(2)
+            val creds = CredentialStore(context)
+            val profiles = cache.registry().all()
+                .filter { creds.load(it) != null }
+                .take(cap - 1)
+            val shortcuts = profiles.map { profile ->
                 ShortcutInfoCompat.Builder(context, "profile-${profile.key}")
                     .setShortLabel(cache.profileLabel(profile))
                     .setLongLabel("${cache.profileLabel(profile)} usage")

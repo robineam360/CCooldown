@@ -57,6 +57,7 @@ class UsageRepository(private val context: Context) {
 
     private val credStore = CredentialStore(context)
     private val cache = UsageCache(context)
+    private val registry = ProfileRegistry(context)
     private val historyStore = HistoryStore(context)
     private val sessionLogStore = SessionLog(context)
 
@@ -99,7 +100,21 @@ class UsageRepository(private val context: Context) {
 
     fun lastRenewedAt(profile: Profile): Long = cache.lastRenewedAt(profile)
 
-    fun configuredProfiles(): List<Profile> = Profile.entries.filter { hasCredentials(it) }
+    fun registry(): ProfileRegistry = registry
+
+    /**
+     * Every registered account. The single entry point for UI code — composables reach it
+     * through the repo rather than constructing a [ProfileRegistry] per call site, so the
+     * label memo is shared.
+     */
+    fun profiles(): List<Profile> = registry.all()
+
+    /**
+     * Accounts with a token. CCRM-6 (Multi-Account) made this the source for the tab strip,
+     * the History screen, the widget picker and the launcher shortcuts: an account you
+     * haven't signed into has nothing to show, and Settings is where signing in happens.
+     */
+    fun configuredProfiles(): List<Profile> = registry.all().filter { hasCredentials(it) }
 
     /**
      * Forgets the token for this slot. Deliberately leaves the local trend data
@@ -118,6 +133,68 @@ class UsageRepository(private val context: Context) {
         cache.setFirstRefreshFailAt(profile, 0L)
         cache.setStaleNotified(profile, false)
         OAuthSignIn.clearPending(context)
+    }
+
+    /**
+     * Adds an account (CCRM-6 (Multi-Account)). Mints a fresh key and slot, then republishes
+     * the shortcuts so the new entry appears the moment it has a token.
+     */
+    fun addProfile(label: String? = null): Profile = registry.add(label)
+
+    fun renameProfile(profile: Profile, label: String) = registry.rename(profile.key, label)
+
+    /** False for the last remaining account — the registry always keeps one. */
+    fun canRemoveProfile(): Boolean = registry.canRemove()
+
+    /**
+     * Removes an account and everything belonging to it (CCRM-6 (Multi-Account) phase 4).
+     * The **only** genuinely destructive path in the app, and the first caller
+     * [HistoryStore.clear] and [SessionLog.clear] have ever had — both were noted as
+     * callerless in CCRM-14 (Clear History).
+     *
+     * The order is load-bearing, not stylistic:
+     *
+     * 1. **Alarms first**, while the slot is still resolvable — an armed ping outlives the
+     *    account otherwise, and fires against a profile that no longer exists.
+     * 2. **Notifications next**, for the same reason: `slot * 100 + 1…31` is only computable
+     *    while we hold the profile, and an orphan sits in the shade until reboot.
+     * 3. Credentials, then the cache, then the two JSONL files — data, largest blast radius
+     *    last.
+     * 4. **Only then** drop it from the registry: everything above needs to resolve the key.
+     * 5. Repoint whatever pointed at it, republish the shortcuts, and redraw every surface
+     *    from the settled state.
+     *
+     * Because slots are never reused there is no window in which a not-yet-redrawn widget or
+     * tile can read a *new* account's numbers. The worst case is a surface showing nothing.
+     *
+     * @return false if this is the last account, in which case nothing is touched.
+     */
+    suspend fun removeProfile(profile: Profile): Boolean {
+        if (!registry.canRemove()) return false
+
+        com.robin.claudeusage.ping.PingScheduler.cancel(context, profile)
+        Alerts.cancelAllFor(context, profile)
+
+        credStore.clear(profile)
+        if (OAuthSignIn.pending(context)?.profile == profile) OAuthSignIn.clearPending(context)
+        cache.clearProfile(profile)
+        historyStore.clear(profile)
+        sessionLogStore.clear(profile)
+
+        if (!registry.remove(profile.key)) return false
+
+        val replacement = registry.first()
+        if (cache.pinnedProfile() == profile) cache.setPinnedProfile(replacement)
+        WidgetPrefs(context).repointFrom(profile.key, replacement)
+
+        AppLog.log(
+            context, AppLog.Level.INFO, "account", profile,
+            "removed — slot ${profile.slot} retired, data deleted",
+        )
+        com.robin.claudeusage.Shortcuts.publish(context)
+        updateWidgets()
+        com.robin.claudeusage.notify.PinnedNotification.update(context, cache)
+        return true
     }
 
     fun hasPendingSignIn(profile: Profile): Boolean =

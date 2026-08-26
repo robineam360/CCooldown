@@ -51,30 +51,42 @@ object RingGeometry {
      * existing call site keeps today's behaviour.
      */
     /**
-     * The weekly flag dot's rungs (CCRM-50 (Weekly Flag)) — the app's pace verdicts,
-     * drawn. [ABOVE] and [ON_PACE] are the *identical* ±[PACE_DEAD_ZONE] comparisons
-     * behind the "above / on / below even pace" sentence, so the dot flips at the
-     * exact poll the sentence does. [SPENT] keys on the level alone, truncated like
-     * every ladder comparison.
+     * The weekly flag dot's rungs — an escalation, drawn (CCRM-51 (Rails Gauge)
+     * revised CCRM-50 (Weekly Flag)):
+     *
+     * [EMPTY] nothing used yet · [WITHIN] used, but not ahead of pace · [ABOVE] ahead
+     * of pace · [SPENT] the week is gone.
+     *
+     * [ABOVE] and [WITHIN] split on the *identical* ±[PACE_DEAD_ZONE] comparison
+     * behind the "above / on / below even pace" sentence, so the dot flips at the exact
+     * poll the sentence does. [EMPTY] and [SPENT] key on the level alone — truncated,
+     * like every ladder comparison — and so need no reset clock at all.
+     *
+     * **[WITHIN] is deliberately wider than CCRM-50's `ON_PACE`.** It covers *below*
+     * pace as well as on it: the quiet rung says "nothing to flag", which is true of
+     * both. CCRM-50 drew nothing below pace ("good news is silence"); that made "no
+     * dot" mean two different things, and the [EMPTY] rung needs the distinction.
      */
-    enum class WeeklyFlag { ON_PACE, ABOVE, SPENT }
+    enum class WeeklyFlag { EMPTY, WITHIN, ABOVE, SPENT }
 
     /**
-     * Null = no dot: the weekly is below pace (good news is silence), has no reading
-     * (an alert never claims silence proves health — the panel says "no data" in
-     * words), or has no reset clock to derive a pace from (never a guessed verdict —
-     * though [SPENT] still fires then, because it needs no clock).
+     * Null = **no dot, and it now means exactly one thing: no weekly reading.** An
+     * alert never claims silence proves health, so a missing window says "no data" in
+     * words rather than drawing a rung.
+     *
+     * Note what is *not* null any more: a week with usage but **no reset clock** used
+     * to draw nothing, which under this ladder would falsely read as "no reading". It
+     * rests on [WITHIN] instead — there is usage, so it is not [EMPTY]; pace cannot be
+     * judged, so it may not be [ABOVE]. Never a guessed verdict, but never a lie
+     * either.
      */
     fun weeklyFlag(percent: Double?, elapsedPercent: Double?): WeeklyFlag? {
         percent ?: return null
         if (percent.toInt() >= 100) return WeeklyFlag.SPENT
-        elapsedPercent ?: return null
-        val delta = percent - elapsedPercent
-        return when {
-            delta > PACE_DEAD_ZONE -> WeeklyFlag.ABOVE
-            delta >= -PACE_DEAD_ZONE -> WeeklyFlag.ON_PACE
-            else -> null
-        }
+        if (percent <= 0.0) return WeeklyFlag.EMPTY
+        elapsedPercent ?: return WeeklyFlag.WITHIN
+        return if (percent - elapsedPercent > PACE_DEAD_ZONE) WeeklyFlag.ABOVE
+        else WeeklyFlag.WITHIN
     }
 
     fun redSegment(

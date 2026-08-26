@@ -1,0 +1,806 @@
+<title>Multi-Account — CCRM-6</title>
+<style>
+  :root {
+    --bg: #FAF8F6; --ink: #26211E; --muted: #6E6660; --accent: #C15F3C;
+    --hair: #E7E1DC; --card: #FFFFFF; --bad: #B3402A; --good: #2F6D44; --warn: #9A6B1E;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171513; --ink: #EDE8E4; --muted: #9B928B; --accent: #E59980;
+      --hair: #2C2825; --card: #201D1B; --bad: #E08268; --good: #7FC08F; --warn: #D8AC63;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171513; --ink: #EDE8E4; --muted: #9B928B; --accent: #E59980;
+    --hair: #2C2825; --card: #201D1B; --bad: #E08268; --good: #7FC08F; --warn: #D8AC63;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    margin: 0; padding: 48px 24px 96px; line-height: 1.5; }
+  .page { max-width: 1240px; margin: 0 auto; }
+  .eyebrow { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11px;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin: 0 0 10px; }
+  h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 8px; }
+  .lede { color: var(--muted); max-width: 72ch; margin: 0 0 12px; font-size: 14px; }
+  h2 { font-size: 19px; font-weight: 650; margin: 56px 0 4px; }
+  h3 { font-size: 14px; font-weight: 650; margin: 26px 0 6px; }
+  .sub { color: var(--muted); font-size: 13px; max-width: 82ch; margin: 0 0 16px; }
+  code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px;
+    background: color-mix(in srgb, var(--hair) 55%, transparent); padding: 1px 5px; border-radius: 4px; }
+  .row { display: flex; flex-wrap: wrap; gap: 22px; align-items: flex-start; }
+  .cap { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 10px;
+    letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+  .cap.bad { color: var(--bad); } .cap.good { color: var(--good); } .cap.warn { color: var(--warn); }
+  .cap.new { color: var(--accent); }
+  .hr { height: 1px; background: var(--hair); margin: 46px 0 0; border: 0; }
+  table.rules { border-collapse: collapse; font-size: 13px; margin: 12px 0; }
+  table.rules th, table.rules td { border: 1px solid var(--hair); padding: 7px 12px; text-align: left; vertical-align: top; }
+  table.rules th { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .q { border-left: 3px solid var(--accent); padding: 2px 0 2px 14px; margin: 18px 0;
+       font-size: 13.5px; max-width: 82ch; }
+  .q b { color: var(--accent); }
+
+  /* ---- Android app-surface mock (Material 3-ish, in the app's own palette) ---- */
+  .phone { width: 400px; background: var(--bg); border: 1px solid var(--hair);
+           border-radius: 22px; padding: 14px; }
+  .phone.narrow { width: 330px; }
+  .seclabel { font-size: 11px; letter-spacing: .09em; text-transform: uppercase;
+              color: var(--accent); margin: 4px 0 8px; font-weight: 650; }
+  .acard { background: var(--card); border: 1px solid var(--hair); border-radius: 16px;
+           padding: 14px 15px; margin: 0 0 10px; }
+  .acard .hdr { display: flex; align-items: center; gap: 8px; }
+  .acard .nm { font-size: 15px; font-weight: 650; }
+  .chip { font-size: 10.5px; border-radius: 999px; padding: 2px 8px; border: 1px solid var(--hair);
+          color: var(--muted); white-space: nowrap; }
+  .chip.ok { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, transparent); }
+  .chip.err { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, transparent); }
+  .chip.plan { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+  .tail { font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: var(--muted); margin-left: auto; }
+  .kebab { font-size: 16px; color: var(--muted); cursor: default; padding-left: 8px; }
+  .acard .ln { font-size: 11.5px; color: var(--muted); margin-top: 5px; }
+  .acard .ln.err { color: var(--bad); }
+  .btnrow { display: flex; gap: 8px; align-items: center; margin-top: 11px; flex-wrap: wrap; }
+  .btn { font-size: 12.5px; border-radius: 999px; padding: 6px 14px; border: 1px solid var(--hair);
+         color: var(--ink); background: transparent; }
+  .btn.fill { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.txt { border-color: transparent; padding: 6px 8px; }
+  .btn.danger { color: var(--bad); border-color: transparent; }
+  .divider { height: 1px; background: var(--hair); margin: 11px -15px; }
+  .addrow { background: transparent; border: 1px dashed color-mix(in srgb, var(--accent) 55%, var(--hair));
+            border-radius: 16px; padding: 13px 15px; font-size: 13.5px; color: var(--accent);
+            font-weight: 600; margin: 0 0 10px; }
+  .menu { background: var(--card); border: 1px solid var(--hair); border-radius: 12px;
+          box-shadow: 0 6px 20px rgba(0,0,0,.14); width: 190px; padding: 5px 0; font-size: 13.5px; }
+  .menu div { padding: 9px 14px; }
+  .menu div.danger { color: var(--bad); }
+  .tf { border: 1px solid var(--hair); border-radius: 10px; padding: 9px 12px; font-size: 13.5px;
+        position: relative; margin-top: 10px; }
+  .tf .lbl { position: absolute; top: -7px; left: 10px; background: var(--card); padding: 0 5px;
+             font-size: 10px; color: var(--accent); }
+  .tf .cnt { float: right; font-size: 10.5px; color: var(--muted); }
+
+  /* dialog */
+  .dlg { width: 340px; background: var(--card); border: 1px solid var(--hair); border-radius: 26px;
+         padding: 22px 22px 14px; }
+  .dlg h4 { font-size: 17px; font-weight: 650; margin: 0 0 10px; }
+  .dlg p { font-size: 13px; color: var(--muted); margin: 0 0 10px; }
+  .dlg ul { font-size: 13px; color: var(--ink); margin: 0 0 10px; padding-left: 18px; }
+  .dlg li { margin-bottom: 3px; }
+  .dlg .foot { display: flex; justify-content: flex-end; gap: 6px; margin-top: 6px; }
+
+  /* tabs */
+  .tabs { display: flex; border-bottom: 1px solid var(--hair); }
+  .tabs > div { flex: 1; text-align: center; padding: 13px 4px 11px; font-size: 13.5px;
+                color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tabs > div.on { color: var(--accent); font-weight: 650; box-shadow: inset 0 -2.5px 0 var(--accent); }
+  .tabs.scroll { overflow: hidden; }
+  .tabs.scroll > div { flex: 0 0 auto; padding-left: 16px; padding-right: 16px; }
+  .tabs.scroll .fade { flex: 0 0 26px; background: linear-gradient(90deg, transparent, var(--bg)); }
+  .pagebody { padding: 22px 6px; font-size: 12.5px; color: var(--muted); text-align: center; }
+  .bignum { font-size: 44px; font-weight: 700; color: var(--ink); letter-spacing: -.02em; }
+
+  /* chips row */
+  .chiprow { display: flex; flex-wrap: wrap; gap: 8px; }
+  .fchip { font-size: 12.5px; border-radius: 999px; padding: 7px 14px; border: 1px solid var(--hair);
+           color: var(--ink); white-space: nowrap; }
+  .fchip.sel { background: color-mix(in srgb, var(--accent) 20%, transparent);
+               border-color: color-mix(in srgb, var(--accent) 55%, transparent); font-weight: 600; }
+  .nowrap { display: flex; gap: 8px; overflow: hidden; }
+  .nowrap .fchip { flex: 0 0 auto; }
+  .clipmark { position: relative; }
+  .clipmark::after { content: "clipped →"; position: absolute; right: -2px; top: 8px;
+    font-family: ui-monospace, Menlo, monospace; font-size: 9.5px; color: var(--bad);
+    background: var(--bg); padding-left: 4px; }
+
+  /* One UI-ish notification card — "Huge number" pinned style (the one in use) */
+  .notif { width: 344px; border-radius: 22px; background: #232529; color: #E9E9EC;
+    padding: 14px 16px; border: 1px solid #33363C; font-size: 13.5px; }
+  .notif .hdr { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: #A6A9B0; margin-bottom: 9px; }
+  .notif .dotico { width: 14px; height: 14px; border-radius: 50%; border: 2.5px solid #E59980; display: inline-block; }
+  .bigrow { display: flex; align-items: center; gap: 14px; }
+  .bigrow .left { flex: 1; min-width: 0; }
+  .bigrow .title { font-size: 14px; font-weight: 600; color: #E9E9EC; white-space: nowrap;
+                   overflow: hidden; text-overflow: ellipsis; }
+  .bigrow .sub { font-size: 12px; color: #A6A9B0; margin: 4px 0 0; white-space: nowrap;
+                 overflow: hidden; text-overflow: ellipsis; }
+  .bigrow .pct { font-size: 44px; font-weight: 700; line-height: .95; color: #E9E9EC; }
+  .bigrow .pct.dim { color: #8C8F96; }
+  .bar { height: 13px; border-radius: 6px; background: #3A3D44; margin: 4px 0 0; position: relative; overflow: hidden; }
+  .bar > i { position: absolute; inset: 0 auto 0 0; background: #E59980; border-radius: 6px; }
+  .bar > s { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #9B9EA6; }
+  .panel { margin-top: 10px; }
+  .strip { border-radius: 10px; padding: 7px 10px; margin: 0 0 7px; font-size: 13.5px; }
+  .strip .s2 { font-size: 12px; opacity: .75; display: block; }
+  .strip.cond { background: color-mix(in srgb, #D8AC63 13%, transparent); color: #E6C88C; }
+  .strip.evt  { background: color-mix(in srgb, #E59980 13%, transparent); color: #EFB49C; }
+  .strip.bad  { background: color-mix(in srgb, #E08268 13%, transparent); color: #ECA890; }
+  .strip.more { background: transparent; color: #A6A9B0; font-size: 12px; padding: 2px 10px 0; }
+  .barrow { display: flex; align-items: center; gap: 9px; font-size: 12px; color: #A6A9B0; margin: 7px 0 0; }
+  .barrow .nm { width: 46px; flex: 0 0 46px; }
+  .barrow .bw { flex: 1; }
+  .note { font-size: 12.5px; color: var(--muted); max-width: 344px; margin-top: 8px; }
+
+  /* QS shade mock */
+  .shade { width: 344px; background: #1A1C20; border-radius: 20px; padding: 14px; }
+  .tile { display: inline-flex; align-items: center; gap: 10px; width: 152px; height: 62px;
+          border-radius: 22px; background: #2B2E34; color: #E9E9EC; padding: 0 12px;
+          font-size: 12px; margin: 5px 4px; vertical-align: top; }
+  .tile.active { background: #E59980; color: #241C18; }
+  .tile.off { opacity: .38; }
+  .tile .ico { width: 22px; height: 22px; border-radius: 50%; border: 3px solid currentColor; flex: 0 0 22px; }
+  .tile .t2 { font-size: 10.5px; opacity: .8; display: block; }
+  .picker { width: 300px; background: #24262B; border-radius: 16px; padding: 8px 0; color: #E9E9EC; font-size: 13px; }
+  .picker div { padding: 10px 16px; display: flex; gap: 10px; align-items: center; }
+  .picker .sq { width: 18px; height: 18px; border-radius: 5px; background: #3E4148; flex: 0 0 18px; }
+
+  /* launcher shortcut sheet */
+  .sheet { width: 250px; background: var(--card); border: 1px solid var(--hair); border-radius: 16px;
+           padding: 6px 0; font-size: 13px; }
+  .sheet div { padding: 9px 14px; display: flex; gap: 10px; align-items: center; }
+  .sheet .sq { width: 20px; height: 20px; border-radius: 6px;
+               background: color-mix(in srgb, var(--accent) 35%, transparent); flex: 0 0 20px; }
+  .sheet .cut { color: var(--bad); font-family: ui-monospace, Menlo, monospace; font-size: 10.5px; }
+</style>
+
+<div class="page">
+  <p class="eyebrow">CCRM-6 · wireframe for approval</p>
+  <h1>Multi-account — a dynamic profile registry</h1>
+  <p class="lede">
+    <code>Profile</code> stops being a two-constant enum and becomes a registry-backed value
+    type: a stable string <b>key</b>, a never-reused <b>slot</b> int, and a user-editable
+    <b>label</b>. Accounts become cards you add and remove. Two things are already settled and
+    are not on the table here: the registry (not a third enum constant), and unconfigured
+    profiles losing their tab. What follows is everything that <i>looks</i> different, in every
+    state — including the ones nobody has looked at yet.
+  </p>
+
+  <h2>0 · The model, in one table</h2>
+  <p class="sub">Not a visual, but every state below depends on it. Slots 0 and 1 stay pinned to
+    <code>personal</code>/<code>work</code>: existing installs have placed widgets, armed alarms
+    and posted notification IDs keyed off those ints. Slots come from a persisted monotonic
+    counter and are <b>never reused</b>, so a stale widget or tile can never inherit a new
+    account's data.</p>
+  <table class="rules">
+    <tr><th>Account</th><th>key</th><th>slot</th><th>label (editable)</th><th>history file</th><th>notif IDs</th><th>QS tile</th></tr>
+    <tr><td>1st (seeded)</td><td><code>personal</code></td><td>0</td><td>Personal</td><td><code>usage-history-personal.jsonl</code></td><td>1–31</td><td><code>PersonalTileService</code></td></tr>
+    <tr><td>2nd (seeded)</td><td><code>work</code></td><td>1</td><td>Work</td><td><code>usage-history-work.jsonl</code></td><td>101–131</td><td><code>WorkTileService</code></td></tr>
+    <tr><td>3rd (added)</td><td><code>p2</code></td><td>2</td><td>Teams</td><td><code>usage-history-p2.jsonl</code></td><td>201–231</td><td><code>Slot2TileService</code></td></tr>
+    <tr><td>4th (added)</td><td><code>p3</code></td><td>3</td><td>Side project</td><td><code>usage-history-p3.jsonl</code></td><td>301–331</td><td><code>Slot3TileService</code></td></tr>
+    <tr><td>5th (added)</td><td><code>p4</code></td><td>4</td><td>—</td><td><code>usage-history-p4.jsonl</code></td><td>401–431</td><td style="color:var(--bad)">none — tiles cap at 4</td></tr>
+  </table>
+  <p class="sub">Slots 0/1 reproduce today's notification IDs exactly (<code>kind + slot*100</code>,
+    kinds top out at 31), so nothing churns on upgrade. Removing the 3rd account and adding
+    another gives the new one <code>p4</code>/slot 4 — <code>p2</code>/slot 2 is retired forever.</p>
+
+  <hr class="hr">
+  <h2>1 · Accounts section — two accounts (today's look, preserved)</h2>
+  <p class="sub">This is the state every existing install upgrades into, so it must be
+    recognisable. The only visible additions are the <b>⋮</b> on each card and the
+    <b>+ Add account</b> row. Nothing moves.</p>
+  <div class="row">
+    <div>
+      <p class="cap good">2 accounts · both signed in</p>
+      <div class="phone">
+        <div class="seclabel">Accounts</div>
+        <div class="acard">
+          <div class="hdr">
+            <span class="nm">Personal</span>
+            <span class="chip ok">Working</span>
+            <span class="chip plan">Max 20×</span>
+            <span class="tail">…4f2a</span>
+            <span class="kebab">⋮</span>
+          </div>
+          <div class="ln">Last checked: Today 14:02 · 3m ago</div>
+          <div class="ln">Auto-renews in 7h 12m</div>
+          <div class="ln">Sign-in expires around 12 Sep 2026 · ~22d left</div>
+          <div class="ln">Added: 21 Aug 2026</div>
+          <div class="btnrow">
+            <span class="btn">Re-sign in</span>
+            <span class="btn danger">Clear</span>
+          </div>
+          <div class="divider"></div>
+          <div class="btnrow">
+            <span class="btn txt">Anthropic status</span>
+            <span class="btn txt">Usage dashboard</span>
+          </div>
+        </div>
+        <div class="acard">
+          <div class="hdr">
+            <span class="nm">Work</span>
+            <span class="chip ok">Working</span>
+            <span class="chip plan">Team</span>
+            <span class="tail">…91c0</span>
+            <span class="kebab">⋮</span>
+          </div>
+          <div class="ln">Last checked: Today 14:02 · 3m ago</div>
+          <div class="ln">Added: 04 Aug 2026</div>
+          <div class="btnrow">
+            <span class="btn">Re-sign in</span>
+            <span class="btn danger">Clear</span>
+          </div>
+        </div>
+        <div class="addrow">+ Add account</div>
+      </div>
+    </div>
+    <div>
+      <p class="cap new">what the ⋮ holds</p>
+      <div class="menu">
+        <div>Rename…</div>
+        <div class="danger">Remove account</div>
+      </div>
+      <p class="note">
+        <b>Rename</b> and <b>Remove</b> both live behind the ⋮, deliberately away from
+        <b>Clear</b>. Clear signs out and <i>keeps</i> the history (CCBG-1 (History Retention)
+        made that call); Remove destroys it. Putting them side by side in the button row is a
+        fat-finger disaster waiting to happen.
+      </p>
+      <p class="note">
+        <b>Remove</b> is hidden on the last remaining card — the registry always holds at least
+        one profile, which is what makes <code>registry.first()</code> total and keeps the
+        zero-account fallback (state 5a) reachable without a synthetic ghost profile.
+      </p>
+    </div>
+  </div>
+
+  <h3>1a · Three accounts, third mid-sign-in</h3>
+  <div class="row">
+    <div>
+      <p class="cap">3 accounts · third just added, no token yet</p>
+      <div class="phone">
+        <div class="seclabel">Accounts</div>
+        <div class="acard">
+          <div class="hdr"><span class="nm">Personal</span><span class="chip ok">Working</span>
+            <span class="chip plan">Max 20×</span><span class="tail">…4f2a</span><span class="kebab">⋮</span></div>
+          <div class="ln">Last checked: Today 14:02 · 3m ago</div>
+        </div>
+        <div class="acard">
+          <div class="hdr"><span class="nm">Work</span><span class="chip err">Sign-in needed</span>
+            <span class="tail">…91c0</span><span class="kebab">⋮</span></div>
+          <div class="ln err">Renewal has stopped working — re-sign in below.</div>
+          <div class="btnrow"><span class="btn">Re-sign in</span><span class="btn danger">Clear</span></div>
+        </div>
+        <div class="acard">
+          <div class="hdr"><span class="nm">Account 3</span><span class="kebab">⋮</span></div>
+          <div class="ln">Not signed in</div>
+          <div class="btnrow"><span class="btn fill">Sign in on this phone</span></div>
+          <div class="ln">Opens Claude's sign-in in your browser — no computer needed.</div>
+        </div>
+        <div class="addrow">+ Add account</div>
+      </div>
+    </div>
+    <div>
+      <p class="cap new">+ Add account → the card appears immediately</p>
+      <p class="note">
+        Tapping <b>+ Add account</b> mints <code>p2</code>/slot 2 with the default label
+        <b>“Account 3”</b> and appends the card in its familiar not-signed-in state — no
+        name-first dialog. The user's next tap is <b>Sign in on this phone</b>, which is what
+        they came for; renaming is a later, optional thought via ⋮ → Rename.
+      </p>
+      <p class="note">
+        Default labels are <b>“Account N”</b> where N is the position in the list at creation
+        time, not the slot — so the third account you add is “Account 3” even if you have
+        removed one before. It is a starting label, not an identity; the key and slot are the
+        identity.
+      </p>
+      <p class="cap new" style="margin-top:18px">⋮ → Rename…</p>
+      <div class="dlg" style="width:320px">
+        <h4>Rename account</h4>
+        <div class="tf"><span class="lbl">Name</span>Teams<span class="cnt">5/16</span></div>
+        <p style="margin-top:12px">Used everywhere — tabs, widgets, notifications and shortcuts.
+          Clear the field to go back to “Account 3”.</p>
+        <div class="foot"><span class="btn txt">Cancel</span><span class="btn fill">Save</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="q">
+    <b>Decision 1 — rename lives where?</b> Recommended: <b>⋮ → Rename… dialog</b> (drawn above).
+    The alternative is an inline <code>OutlinedTextField</code> inside every account card — a
+    direct port of today's “Profile names” section — which is one tap shorter but adds a
+    permanent 56 dp text field to every card, on a screen that already scrolls a long way at
+    three accounts.
+  </div>
+
+  <h2>2 · The “Profile names” section — recommend deleting it</h2>
+  <p class="sub">Today there is a separate <b>Profile names</b> section below Accounts, with one
+    text field per profile. Once names are registry-owned and each card can rename itself, that
+    section is a second editor for the same field, and it has no way to grow a row for an account
+    that does not exist yet.</p>
+  <div class="row">
+    <div>
+      <p class="cap bad">today — duplicated once rename is on the card</p>
+      <div class="phone">
+        <div class="seclabel">Profile names</div>
+        <div class="acard">
+          <div class="tf" style="margin-top:2px"><span class="lbl">Personal profile</span>Personal</div>
+          <div class="tf"><span class="lbl">Work profile</span>Work</div>
+          <div class="ln" style="margin-top:10px">Used everywhere — tabs, widgets, and
+            notifications. Clear a field to go back to the default.</div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <p class="cap good">proposed — gone; the sentence moves into the rename dialog</p>
+      <p class="note">
+        Deleting it removes ~30 lines and one whole scroll-length of Settings, and it removes the
+        “which of these two editors is authoritative” question entirely. The explanatory sentence
+        (“Used everywhere — tabs, widgets, notifications”) is not lost; it moves into the rename
+        dialog, where it is read at the moment it matters.
+      </p>
+      <p class="note">
+        Cost: renaming becomes two taps instead of zero-taps-visible. That is the trade. If you
+        would rather keep a single place to see all names at once, the alternative is keeping the
+        section and having it iterate <code>registry.all()</code> — it grows a field per account
+        and stays in sync, it is just redundant.
+      </p>
+    </div>
+  </div>
+  <div class="q">
+    <b>Decision 2 — does “Profile names” survive?</b> Recommended: <b>delete it</b>, rename lives
+    only on the card. Alternative: keep it, iterating the registry.
+  </div>
+
+  <h2>3 · Remove account — the only destructive path</h2>
+  <p class="sub">Named in full, because it is the first caller
+    <code>HistoryStore.clear()</code> and <code>SessionLog.clear()</code> have ever had, and
+    because a year of session history is genuinely unrecoverable.</p>
+  <div class="row">
+    <div>
+      <p class="cap bad">⋮ → Remove account</p>
+      <div class="dlg">
+        <h4>Remove “Teams”?</h4>
+        <p>This deletes, permanently and only for this account:</p>
+        <ul>
+          <li>the saved sign-in</li>
+          <li>its cached usage and settings — alerts, credits, reset pings</li>
+          <li><b>8 days</b> of trend history</li>
+          <li><b>a year</b> of session and weekly history</li>
+        </ul>
+        <p>Its Quick Settings tile goes blank, its launcher shortcut disappears, and any widget
+          showing it switches to <b>Personal</b>. The pinned notification switches to
+          <b>Personal</b> too.</p>
+        <p style="color:var(--ink)">To keep the history and just sign out, use
+          <b>Clear</b> instead.</p>
+        <div class="foot">
+          <span class="btn txt">Cancel</span>
+          <span class="btn" style="color:var(--bad);border-color:var(--bad)">Remove account</span>
+        </div>
+      </div>
+    </div>
+    <div>
+      <p class="cap">what happens, in order</p>
+      <table class="rules" style="font-size:12.5px">
+        <tr><th>#</th><th>Step</th><th>Why this order</th></tr>
+        <tr><td>1</td><td>cancel ping + verify alarms</td><td>while the slot is still resolvable</td></tr>
+        <tr><td>2</td><td>cancel notification IDs <code>slot*100 + 1…31</code></td><td>before the label is gone, or an orphan sits in the shade forever</td></tr>
+        <tr><td>3</td><td>clear credentials</td><td></td></tr>
+        <tr><td>4</td><td>clear the cache keys</td><td></td></tr>
+        <tr><td>5</td><td>delete <code>usage-history-pN.jsonl</code> + <code>usage-sessions-pN.jsonl</code></td><td></td></tr>
+        <tr><td>6</td><td>drop it from the registry</td><td>only now, once nothing else needs to resolve it</td></tr>
+        <tr><td>7</td><td>repoint <code>pinnedProfile</code> and any <code>WidgetPrefs</code> entry</td><td></td></tr>
+        <tr><td>8</td><td>republish shortcuts</td><td></td></tr>
+        <tr><td>9</td><td>refresh widgets + the pinned panel</td><td>last, so every surface redraws from the settled state</td></tr>
+      </table>
+      <p class="note">
+        Because slots are never reused, there is no window in which a stale widget or a
+        not-yet-removed tile can read a <i>new</i> account's data. The worst case is a surface
+        showing nothing, which is correct.
+      </p>
+    </div>
+  </div>
+  <div class="q">
+    <b>Decision 3 — can Personal and Work be removed?</b> Recommended: <b>yes</b>, any account
+    except the last one. Their slots and keys are retired like any other, and the seed migration
+    is gated on a one-time flag so a removed Personal does not resurrect on next launch. The
+    alternative is making slots 0/1 permanent (Clear only), which is safer but means the person
+    who never used “Work” is stuck with a dead card forever.
+  </div>
+
+  <h2>4 · Tab strip — every count, plus the narrow width</h2>
+  <p class="sub">Settled: the strip shows <b>only accounts with credentials</b>. Signing in
+    happens in Settings, so a tab is never the route to adding an account.</p>
+  <div class="row">
+    <div>
+      <p class="cap">5a · 0 configured — fallback, no strip</p>
+      <div class="phone">
+        <div class="pagebody" style="padding:34px 6px">
+          <div style="font-size:13.5px;color:var(--ink);font-weight:600">Personal</div>
+          <div style="margin-top:8px">Not signed in</div>
+          <div style="margin-top:14px"><span class="btn fill">Open settings</span></div>
+        </div>
+      </div>
+      <p class="note">Falls back to <code>registry.first()</code>. No tab row — there is nothing
+        to switch between.</p>
+    </div>
+    <div>
+      <p class="cap good">5b · 1 configured — no strip at all</p>
+      <div class="phone">
+        <div class="pagebody" style="padding:10px 6px 22px">
+          <div class="bignum">48%</div>
+          <div>5-hour window · resets 21:41</div>
+        </div>
+      </div>
+      <p class="note">The strip disappears entirely and the content gains ~48 dp. This is a
+        <b>visible change for single-account users</b> — today they see a lone “Personal” tab
+        with nothing to switch to.</p>
+    </div>
+    <div>
+      <p class="cap">5c · 2 — fixed TabRow, today's look</p>
+      <div class="phone">
+        <div class="tabs"><div class="on">Personal</div><div>Work</div></div>
+        <div class="pagebody">…profile screen…</div>
+      </div>
+    </div>
+  </div>
+  <div class="row" style="margin-top:22px">
+    <div>
+      <p class="cap">5d · 3 — fixed TabRow, 400 dp</p>
+      <div class="phone">
+        <div class="tabs"><div class="on">Personal</div><div>Work</div><div>Teams</div></div>
+        <div class="pagebody">…profile screen…</div>
+      </div>
+      <p class="note">133 dp per tab. A 16-character label at 14 sp needs ~110 dp, so it fits —
+        with Material's own ellipsis as the backstop for wide glyphs.</p>
+    </div>
+    <div>
+      <p class="cap warn">5e · 4 — scrollable</p>
+      <div class="phone">
+        <div class="tabs scroll">
+          <div class="on">Personal</div><div>Work</div><div>Teams</div><div class="fade"></div>
+        </div>
+        <div class="pagebody">…profile screen…</div>
+      </div>
+      <p class="note">At 4+ the row becomes a <code>ScrollableTabRow</code>: tabs size to their
+        label and the strip scrolls, so a long label is never squeezed to three characters.</p>
+    </div>
+    <div>
+      <p class="cap bad">5f · 4 on the cover screen (330 dp) — fixed would fail</p>
+      <div class="phone narrow">
+        <div class="tabs clipmark">
+          <div class="on">Person…</div><div>Work</div><div>Teams</div><div>Side …</div>
+        </div>
+        <div class="pagebody">what a fixed TabRow does here</div>
+      </div>
+      <p class="note">82 dp per tab: every label truncates and the selected one is unreadable.
+        This is why the switch at 4 is not cosmetic.</p>
+    </div>
+  </div>
+  <div class="q">
+    <b>Decision 4 — where does the strip go scrollable?</b> Recommended: <b>fixed at 2–3,
+    scrollable at 4+</b>, at every width. Alternatives: scrollable at 3+ (consistent, but leaves
+    dead space on the right with three short labels), or width-dependent (fixed at 3 only when
+    ≥ 400 dp) — correct but it makes the strip change shape when you unfold, which is worse than
+    either fixed rule.
+  </div>
+
+  <h3>4a · History screen tabs, and the shrink case</h3>
+  <div class="row">
+    <div>
+      <p class="cap">history · 3 configured, same rule</p>
+      <div class="phone">
+        <div class="tabs"><div>Personal</div><div class="on">Work</div><div>Teams</div></div>
+        <div class="pagebody" style="padding:14px 6px">
+          <div class="chiprow" style="justify-content:center"><span class="fchip sel">5-hour</span><span class="fchip">7-day</span></div>
+          <div style="margin-top:14px">…history bars…</div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <p class="cap bad">the shrink case — sign out of Work while its tab is selected</p>
+      <div class="phone">
+        <div class="tabs"><div class="on">Personal</div><div>Teams</div></div>
+        <div class="pagebody" style="padding:14px 6px">…history bars for Personal…</div>
+      </div>
+      <p class="note">
+        The selected index is remembered across recomposition, so a shrinking list must
+        <b>clamp</b>, not index past the end. Selection falls back to the first tab rather than
+        trying to follow the account that vanished — the same rule on the main strip and in
+        History.
+      </p>
+    </div>
+  </div>
+
+  <h2>5 · Pinned “Show profile” chips</h2>
+  <p class="sub">Today a non-wrapping <code>Row</code>. Two chips fit at any width; three or four
+    do not.</p>
+  <div class="row">
+    <div>
+      <p class="cap bad">today's Row at 4 chips — clipped, unreachable</p>
+      <div class="phone">
+        <div class="seclabel">Pinned notification</div>
+        <div class="acard">
+          <div style="font-size:13.5px;margin-bottom:9px">Show profile</div>
+          <div class="nowrap clipmark">
+            <span class="fchip sel">Personal</span><span class="fchip">Work</span>
+            <span class="fchip">Teams</span><span class="fchip">Side project</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <p class="cap good">proposed FlowRow — wraps</p>
+      <div class="phone">
+        <div class="seclabel">Pinned notification</div>
+        <div class="acard">
+          <div style="font-size:13.5px;margin-bottom:9px">Show profile</div>
+          <div class="chiprow">
+            <span class="fchip sel">Personal</span><span class="fchip">Work</span>
+            <span class="fchip">Teams</span><span class="fchip">Side project</span>
+          </div>
+        </div>
+      </div>
+      <p class="note">
+        Same one-line fix (<code>Row</code> → <code>FlowRow</code>) for the three other
+        non-wrapping chip rows: the widget config picker, the reset-ping <b>Account</b> row, and
+        the debug endpoint probe.
+      </p>
+    </div>
+  </div>
+  <div class="q">
+    <b>Decision 5 — which pickers list unconfigured accounts?</b> Recommended split:
+    <b>Settings pickers list every account</b> (Show profile, reset pings, per-account alerts,
+    credits — Settings is where accounts live, and you may want them set up before signing in),
+    while <b>content surfaces list only configured ones</b> (tabs, History, widget picker,
+    shortcuts). Alternative: configured-only everywhere, which makes the per-account alert
+    toggles vanish for an account you have temporarily signed out of, losing the setting's
+    visibility exactly when you are wondering why it went quiet.
+  </div>
+
+  <h2>6 · The pinned panel — “Huge number”, folding 2+ other accounts</h2>
+  <p class="sub">Mocked in the <b>Huge number</b> style, the one actually in use. The ordering
+    contract from CCRM-44 (One Surface) is unchanged — <b>faults · events newest-first ·
+    warnings · update last</b> — and <code>MAX_STRIPS</code> stays <b>3</b>. What changes is that
+    “the other profile” becomes “every other profile”: each one's re-auth / stale / expiry strips
+    carry its label, and its folded events merge into the same newest-first sort.</p>
+  <div class="row">
+    <div>
+      <p class="cap good">quiet · 4 accounts, nothing wrong — unchanged from today</p>
+      <div class="notif">
+        <div class="hdr"><span class="dotico"></span> Claude Cooldown · Teams</div>
+        <div class="bigrow">
+          <div class="left">
+            <div class="title">5-hour window</div>
+            <div class="bar"><i style="width:48%"></i><s style="left:52%"></s></div>
+            <div class="sub">Resets 21:41 · 7-day 31%</div>
+          </div>
+          <div class="pct">48<span style="font-size:22px">%</span></div>
+        </div>
+        <div class="panel">
+          <div class="barrow"><span class="nm">5-hour</span><span class="bw"><span class="bar" style="display:block"><i style="width:48%"></i><s style="left:52%"></s></span></span><span>48%</span></div>
+          <div class="barrow"><span class="nm">7-day</span><span class="bw"><span class="bar" style="display:block"><i style="width:31%"></i><s style="left:44%"></s></span></span><span>31%</span></div>
+        </div>
+      </div>
+      <p class="note">No strips, so no account count is visible. Three other accounts being
+        healthy costs the panel nothing.</p>
+    </div>
+    <div>
+      <p class="cap warn">3 strips + overflow · Teams shown</p>
+      <div class="notif">
+        <div class="hdr"><span class="dotico"></span> Claude Cooldown · Teams</div>
+        <div class="bigrow">
+          <div class="left">
+            <div class="title">5-hour window</div>
+            <div class="bar"><i style="width:92%;background:#E08268"></i><s style="left:58%"></s></div>
+            <div class="sub">Stale — nothing since 09:12</div>
+          </div>
+          <div class="pct dim">92<span style="font-size:22px">%</span></div>
+        </div>
+        <div class="panel">
+          <div class="strip bad">Usage data is stale
+            <span class="s2">Nothing fetched since Today 09:12 · 5h ago. Last error: No network</span></div>
+          <div class="strip bad">Personal: Sign-in stopped working
+            <span class="s2">The saved sign-in failed and couldn't renew. Open the app and re-sign in.</span></div>
+          <div class="strip evt">Work: 7-day window at 90%
+            <span class="s2">Resets Fri 14:00 — 2d 4h</span></div>
+          <div class="strip more">+ 2 more — open the app for the rest</div>
+        </div>
+      </div>
+      <p class="note">
+        The shown account's own fault takes the top slot and dims the big number — only
+        <i>its</i> staleness does that, as today. Then Personal's fault, then the newest event
+        across all four accounts. Pushed into the overflow: Side project's expiry warning and
+        the update strip.
+      </p>
+    </div>
+    <div>
+      <p class="cap bad">worst case · shown account healthy, three others faulting</p>
+      <div class="notif">
+        <div class="hdr"><span class="dotico"></span> Claude Cooldown · Teams</div>
+        <div class="bigrow">
+          <div class="left">
+            <div class="title">5-hour window</div>
+            <div class="bar"><i style="width:12%"></i><s style="left:20%"></s></div>
+            <div class="sub">Resets 18:05 · 7-day 9%</div>
+          </div>
+          <div class="pct">12<span style="font-size:22px">%</span></div>
+        </div>
+        <div class="panel">
+          <div class="strip bad">Personal: Sign-in stopped working<span class="s2">Open the app and re-sign in.</span></div>
+          <div class="strip bad">Work: Usage data is stale<span class="s2">Nothing fetched since Yesterday 22:40 · 16h ago.</span></div>
+          <div class="strip bad">Side project: Sign-in stopped working<span class="s2">Open the app and re-sign in.</span></div>
+          <div class="strip more">+ 1 more — open the app for the rest</div>
+        </div>
+      </div>
+      <p class="note">
+        Every strip is about an account you are not looking at. This is the state that argues for
+        raising <code>MAX_STRIPS</code> — and against it: the panel's height is finite whether
+        you have two accounts or five, and “+ n more” is already the honest answer.
+      </p>
+    </div>
+  </div>
+  <div class="q">
+    <b>Decision 6 — does <code>MAX_STRIPS</code> stay at 3?</b> Recommended: <b>yes, 3</b>, with
+    the existing order untouched. Alternatives: scale it (3 + 1 per extra account) — the panel
+    gets tall and the ordering stops being predictable; or reserve the last slot for a single
+    rolled-up “2 other accounts need attention” line, which is tidier but strictly less
+    informative than the strips it replaces.
+  </div>
+
+  <h2>7 · Widget config picker at 4 entries</h2>
+  <div class="row">
+    <div>
+      <p class="cap good">widget setup · FlowRow, configured accounts only</p>
+      <div class="phone">
+        <div style="font-size:19px;font-weight:650;margin:4px 0 16px">Widget setup</div>
+        <div style="font-size:12.5px;font-weight:650;margin-bottom:9px">Profile</div>
+        <div class="chiprow">
+          <span class="fchip sel">Personal</span><span class="fchip">Work</span>
+          <span class="fchip">Teams</span><span class="fchip">Side project</span>
+        </div>
+        <div style="font-size:12.5px;font-weight:650;margin:18px 0 9px">Window</div>
+        <div class="chiprow"><span class="fchip sel">5-hour</span><span class="fchip">7-day</span></div>
+        <div class="btnrow" style="margin-top:22px"><span class="btn fill">Add widget</span></div>
+      </div>
+    </div>
+    <div>
+      <p class="cap">a widget whose account was removed</p>
+      <p class="note">
+        Removal repoints the widget's stored profile to the first account, so on the next redraw
+        it is simply that account's widget — correct data, correct label, no error state and no
+        chance of showing a <i>different</i> new account's numbers, because slot 2 is retired
+        forever. The label appears because more than one account is configured; at one account
+        the widget drops the label as it does today.
+      </p>
+      <p class="cap" style="margin-top:18px">launcher shortcuts · the cap</p>
+      <div class="sheet">
+        <div><span class="sq"></span> Personal</div>
+        <div><span class="sq"></span> Work</div>
+        <div><span class="sq"></span> Teams</div>
+        <div><span class="sq"></span> Side project</div>
+        <div><span class="sq"></span> Refresh now</div>
+        <div class="cut">— 5th account truncated (launcher cap: 5) —</div>
+      </div>
+      <p class="note">
+        Today's unbounded list silently overflows past four accounts. Proposed rule: accounts
+        fill the list in order, <b>“Refresh now” always keeps the last slot</b>, so with five
+        accounts you get four of them plus Refresh rather than five accounts and no Refresh.
+      </p>
+    </div>
+  </div>
+
+  <h2>8 · Quick Settings tiles — a fixed pool of four</h2>
+  <p class="sub">A QS tile is a statically declared <code>&lt;service&gt;</code>; Android will not
+    let the list be driven at runtime. So four tiles are declared, bound to <b>slots</b> 0–3.
+    The two existing class names stay (renaming one breaks tiles already placed) and are
+    rebound to slots 0 and 1.</p>
+  <div class="row">
+    <div>
+      <p class="cap">tile picker · what the four entries read as</p>
+      <div class="picker">
+        <div><span class="sq"></span> Claude Personal</div>
+        <div><span class="sq"></span> Claude Work</div>
+        <div><span class="sq"></span> Claude account 3</div>
+        <div><span class="sq"></span> Claude account 4</div>
+      </div>
+      <p class="note">
+        <code>android:label</code> is static and cannot follow a rename — that is already true of
+        “Claude Personal” today. So the picker says “Claude account 3” even when the account is
+        called Teams; the <i>placed</i> tile shows the live label.
+      </p>
+    </div>
+    <div>
+      <p class="cap">placed tiles · the three states</p>
+      <div class="shade">
+        <span class="tile active"><span class="ico"></span><span>Teams 48%<span class="t2">resets 21:41</span></span></span>
+        <span class="tile"><span class="ico"></span><span>Claude Work<span class="t2">no data</span></span></span>
+        <span class="tile off"><span class="ico"></span><span>Claude account 4<span class="t2">unavailable</span></span></span>
+      </div>
+      <p class="note">
+        Left: slot 2 has an account with data — live label, live meter.
+        Middle: an account with no data yet — today's inactive state, unchanged.
+        Right: <b>slot 3 has no account</b> — the tile reports
+        <code>STATE_UNAVAILABLE</code>, greys out and does nothing when tapped. That is the
+        state a user reaches by placing all four tiles and then removing an account.
+      </p>
+      <p class="note">
+        <b>The documented limit:</b> a fifth account works on every surface — tabs, widgets,
+        history, alerts, the pinned panel — except a Quick Settings tile. This goes in the
+        roadmap entry, not just here.
+      </p>
+    </div>
+  </div>
+
+  <h2>9 · Copy changes</h2>
+  <table class="rules">
+    <tr><th>Where</th><th>Today</th><th>Proposed</th></tr>
+    <tr><td>Always-on notification subtitle</td><td>“all alerts — both profiles — fold into this panel”</td><td>“all alerts, from <b>every account</b>, fold into this panel”</td></tr>
+    <tr><td>Pace alerts footnote</td><td>“on profiles with alerts enabled”</td><td>unchanged — already count-agnostic</td></tr>
+    <tr><td>Section label</td><td>“Profile names”</td><td>section removed (Decision 2)</td></tr>
+    <tr><td>Debug / endpoint probe</td><td>a button flipping Personal ↔ Work</td><td>the same button cycling every account</td></tr>
+  </table>
+
+  <hr class="hr">
+  <h2>The six decisions, in one place</h2>
+  <table class="rules">
+    <tr><th>#</th><th>Question</th><th>Recommended</th></tr>
+    <tr><td>1</td><td>Where does rename live?</td><td>⋮ → Rename… dialog on the card</td></tr>
+    <tr><td>2</td><td>Does the “Profile names” section survive?</td><td>No — delete it</td></tr>
+    <tr><td>3</td><td>Can Personal / Work be removed?</td><td>Yes, any but the last</td></tr>
+    <tr><td>4</td><td>Where does the tab strip go scrollable?</td><td>Fixed at 2–3, scrollable at 4+</td></tr>
+    <tr><td>5</td><td>Which pickers list unconfigured accounts?</td><td>Settings yes, content surfaces no</td></tr>
+    <tr><td>6</td><td>Does <code>MAX_STRIPS</code> stay at 3?</td><td>Yes</td></tr>
+  </table>
+  <p class="sub"><b>Answered 2026-08-21 — all six taken as recommended</b>, so every mock above
+    stands exactly as drawn. Nothing else changes shape.</p>
+  <table class="rules">
+    <tr><th>#</th><th>Decision</th></tr>
+    <tr><td>1</td><td>Rename lives behind <b>⋮ → Rename…</b> on the account card.</td></tr>
+    <tr><td>2</td><td>The <b>“Profile names” section is deleted</b>; its sentence moves into the rename dialog.</td></tr>
+    <tr><td>3</td><td><b>Any account is removable except the last</b> — slots 0/1 included; the seed is gated on a one-time flag.</td></tr>
+    <tr><td>4</td><td>Tab strip <b>fixed at 2–3, scrollable at 4+</b>, at every width.</td></tr>
+    <tr><td>5</td><td><b>Settings pickers list every account; content surfaces list configured only.</b></td></tr>
+    <tr><td>6</td><td><code>MAX_STRIPS</code> <b>stays at 3</b>, ordering contract untouched.</td></tr>
+  </table>
+
+  <h2>Built and checked against this wireframe — Fold 7, 2026-08-21</h2>
+  <p class="sub">Two runs, both on a release-signed build over the live install, cover screen,
+    <b>Huge number</b> style. The first ran over two accounts (then labelled <b>Pro</b> and
+    <b>Teams</b>); the second, later the same evening, ran with a real third account signed in
+    (<b>Personal</b>, <b>Work</b>, <b>Product</b>). Kept until the remaining states are seen.</p>
+  <table class="rules">
+    <tr><th>State</th><th>Outcome</th></tr>
+    <tr><td>1 · Accounts at 2, ⋮, + Add account</td><td style="color:var(--good)">As drawn. Cards unchanged bar the ⋮; “Profile names” gone, POLLING follows directly.</td></tr>
+    <tr><td>1a · third card, default label</td><td style="color:var(--good)">“Account 3 · Not signed in”, and its per-account alerts toggle appeared in the notifications list.</td></tr>
+    <tr><td>1a · ⋮ → Rename… dialog</td><td style="color:var(--good)">As drawn, 9/16 counter, restore line naming the real default.</td></tr>
+    <tr><td>3 · Remove confirmation</td><td style="color:var(--good)">As drawn, naming <b>Pro</b> as the fallback. Removal clean, no orphan, no crash.</td></tr>
+    <tr><td>0 · slots never reused</td><td style="color:var(--good)">Retiring slot 3 then adding gave slot <b>4</b>, logged both times. The fifth-slot account correctly gets no tile.</td></tr>
+    <tr><td>5 · Show profile chips at 4</td><td style="color:var(--good)">Wraps — three on line one, the fourth below. The old <code>Row</code> clipped it.</td></tr>
+    <tr><td>8 · tile picker entries</td><td style="color:var(--good)">All four declared with the exact static labels; original class names preserved.</td></tr>
+    <tr><td>9 · “every account” copy</td><td style="color:var(--good)">Reads correctly in the pinned section.</td></tr>
+    <tr><td>4 · tab strip at 3</td><td style="color:var(--good)"><b>Second run, third account signed in:</b> three tabs in a fixed <code>TabRow</code> at 411&nbsp;dp, every label legible at full width. The fixed-up-to-three half of decision 4 holds.</td></tr>
+    <tr><td>4a · History at 3</td><td style="color:var(--good)">Three tabs, and the third account's tab shows only its own session log — one window against the first account's thirteen.</td></tr>
+    <tr><td>6 · panel folding another account</td><td style="color:var(--good)"><b>As drawn.</b> Switched to the third account, the headline carried <i>its</i> 5-hour figure, reset, 7-day bar and per-model bar, with <i>another account's</i> folded pace event as the strip between them. The generalised <code>panelFor</code> works.</td></tr>
+    <tr><td>8 · placed tile states</td><td style="color:var(--good)"><b>All four.</b> The two pre-existing tiles kept working after the rebind to slots 0/1; <code>Slot2TileService</code> showed the third account's live label and figure, not its static one; <code>Slot3TileService</code> showed <code>STATE_UNAVAILABLE</code> — greyed, "no account" — because slot 3 had been retired earlier.</td></tr>
+    <tr><td>4 · tab strip at 4</td><td style="color:var(--bad)"><b>Still not seen.</b> Needs a fourth real token. The <code>ScrollableTabRow</code> switch is unobserved — treat as CCRM-15 (Above-Pace Verification) risk.</td></tr>
+    <tr><td>4a · shrink case</td><td style="color:var(--bad)"><b>Not seen.</b> Costs a re-sign-in on a live account.</td></tr>
+    <tr><td>6 · <code>+ n more</code> overflow</td><td style="color:var(--bad)"><b>Not seen.</b> Only one condition was live across all three accounts, so the cap was never approached.</td></tr>
+    <tr><td>7 · widget picker</td><td style="color:var(--bad)"><b>Not seen.</b> No widgets are placed on the device, so there was nothing to open or repoint.</td></tr>
+  </table>
+  <p class="sub"><b>One defect found and filed: CCBG-16 (Stale Strip Label).</b> The panel read
+    <code>Personal · 5-hour window</code> above a strip reading <code>Pro: 7-day window will
+    run out early</code> — "Pro" being the name that account had when the event fired.
+    <code>FoldedEvent</code> stores finished text, so a rename cannot reach it. Pre-dates
+    CCRM-6; this wireframe's own label-prefix path (<code>Condition.labelled</code>) reads the
+    label live and is correct. Cosmetic, but the two look identical in the panel.</p>
+</div>

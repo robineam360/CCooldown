@@ -29,11 +29,14 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -55,6 +58,7 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -86,6 +90,7 @@ import com.robin.claudeusage.data.AuthState
 import com.robin.claudeusage.data.OAuthSignIn
 import com.robin.claudeusage.data.PingSchedule
 import com.robin.claudeusage.data.Profile
+import com.robin.claudeusage.data.ProfileRegistry
 import com.robin.claudeusage.data.Projection
 import com.robin.claudeusage.data.SignInExpiry
 import com.robin.claudeusage.data.UpdateCheck
@@ -144,9 +149,16 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val cacheSettings = repo.cacheSettings()
-    // Bumped when a profile is renamed so labels elsewhere on this screen refresh.
+    // Bumped when an account is added, renamed or removed, so the list and every label
+    // elsewhere on this screen refresh. CCRM-6 (Multi-Account) made the account list itself
+    // mutable, so this now gates the list too, not only the labels.
     var namesTick by remember { mutableIntStateOf(0) }
-    val labels = remember(namesTick) { Profile.entries.associateWith { cacheSettings.profileLabel(it) } }
+    val profiles = remember(namesTick) { repo.profiles() }
+    val labels = remember(namesTick) { profiles.associateWith { cacheSettings.profileLabel(it) } }
+    // Which account's ⋮ sheet or dialog is open, and which kind.
+    var renaming by remember { mutableStateOf<Profile?>(null) }
+    var removing by remember { mutableStateOf<Profile?>(null) }
+    val accountScope = rememberCoroutineScope()
 
     // The sections split into two independent groups so a wide window — the
     // Fold's inner screen, a tablet, a freeform window — can run them as two
@@ -155,39 +167,35 @@ fun SettingsScreen(
     // surfaces them on the other.
     val accountSections: @Composable () -> Unit = {
         SectionLabel("Accounts")
-        for (profile in Profile.entries) {
-            TokenCard(repo, profile, use24h, onOpenGuide, label = labels.getValue(profile))
-            Spacer(Modifier.height(10.dp))
-        }
-        Spacer(Modifier.height(14.dp))
-
-        SectionLabel("Profile names")
-        SectionCard {
-            for ((index, profile) in Profile.entries.withIndex()) {
-                if (index > 0) Spacer(Modifier.height(10.dp))
-                var name by remember { mutableStateOf(cacheSettings.profileLabel(profile)) }
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = {
-                        name = it.take(16)
-                        cacheSettings.setProfileLabel(profile, name)
-                        namesTick++
-                        refreshWidgets()
-                        // CCRM-33 (App Shortcuts): shortcut labels follow renames.
-                        Shortcuts.publish(context)
-                    },
-                    label = { Text("${profile.label} profile") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
+        for (profile in profiles) {
+            // Keyed on the account, not on its position: removing a card from the middle
+            // would otherwise shift every card below it onto the state of its neighbour —
+            // a signed-in card showing the next account's sign-in step.
+            key(profile.key) {
+                TokenCard(
+                    repo, profile, use24h, onOpenGuide,
+                    label = labels.getValue(profile),
+                    canRemove = profiles.size > 1,
+                    onRename = { renaming = profile },
+                    onRemove = { removing = profile },
                 )
             }
-            Spacer(Modifier.height(6.dp))
-            Text(
-                "Used everywhere — tabs, widgets, and notifications. Clear a field to go back to the default.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Spacer(Modifier.height(10.dp))
         }
+        // CCRM-6 (Multi-Account): the card appears immediately with a positional default
+        // label, in its familiar not-signed-in state — no name-first dialog, because the
+        // next tap the user wants is "Sign in on this phone". Renaming is a later thought.
+        OutlinedButton(
+            onClick = {
+                repo.addProfile()
+                namesTick++
+                Shortcuts.publish(context)
+            },
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text("+ Add account") }
+        // The old "Profile names" section lived here. Names are registry-owned now and each
+        // card renames itself through ⋮ → Rename, so a second editor for the same field
+        // would only raise the question of which one is authoritative.
         Spacer(Modifier.height(24.dp))
 
         SectionLabel("Polling")
@@ -203,14 +211,25 @@ fun SettingsScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(4.dp))
+            // CCBG-17 (Strip Revocation): every alert control in this card redraws the
+            // pinned panel, because with the pinned notification on that panel *is* where
+            // these alerts appear. Without the redraw a revoked strip stays on screen
+            // until the next poll — the same lag CCBG-14 (Stale Notification Theme) fixed
+            // for the theme swatches, in the same card's sibling section.
+            fun refreshPanel() {
+                com.robin.claudeusage.notify.PinnedNotification.update(context, cacheSettings)
+            }
             ThresholdChipsRow("5-hour window", listOf(80, 90, 95), cacheSettings.sessionAlertThresholds()) {
                 cacheSettings.setSessionAlertThresholds(it)
+                refreshPanel()
             }
             ThresholdChipsRow("7-day window", listOf(75, 90), cacheSettings.weeklyAlertThresholds()) {
                 cacheSettings.setWeeklyAlertThresholds(it)
+                refreshPanel()
             }
             ThresholdChipsRow("Per-model caps", listOf(75, 90), cacheSettings.modelCapAlertThresholds()) {
                 cacheSettings.setModelCapAlertThresholds(it)
+                refreshPanel()
             }
             RowDivider()
             // Pace alerts (CCRM-21): the projection-based counterpart to the absolute
@@ -224,6 +243,7 @@ fun SettingsScreen(
             ) {
                 paceEnabled = it
                 cacheSettings.setPaceAlertsEnabled(it)
+                refreshPanel()
             }
             Spacer(Modifier.height(4.dp))
             val milestones = listOf(
@@ -267,9 +287,11 @@ fun SettingsScreen(
             Spacer(Modifier.height(8.dp))
             ResetModeRow("7-day reset", "Weekly", cacheSettings)
             RowDivider()
-            for ((index, profile) in Profile.entries.withIndex()) {
+            for ((index, profile) in profiles.withIndex()) {
                 if (index > 0) RowDivider()
-                var enabled by remember { mutableStateOf(cacheSettings.profileAlertsEnabled(profile)) }
+                var enabled by remember(profile) {
+                    mutableStateOf(cacheSettings.profileAlertsEnabled(profile))
+                }
                 ToggleRow(
                     title = "${labels.getValue(profile)} alerts",
                     subtitle = "Usage warnings and reset pings for this profile",
@@ -277,6 +299,7 @@ fun SettingsScreen(
                 ) {
                     enabled = it
                     cacheSettings.setProfileAlertsEnabled(profile, it)
+                    refreshPanel()
                 }
             }
             RowDivider()
@@ -325,7 +348,7 @@ fun SettingsScreen(
             ToggleRow(
                 title = "Always-on usage notification",
                 subtitle = "A silent, ongoing notification with a status-bar icon that fills as you use your 5-hour window. " +
-                    "While it's on, all alerts — both profiles — fold into this panel instead of posting separately; no sounds, no pop-ups",
+                    "While it's on, all alerts, from every account, fold into this panel instead of posting separately; no sounds, no pop-ups",
                 checked = pinned,
             ) {
                 pinned = it
@@ -336,8 +359,12 @@ fun SettingsScreen(
                 RowDivider()
                 Text("Show profile", style = MaterialTheme.typography.bodyLarge)
                 Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for (p in Profile.entries) {
+                // FlowRow, not Row: four 16-character labels do not fit one line at any
+                // phone width, and the old Row clipped the last chip out of reach entirely.
+                // Lists every registered account, signed in or not — this is Settings, where
+                // accounts live, so the setting stays visible while an account is signed out.
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for (p in profiles) {
                         FilterChip(
                             selected = pinnedProfile == p,
                             onClick = {
@@ -418,12 +445,14 @@ fun SettingsScreen(
                 Text("Status-bar icon", style = MaterialTheme.typography.bodyLarge)
                 Spacer(Modifier.height(8.dp))
                 // CCRM-49 (Glyph Legibility): the concentric two-ring "Twin" style is
-                // withdrawn — measured at ~14 dp it could not be read. Ring carries the
-                // pace mark and the colour instead. FlowRow stays, so a long chip row
-                // wraps rather than overflowing a narrow screen.
+                // withdrawn — measured at ~14 dp it could not be read. FlowRow stays,
+                // so a long chip row wraps rather than overflowing a narrow screen.
+                // CCRM-51 (Rails Gauge) redrew Ring and Pie in one grammar, so the
+                // choice is a look rather than a choice between an informative icon and
+                // an uninformative one — Pie used to carry no pace mark at all.
                 val iconStyles = listOf(
                     UsageIcon.RING to "Ring",
-                    "pie" to "Pie",
+                    UsageIcon.PIE to "Pie",
                     "battery" to "Battery",
                     "number" to "Number",
                 )
@@ -442,7 +471,7 @@ fun SettingsScreen(
                 }
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    "The colored gauge and bars follow your theme and turn orange, then red, near the limit. Ring shows the 5-hour window and carries a pace mark — a small gap at where you'd be at an even burn, so fill past the gap means you're going faster than even pace. A dot appears in the ring's middle when the 7-day window needs a look: grey on pace, yellow above pace, red spent — no dot means the week is fine. The Quick Settings tile is monochrome, because Android renders tile icons that way.",
+                    "The colored gauge and bars follow your theme and turn orange, then red, near the limit. Ring and Pie both show the 5-hour window with a needle at even pace — like a clock hand — so usage reaching past the needle means you're going faster than even pace, and the part past it turns red. The needle only appears once you've used something. At 100% a mark appears at the top of the gauge. The dot in the middle is the 7-day window: an empty circle when you haven't used any of it, then grey, yellow above pace, and red when it's spent. No dot means there's no weekly reading yet. The Quick Settings tile is monochrome, because Android renders tile icons that way.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -483,9 +512,11 @@ fun SettingsScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(4.dp))
-            for (profile in Profile.entries) {
+            for (profile in profiles) {
                 RowDivider()
-                var visible by remember { mutableStateOf(cacheSettings.creditsVisible(profile)) }
+                var visible by remember(profile) {
+                    mutableStateOf(cacheSettings.creditsVisible(profile))
+                }
                 ToggleRow(
                     title = "Show for ${labels.getValue(profile)}",
                     subtitle = "Credits card on this profile's screen",
@@ -765,6 +796,139 @@ fun SettingsScreen(
         deviceSections()
     }
     Spacer(Modifier.height(8.dp))
+
+    // CCRM-6 (Multi-Account): both live here rather than inside TokenCard so they survive
+    // the card recomposing under them, and so the remove path can bump namesTick once.
+    renaming?.let { profile ->
+        RenameAccountDialog(
+            current = labels[profile] ?: cacheSettings.profileLabel(profile),
+            fallback = repo.registry().defaultLabelFor(profile.key),
+            onDismiss = { renaming = null },
+            onSave = { name ->
+                repo.renameProfile(profile, name)
+                renaming = null
+                namesTick++
+                refreshWidgets()
+                // CCRM-33 (App Shortcuts): shortcut labels follow renames.
+                Shortcuts.publish(context)
+                com.robin.claudeusage.notify.PinnedNotification.update(context, cacheSettings)
+            },
+        )
+    }
+    removing?.let { profile ->
+        RemoveAccountDialog(
+            label = labels[profile] ?: cacheSettings.profileLabel(profile),
+            replacement = repo.profiles().firstOrNull { it != profile }
+                ?.let { cacheSettings.profileLabel(it) } ?: "",
+            onDismiss = { removing = null },
+            onConfirm = {
+                accountScope.launch {
+                    repo.removeProfile(profile)
+                    removing = null
+                    namesTick++
+                    refreshWidgets()
+                }
+            },
+        )
+    }
+}
+
+/**
+ * CCRM-6 (Multi-Account): rename lives behind the card's ⋮ rather than in a standing text
+ * field, so a card at rest looks exactly as it did before three accounts were possible.
+ */
+@Composable
+private fun RenameAccountDialog(
+    current: String,
+    fallback: String,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit,
+) {
+    var name by remember { mutableStateOf(current) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Rename account") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it.take(ProfileRegistry.MAX_LABEL) },
+                    label = { Text("Name") },
+                    singleLine = true,
+                    supportingText = { Text("${name.length}/${ProfileRegistry.MAX_LABEL}") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Used everywhere — tabs, widgets, notifications and shortcuts. " +
+                        "Clear the field to go back to \"$fallback\".",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = { onSave(name) }) { Text("Save") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+/**
+ * The one destructive confirmation in the app, so it names what goes rather than asking
+ * "are you sure" — including the year-long session log, which is the part that is genuinely
+ * unrecoverable, and the fact that **Clear** is the non-destructive alternative (CCBG-1
+ * (History Retention) is why the two are different actions at all).
+ */
+@Composable
+private fun RemoveAccountDialog(
+    label: String,
+    replacement: String,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Remove \"$label\"?") },
+        text = {
+            Column {
+                Text(
+                    "This deletes, permanently and only for this account:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(6.dp))
+                for (line in listOf(
+                    "the saved sign-in",
+                    "its cached usage and settings — alerts, credits, reset pings",
+                    "8 days of trend history",
+                    "a year of session and weekly history",
+                )) {
+                    Text("•  $line", style = MaterialTheme.typography.bodySmall)
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Its Quick Settings tile goes blank and its launcher shortcut " +
+                        "disappears." +
+                        if (replacement.isNotEmpty()) {
+                            " Any widget showing it switches to $replacement, and so does " +
+                                "the pinned notification."
+                        } else "",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "To keep the history and just sign out, use Clear instead.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text("Remove account", color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 private data class BrowserChoice(
@@ -864,6 +1028,9 @@ private fun TokenCard(
     use24h: Boolean,
     onOpenGuide: () -> Unit,
     label: String,
+    canRemove: Boolean,
+    onRename: () -> Unit,
+    onRemove: () -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -1000,6 +1167,39 @@ private fun TokenCard(
                 if (busy) {
                     Spacer(Modifier.width(8.dp))
                     CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                }
+                // CCRM-6 (Multi-Account): rename and remove live here, deliberately away
+                // from "Clear" in the button row below. Clear signs out and keeps the
+                // history; Remove destroys it. Side by side, that is a fat-finger disaster.
+                var menuOpen by remember { mutableStateOf(false) }
+                Box {
+                    IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(28.dp)) {
+                        Icon(
+                            Icons.Filled.MoreVert,
+                            contentDescription = "Account options",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Rename…") },
+                            onClick = { menuOpen = false; onRename() },
+                        )
+                        // Hidden on the last remaining card: the registry always keeps one
+                        // account, which is what makes the zero-configured fallback work.
+                        if (canRemove) {
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        "Remove account",
+                                        color = MaterialTheme.colorScheme.error,
+                                    )
+                                },
+                                onClick = { menuOpen = false; onRemove() },
+                            )
+                        }
+                    }
                 }
             }
 
@@ -1396,7 +1596,7 @@ private fun PollingSection(repo: UsageRepository) {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        val lastAttempt = Profile.entries.maxOfOrNull { repo.snapshot(it).lastAttemptAt } ?: 0L
+        val lastAttempt = repo.profiles().maxOfOrNull { repo.snapshot(it).lastAttemptAt } ?: 0L
         if (lastAttempt > 0) {
             val next = lastAttempt + interval * 60_000
             Text(
@@ -1734,7 +1934,7 @@ private sealed interface UpdateUi {
 private fun TrendDiagnostics(repo: UsageRepository, use24h: Boolean) {
     SectionCard {
         Text("Trend samples", style = MaterialTheme.typography.bodyLarge)
-        for (profile in Profile.entries) {
+        for (profile in repo.profiles()) {
             val points = remember(profile) { repo.history().points(profile) }
             val data = repo.snapshot(profile).data
             Spacer(Modifier.height(8.dp))
@@ -1792,14 +1992,15 @@ private fun TrendDiagnostics(repo: UsageRepository, use24h: Boolean) {
 @Composable
 private fun DebugSection(repo: UsageRepository) {
     var showDebug by remember { mutableStateOf(false) }
-    var debugProfile by remember { mutableStateOf(Profile.PERSONAL) }
+    val profiles = remember { repo.profiles() }
+    var debugProfile by remember { mutableStateOf(profiles.first()) }
     SectionCard {
         // CCRM-16: the ~30-day family estimate has never been verified against a
         // real expiry — this age readout is how we learn the true number the first
         // time a family dies of old age rather than revocation.
         val signInAges = remember {
             val now = System.currentTimeMillis()
-            Profile.entries.joinToString(" · ") { p ->
+            profiles.joinToString(" · ") { p ->
                 val label = repo.cacheSettings().profileLabel(p)
                 val added = repo.tokenAddedAt(p)
                 when {
@@ -1825,15 +2026,18 @@ private fun DebugSection(repo: UsageRepository) {
             }
             Spacer(Modifier.width(8.dp))
             if (showDebug) {
+                // Cycles every account rather than flip-flopping two, or a third account
+                // would be unreachable from the dev tools (CCRM-6 (Multi-Account)).
                 OutlinedButton(onClick = {
-                    debugProfile = if (debugProfile == Profile.PERSONAL) Profile.WORK else Profile.PERSONAL
-                }) { Text(debugProfile.label) }
+                    val i = profiles.indexOf(debugProfile)
+                    debugProfile = profiles[(i + 1).mod(profiles.size)]
+                }) { Text(repo.cacheSettings().profileLabel(debugProfile)) }
             }
         }
         if (showDebug) {
             Spacer(Modifier.height(8.dp))
             val raw = repo.snapshot(debugProfile).rawJson
-                ?: "(nothing cached yet for ${debugProfile.label})"
+                ?: "(nothing cached yet for ${repo.cacheSettings().profileLabel(debugProfile)})"
             SelectionContainer {
                 Text(
                     raw,
@@ -1892,7 +2096,8 @@ private val PROBE_PRESETS = listOf(
 @Composable
 private fun EndpointProbe(repo: UsageRepository) {
     val scope = rememberCoroutineScope()
-    var profile by remember { mutableStateOf(Profile.PERSONAL) }
+    val profiles = remember { repo.profiles() }
+    var profile by remember { mutableStateOf(profiles.first()) }
     var host by remember { mutableStateOf(ApiClient.ProbeHost.CLAUDE_AI) }
     var path by remember { mutableStateOf(PROBE_PRESETS.first()) }
     var running by remember { mutableStateOf(false) }
@@ -1910,8 +2115,8 @@ private fun EndpointProbe(repo: UsageRepository) {
         Spacer(Modifier.height(8.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             OutlinedButton(onClick = {
-                profile = if (profile == Profile.PERSONAL) Profile.WORK else Profile.PERSONAL
-            }) { Text(profile.label) }
+                profile = profiles[(profiles.indexOf(profile) + 1).mod(profiles.size)]
+            }) { Text(repo.cacheSettings().profileLabel(profile)) }
             Spacer(Modifier.width(8.dp))
             OutlinedButton(onClick = {
                 host = if (host == ApiClient.ProbeHost.CLAUDE_AI) {
@@ -2202,6 +2407,7 @@ private fun ThresholdChipsRow(
  */
 @Composable
 private fun AlertLifetimeRow(cache: UsageCache) {
+    val context = LocalContext.current
     var value by remember { mutableStateOf(cache.alertLifetime()) }
     Column(Modifier.fillMaxWidth()) {
         Text("Keep alerts in the shade for", style = MaterialTheme.typography.bodyMedium)
@@ -2224,6 +2430,10 @@ private fun AlertLifetimeRow(cache: UsageCache) {
                     onClick = {
                         value = stored
                         cache.setAlertLifetime(stored)
+                        // CCBG-18 (Strip Lifetime Stamp): the lifetime is read at draw
+                        // time now, so a shorter choice retires a strip already on
+                        // screen — but only once something redraws the panel.
+                        com.robin.claudeusage.notify.PinnedNotification.update(context, cache)
                     },
                     shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
                 ) { Text(text) }
@@ -2243,6 +2453,7 @@ private fun AlertLifetimeRow(cache: UsageCache) {
 
 @Composable
 private fun ResetModeRow(label: String, window: String, cache: UsageCache) {
+    val context = LocalContext.current
     var mode by remember { mutableStateOf(cache.resetPingMode(window)) }
     Column(Modifier.fillMaxWidth()) {
         Text(label, style = MaterialTheme.typography.bodyMedium)
@@ -2259,6 +2470,7 @@ private fun ResetModeRow(label: String, window: String, cache: UsageCache) {
                     onClick = {
                         mode = value
                         cache.setResetPingMode(window, value)
+                        com.robin.claudeusage.notify.PinnedNotification.update(context, cache)
                     },
                     shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
                 ) { Text(text) }
@@ -2389,7 +2601,8 @@ private fun WindowPingsSection(
     val context = LocalContext.current
     val cacheSettings = repo.cacheSettings()
     val scope = rememberCoroutineScope()
-    var profile by remember { mutableStateOf(Profile.PERSONAL) }
+    val profiles = remember { repo.profiles() }
+    var profile by remember { mutableStateOf(profiles.first()) }
     var tick by remember { mutableIntStateOf(0) }
 
     var enabled by remember(profile, tick) { mutableStateOf(cacheSettings.pingEnabled(profile)) }
@@ -2429,16 +2642,14 @@ private fun WindowPingsSection(
 
     Text("Account", style = MaterialTheme.typography.bodyLarge)
     Spacer(Modifier.height(8.dp))
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        for (p in Profile.entries) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        for (p in profiles) {
             FilterChip(
                 selected = profile == p,
                 onClick = { profile = p },
                 label = {
-                    Text(
-                        if (cacheSettings.pingEnabled(p)) "${labels.getValue(p)} · on"
-                        else labels.getValue(p)
-                    )
+                    val label = labels[p] ?: cacheSettings.profileLabel(p)
+                    Text(if (cacheSettings.pingEnabled(p)) "$label · on" else label)
                 },
             )
         }
@@ -2459,7 +2670,8 @@ private fun WindowPingsSection(
     if (!repo.hasCredentials(profile)) {
         Spacer(Modifier.height(8.dp))
         Text(
-            "${labels.getValue(profile)} isn't signed in yet, so pings can't run for it.",
+            "${labels[profile] ?: cacheSettings.profileLabel(profile)} isn't signed in yet, " +
+                "so pings can't run for it.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.error,
         )

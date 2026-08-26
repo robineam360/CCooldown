@@ -21,6 +21,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
@@ -57,11 +58,15 @@ import java.time.format.DateTimeFormatter
  */
 @Composable
 fun HistoryScreen(repo: UsageRepository, tick: Int) {
-    val profiles = Profile.entries
+    // CCRM-6 (Multi-Account): configured accounts only, same rule as the main tab strip.
+    val profiles = repo.configuredProfiles().ifEmpty { listOf(repo.registry().first()) }
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var weekly by rememberSaveable { mutableStateOf(false) }
     var weekIndex by rememberSaveable { mutableIntStateOf(0) }
-    val profile = profiles[tab]
+    // The remembered index outlives a shrinking list — sign out of the selected account and
+    // an unclamped read walks off the end. Falls back to the first tab rather than trying to
+    // follow the account that vanished.
+    val profile = profiles[tab.coerceIn(0, profiles.lastIndex)]
     val zone = remember { ZoneId.systemDefault() }
     val use24h = repo.cacheSettings().use24hTime()
 
@@ -88,15 +93,27 @@ fun HistoryScreen(repo: UsageRepository, tick: Int) {
     // stops being a choice you have to make — the comparison is the useful part.
     val sideBySide = LocalWidthClass.current.twoPane
 
-    TabRow(selectedTabIndex = tab) {
-        profiles.forEachIndexed { index, p ->
-            Tab(
-                selected = tab == index,
-                onClick = { tab = index },
-                text = { Text(repo.cacheSettings().profileLabel(p)) },
-            )
+    // Same strip rule as the main screen (CCRM-6 (Multi-Account)): hidden at one account,
+    // fixed up to three, scrollable at four or more.
+    if (profiles.size > 1) {
+        val selected = tab.coerceIn(0, profiles.lastIndex)
+        val tabs: @Composable () -> Unit = {
+            profiles.forEachIndexed { index, p ->
+                Tab(
+                    selected = selected == index,
+                    onClick = { tab = index },
+                    text = { Text(repo.cacheSettings().profileLabel(p)) },
+                )
+            }
+        }
+        if (profiles.size <= FIXED_TAB_LIMIT) {
+            TabRow(selectedTabIndex = selected) { tabs() }
+        } else {
+            ScrollableTabRow(selectedTabIndex = selected, edgePadding = 0.dp) { tabs() }
         }
     }
+    // Outside the strip: the top gap belongs to the screen, not to the tabs, so a
+    // single-account view doesn't start hard against the app bar.
     Spacer(Modifier.height(16.dp))
 
     if (!sideBySide) {

@@ -114,16 +114,18 @@ object PinnedNotification {
         val sessionElapsed = elapsedPercent(session, Projection.SESSION_MS)
         // CCRM-49 (Glyph Legibility): the status bar keeps colour, so the glyph wears
         // the same severity colour as the gauge below it — one source of truth, and the
-        // two can never disagree. CCRM-50 (Weekly Flag): the pace line wears the
-        // theme's partner colour, and the weekly window rides along as the flag dot.
+        // two can never disagree. CCRM-51 (Rails Gauge): the marks are neutral ink
+        // ("time has no severity"), so no pace hue is passed any more; the weekly
+        // window still rides along as the flag dot in the needle's hub, and this
+        // surface's red toggle now reaches the glyph's over-pace slice too.
         val smallIcon = drawStatusIcon(
             context, pct, cache.pinnedIconStyle(), left,
             sessionElapsed = sessionElapsed,
             fillArgb = fill.toArgb(),
             dark = dark,
-            paceArgb = Palette.paceColor(cache.themeColorName(), dark).toArgb(),
             weeklyPct = data?.weekly?.percent,
             weeklyElapsed = elapsedPercent(data?.weekly, Projection.WEEKLY_MS),
+            showOverPace = showOverPace,
         )
         val pctText = if (pct == null) "—" else "${Fmt.usageInt(pct, left)}%"
         // The worded form for text slots that have room for the word.
@@ -247,6 +249,37 @@ object PinnedNotification {
         } catch (_: SecurityException) {
             // POST_NOTIFICATIONS not granted — nothing to show.
         }
+
+        armExpiry(context, Conditions.nextExpiry(cache, profile))
+    }
+
+    /** The self-redraw that retires an expired strip — see [armExpiry]. */
+    const val ACTION_EXPIRE = "com.robin.claudeusage.PINNED_EXPIRE"
+
+    /**
+     * CCBG-18 (Strip Lifetime Stamp): arms one alarm at [atMs] to redraw this
+     * notification when its soonest strip is due to go.
+     *
+     * The strip store prunes lazily, on read, and the panel only re-renders on a poll, at
+     * the end of `Alerts.evaluate`, or on a Settings change — so without this a 15-minute
+     * strip lingers until the next poll, up to a further poll interval. Inexact by
+     * choice: a strip leaving a minute late is nothing like a window ping landing late
+     * (see `PingScheduler` for why that one is exact), and this must not spend the
+     * exact-alarm budget.
+     *
+     * Always cancels first, so repeated `update` calls replace rather than stack, and a
+     * panel with no strips left is a panel with no alarm.
+     */
+    private fun armExpiry(context: Context, atMs: Long) {
+        val am = context.getSystemService(android.app.AlarmManager::class.java) ?: return
+        val pi = PendingIntent.getBroadcast(
+            context, NOTIF_ID + 2,
+            Intent(context, PinnedRefreshReceiver::class.java).setAction(ACTION_EXPIRE),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        am.cancel(pi)
+        if (atMs <= System.currentTimeMillis()) return
+        am.set(android.app.AlarmManager.RTC, atMs, pi)
     }
 
     /**
@@ -465,7 +498,7 @@ object PinnedNotification {
         return bmp
     }
 
-    /** Monochrome status-bar icon; the drawing itself is shared with the QS tile. */
+    /** The status-bar icon; the drawing itself is shared with the QS tile. */
     private fun drawStatusIcon(
         context: Context,
         pct: Double?,
@@ -474,13 +507,13 @@ object PinnedNotification {
         sessionElapsed: Double?,
         fillArgb: Int?,
         dark: Boolean,
-        paceArgb: Int?,
         weeklyPct: Double?,
         weeklyElapsed: Double?,
+        showOverPace: Boolean,
     ): IconCompat = IconCompat.createWithBitmap(
         UsageIcon.draw(
             context, pct, iconStyle, left, sessionElapsed, fillArgb, dark,
-            paceArgb, weeklyPct, weeklyElapsed,
+            weeklyPct, weeklyElapsed, showOverPace,
         )
     )
 

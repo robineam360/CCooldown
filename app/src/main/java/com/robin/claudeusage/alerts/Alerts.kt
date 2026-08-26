@@ -57,6 +57,12 @@ object Alerts {
     /** Notification-id kinds 1–7 are fixed; per-model caps use this base + index. */
     private const val MODEL_CAP_KIND_BASE = 10
 
+    /**
+     * The widest kind in use — [PACE_WEEKLY_KIND]. Bounds the per-slot ID stride below and
+     * the range [cancelAllFor] sweeps, so both follow the kinds automatically.
+     */
+    const val MAX_KIND = PACE_WEEKLY_KIND
+
     /** Warn this many days before the known sign-in (refresh token) expiry. */
     private val EXPIRY_WARN_DAYS = listOf(1, 3, 7)
     /**
@@ -125,7 +131,7 @@ object Alerts {
     /** Called after every poll; works off the latest cached data and dedupes itself. */
     fun evaluate(context: Context, cache: UsageCache) {
         ensureChannels(context)
-        for (profile in Profile.entries) {
+        for (profile in cache.registry().all()) {
             evaluateProfile(context, cache, profile)
         }
         // The always-on notification rides the same cadence so it stays live.
@@ -502,8 +508,24 @@ object Alerts {
                 "Under 10% left. ${resetLine(window.resetsAt, use24h)}"
     }
 
-    private fun notifId(profile: Profile, kind: Int): Int =
-        kind + if (profile == Profile.WORK) 100 else 0
+    /**
+     * CCRM-6 (Multi-Account): the ID scheme is `kind + slot * 100`. Kinds top out at
+     * [MAX_KIND] = 31, so the ×100 stride can't collide however many accounts exist — and
+     * slots 0/1 reproduce the pre-CCRM-6 IDs exactly (`kind` and `kind + 100`), so nothing
+     * churns on upgrade. It replaces a `+100 only for WORK` test under which every third
+     * account silently overwrote Personal's notifications.
+     */
+    fun notifId(profile: Profile, kind: Int): Int = kind + profile.slot * 100
+
+    /**
+     * Dismisses every notification this profile could have posted — its whole ID range.
+     * Used by account removal (CCRM-6 phase 4), which has to happen while the slot is still
+     * known or an orphan sits in the shade forever.
+     */
+    fun cancelAllFor(context: Context, profile: Profile) {
+        val nm = NotificationManagerCompat.from(context)
+        for (kind in 1..MAX_KIND) nm.cancel(notifId(profile, kind))
+    }
 
     private fun resetLine(resetsAt: Instant?, use24h: Boolean): String {
         resetsAt ?: return ""
@@ -552,18 +574,15 @@ object Alerts {
      *   keys off. Null for an event with no window behind it (the update notice), which
      *   falls back to an hour rather than never expiring.
      */
-    fun eventTimeout(cache: UsageCache, windowResetsAt: Instant?): Long =
-        when (cache.alertLifetime()) {
-            "15m" -> 15 * 60_000L
-            "30m" -> 30 * 60_000L
-            "1h" -> 60 * 60_000L
-            else -> {
-                val left = windowResetsAt?.toEpochMilli()?.minus(System.currentTimeMillis())
-                // A window already past would mean "expire immediately", which would eat
-                // the alert before it could be read. An hour is the floor either way.
-                if (left == null || left <= 0) 60 * 60_000L else left
-            }
-        }
+    fun eventTimeout(cache: UsageCache, windowResetsAt: Instant?): Long {
+        com.robin.claudeusage.notify.StripRules.explicitLifetimeMs(cache.alertLifetime())
+            ?.let { return it }
+        // "auto" — until the window this alert is about resets.
+        val left = windowResetsAt?.toEpochMilli()?.minus(System.currentTimeMillis())
+        // A window already past would mean "expire immediately", which would eat
+        // the alert before it could be read. An hour is the floor either way.
+        return if (left == null || left <= 0) 60 * 60_000L else left
+    }
 
     /**
      * Whether alerts should be drawn with our own compact type scale rather than the

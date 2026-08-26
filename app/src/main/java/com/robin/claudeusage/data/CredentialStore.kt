@@ -37,9 +37,11 @@ class CredentialStore(context: Context) {
         )
     }
 
-    // v0.5 and earlier stored the single (personal) token without a prefix.
+    // v0.5 and earlier stored the single (personal) token without a prefix. Restated as a
+    // key comparison for CCRM-6 (Multi-Account), now that Profile is a value type — the
+    // legacy key is a storage-format constant, so this exception outlives the enum.
     private fun k(profile: Profile, name: String): String =
-        if (profile == Profile.PERSONAL) name else "${profile.key}.$name"
+        if (profile.key == Profile.LEGACY_KEY) name else "${profile.key}.$name"
 
     fun load(profile: Profile): Credentials? {
         val access = prefs.getString(k(profile, "accessToken"), null) ?: return null

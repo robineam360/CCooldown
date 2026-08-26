@@ -125,3 +125,124 @@ CCRM-48 (Status-Bar Gauge) → CCRM-49 (Glyph Legibility) → CCRM-50 (Weekly Fl
 `ROADMAP.md`, plus CCBG-14 (Stale Notification Theme) and CCBG-15 (Amber Ladder
 Blindness — the Amber accent *is* the >80 yellow rung; you likely share this quirk if
 you have an amber theme; check before adopting the ladder colours under theming).
+
+---
+
+# Round two: what came back from porting *your* Rails gauge
+
+**From:** CCooldown (Android), 2026-08-26, CCRM-51 (Rails Gauge) — the port of your Rails
+spec plus your four follow-ups (J2 needle, K2 ring shape, the no-usage rule, the G1
+re-tune). Wireframe `design/rails-gauge-wireframe.html`; implementation `ui/UsageIcon.kt`
+and `ui/RingGeometry.kt`.
+
+Two of your four decisions Android had already reached independently from its own review —
+the no-usage rule and the clock-hand needle — which is a good sign for the grammar. Below is
+only what **diverged**, and why. Each is a deliberate choice with a reason, not a porting
+accident.
+
+## A · The needle is pinned to an occupied hub, not run from the centre
+
+Your J2 needle starts at the centre and carries its own 1.8 pt hub dot. Android's hollow is
+occupied by the **weekly flag dot** (7.5/24 of the box — nearly 3× your hub), so your stated
+degrade rule fired: *"a ring whose hollow is occupied can't host the needle."*
+
+We took a third path instead of degrading: **the needle starts at the weekly dot's edge, and
+the dot becomes its pin.** The needle's cleared halo starts 0.7 further out still, so it
+never bites a notch out of the dot it turns on. This keeps both features, and it reads
+*better* than either — the flag stops looking like a blob in a hole and starts looking like
+the pin a hand turns on. When there is no weekly reading, the needle falls back to your own
+hub dot and starts from its edge, so it never floats.
+
+**Worth adopting if you ever add a compact one-ring style**: "pinned to whatever hub is
+there" is a more useful rule than "centre, unless occupied, then degrade to a tick".
+
+## B · The 12 o'clock post is the *spent* marker, and nothing else
+
+Your spec has a permanent start/end post. On review Android **dropped it below 100%** — the
+usage arc's own round cap at 12 already marks the start whenever there *is* usage — and
+**brought it back at a truncated 100** as the sole "spent" cue.
+
+The reasoning is a surface constraint you don't share, and it is the interesting part: a
+plain erased notch (our first proposal) only half survives Android's Quick Settings tile,
+which flattens the bitmap to one tint. A **post** is a cleared halo *with* an ink line inside
+it, so a gap **and** a mark both survive tinting. One mark, one meaning, and it earns its
+pixels only in the state that needs them.
+
+## C · The red slice wins over the severity fill
+
+Direct reversal of your *"never two alarms on one 22 pt gauge"*. Android's call: past 80 the
+fill wears the ladder colour **and** the over-pace slice still paints red from the needle to
+the tip. Rationale: severity and pace answer different questions ("how bad is it" vs "am I
+burning too fast"), and suppressing the second because the first fired loses the actionable
+one. Android's widget renderers already behaved this way, so this made a filed defect into
+the specification.
+
+**Caveat we have not resolved**, in case you adopt it: the `>90` orange rung against the red
+slice is the tightest pair in the ladder and they are close at small sizes. Yellow-plus-red
+is unambiguous. If you take this, check your orange.
+
+## D · The 7-day dot gains an EMPTY rung — and one hard-won rendering fact
+
+The rungs are now **empty → grey → yellow → red**, an escalation:
+
+| Rung | Predicate | Drawn |
+|---|---|---|
+| **SPENT** | `trunc(usedPct) >= 100` — needs no clock | filled, ladder red |
+| **EMPTY** | `usedPct <= 0` — needs no clock | an **outlined** dot |
+| **ABOVE** | `delta > PACE_DEAD_ZONE` | filled, ladder yellow |
+| **WITHIN** | anything else with a reading | filled, neutral grey |
+| *no dot* | **no reading, and nothing else** | — |
+
+Two changes from what we sent you last time:
+
+- **`WITHIN` is wider than the old `ON_PACE`** — it covers *below* pace too. Previously
+  below-pace drew nothing ("good news is silence"), which made "no dot" mean either *healthy*
+  or *no reading*. The EMPTY rung needs that ambiguity gone. Consequence: a week with usage
+  but **no reset clock** now rests on `WITHIN` rather than drawing nothing — there is usage so
+  it is not empty, pace cannot be judged so it may not be `ABOVE`. Never a guessed verdict,
+  but never a false "no reading" either.
+- **EMPTY is an outline, and that is load-bearing.** The first proposal was a filled *black*
+  dot. It fails twice on Android. On a dark status bar black ink reads as a hole punched in
+  the glyph and vanishes outright on true-black AMOLED — but the disqualifier is the **Quick
+  Settings tile**, which tints every non-transparent pixel one colour: a filled dot arrives
+  **fully inked** and therefore becomes the `SPENT` rung. *"You have used nothing this week"*
+  would render as *"your week is gone"* — an inversion, not a loss.
+
+  **Check this against your template mode before adopting any filled low rung.** Template
+  images behave differently from Android's tint, but the failure shape — *a rung distinguished
+  only by darkness becomes the loudest rung when something flattens it* — is worth testing for.
+  An outline survives because it is a **shape**, not an alpha.
+
+## E · Neutral marks confirmed — you were right, and we reverted our own idea
+
+Your spec says marks are neutral ink: *"time has no severity."* Android had shipped a
+**themed cool pace line** per theme (CCRM-50 (Weekly Flag), §3 above) and sold it to you as a
+finding. On review of CCRM-51 that was **reverted**: the gauges already carry colour in the
+fill, so a coloured mark spends the glyph's one colour budget twice. `Palette.paceColor` and
+the `ThemeOption.paceLight/paceDark` table are retained on Android — no surface draws with
+them now — precisely because they remain a shared contract for you, including the rule that
+cost a wireframe to learn: **the partner must always be cool**, since past 80 the fill is the
+fixed warm ladder whatever the theme.
+
+## F · Alphas lifted for a 37 px canvas
+
+Your hairline is 35% and your posts 55%. Android's icon rasterises to **37 px**, where a
+1.49/24 hairline lands at 2.3 px — at 35% that is close to nothing, and it matters most in the
+one state where the hairline is the *entire* glyph (no reading). Android draws the hairline at
+**50%** and the spent post at **70%**; the needle keeps your 85%. Not a disagreement about
+the design, just a smaller canvas.
+
+## G · The pie: your K2, at Ring's footprint
+
+Adopted with one change. Your disc radius is `Ø/2 − 1`, which renders Pie ~13% smaller than
+Ring; on a 37 px glyph a style choice should not cost that, so Android matches Ring's
+footprint (`Ø/2`) and keeps the faint-disc track. Your needle ratio — 2/3 of the half-width —
+lands unchanged at that size, so the needle still stops short of the rim, as a real clock
+hand does.
+
+## H · The rails *bar* did not port at all
+
+For the record, since your spec offers it: Android's status-bar slot is ~15 dp and fits
+bitmaps **by width** (§4 above), so a 22 × 4 bar would render around 15 × 2.7 dp. Android
+ports the round gauges only. Bars on other Android surfaces keep the pace post from your
+original spec, unchanged, exactly as you specified.

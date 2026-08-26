@@ -83,7 +83,7 @@ class RingWidget : GlanceAppWidget() {
         val resetClock = cache.resetClock()
         val themeName = cache.themeColorName()
         // Single-account users don't need to be told which account.
-        val multiProfile = Profile.entries.count {
+        val multiProfile = cache.registry().all().count {
             cache.snapshot(it).authState != AuthState.NO_CREDENTIALS
         } > 1
         val window = snapshot.data?.let { if (windowKey == "weekly") it.weekly else it.session }

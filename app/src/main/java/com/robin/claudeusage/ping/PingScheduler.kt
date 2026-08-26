@@ -7,6 +7,7 @@ import android.content.Intent
 import android.os.Build
 import com.robin.claudeusage.data.PingSchedule
 import com.robin.claudeusage.data.Profile
+import com.robin.claudeusage.data.ProfileRegistry
 import com.robin.claudeusage.data.UsageCache
 import java.time.ZoneId
 
@@ -64,7 +65,7 @@ object PingScheduler {
     }
 
     fun rescheduleAll(context: Context) {
-        for (profile in Profile.entries) reschedule(context, profile)
+        for (profile in ProfileRegistry(context).all()) reschedule(context, profile)
     }
 
     /** Arms a single exact alarm, falling back to inexact if the permission is missing. */
@@ -127,17 +128,20 @@ object PingScheduler {
             putExtra(EXTRA_INTENDED_AT, intendedAtMs)
         }
         // Request code per profile *and* per action, so a profile's ping and verify
-        // alarms are independent and neither replaces the other.
+        // alarms are independent and neither replaces the other. The slot is the stable
+        // small int for this (CCRM-6 (Multi-Account)) — never reused, so a removed
+        // account's armed alarm can't be inherited, and slots 0/1 keep today's codes.
         val base = if (action == ACTION_VERIFY) 1750 else 1700
         return PendingIntent.getBroadcast(
             context,
-            base + profile.ordinal,
+            base + profile.slot,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
     }
 
-    fun profileOf(intent: Intent): Profile = Profile.fromKey(intent.getStringExtra(EXTRA_PROFILE))
+    fun profileOf(context: Context, intent: Intent): Profile =
+        ProfileRegistry(context).resolve(intent.getStringExtra(EXTRA_PROFILE))
 
     fun intendedAt(intent: Intent): Long = intent.getLongExtra(EXTRA_INTENDED_AT, 0L)
 }

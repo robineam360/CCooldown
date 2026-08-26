@@ -33,6 +33,27 @@ class UsageCache(context: Context) {
 
         /** In smart mode a reset ping fires only if the window had reached this. */
         const val SMART_RESET_MIN_PCT = 80.0
+
+        /**
+         * Every fixed per-profile entry name, for [clearProfile]'s legacy path. Kept next to
+         * the getters that write them: adding a `k(profile, "…")` key without adding it here
+         * leaves residue behind on removal. The runtime-built families (`pace…`, `peak…`,
+         * `seen…Key`, `modelAlert.…`) are handled separately in [clearProfile].
+         */
+        private val LEGACY_PROFILE_KEYS = listOf(
+            "rawJson", "fetchedAt", "lastStatus", "lastStatusKind", "lastAttemptAt",
+            "authState", "plan", "tier", "signInTokenKeys", "nativeSignIn",
+            "refreshExpiresAt", "refreshExpiryEstimated", "lastRenewedAt",
+            "firstRefreshFailAt", "backoffUntil", "consecutive429",
+            "reauthNotified", "staleNotified", "foldedEvents",
+            "profileAlertsEnabled", "creditsVisible", "customLabel",
+            "sessionAlertKey", "sessionAlertThreshold",
+            "weeklyAlertKey", "weeklyAlertThreshold",
+            "pingEnabled", "pingFirstMinute", "pingCutoffMinute", "pingRenewals",
+            "pingDay", "pingWindowsStarted", "pingRetryIndex", "pingLastSentAt",
+            "pingLastAttemptAt", "pingLastResult", "pingLastFailed", "pingRevision",
+            "pingPendingBefore", "pingVerifyAttempt",
+        )
     }
 
     private val appContext = context.applicationContext
@@ -40,8 +61,16 @@ class UsageCache(context: Context) {
     private val prefs: SharedPreferences =
         appContext.getSharedPreferences("usage_cache", Context.MODE_PRIVATE)
 
+    /** The registry is the owner of labels and of the account list; see [profileLabel]. */
+    private val registry: ProfileRegistry by lazy { ProfileRegistry(appContext) }
+
+    fun registry(): ProfileRegistry = registry
+
+    // The legacy exception, restated as a key comparison now that Profile is a value type
+    // (CCRM-6 (Multi-Account)): v0.5 stored the single account's entries unprefixed, and
+    // that key is a storage-format constant, so this test can never be dropped.
     private fun k(profile: Profile, name: String): String =
-        if (profile == Profile.PERSONAL) name else "${profile.key}.$name"
+        if (profile.key == Profile.LEGACY_KEY) name else "${profile.key}.$name"
 
     fun snapshot(profile: Profile): Snapshot {
         val lastStatus =
@@ -135,17 +164,54 @@ class UsageCache(context: Context) {
         prefs.edit().putBoolean("authAlertsEnabled", enabled).apply()
     }
 
-    /** Display name for a profile — the fixed key stays, only the label is editable. */
+    /**
+     * Display name for a profile — the key stays, only the label is editable.
+     *
+     * Still the read path ~40 sites use, but it resolves through the registry **by key**
+     * rather than returning the [Profile]'s own field, so a rename is visible to a
+     * `Profile` captured earlier in a composition, an intent extra or a widget's prefs.
+     * Falls back to the captured label if the account has since been removed.
+     */
     fun profileLabel(profile: Profile): String =
-        prefs.getString(k(profile, "customLabel"), null)?.takeIf { it.isNotBlank() }
-            ?: profile.label
+        registry.byKey(profile.key)?.label ?: profile.label
 
     fun setProfileLabel(profile: Profile, label: String) {
-        val trimmed = label.trim().take(16)
-        prefs.edit().apply {
-            if (trimmed.isEmpty() || trimmed == profile.label) remove(k(profile, "customLabel"))
-            else putString(k(profile, "customLabel"), trimmed)
-        }.apply()
+        registry.rename(profile.key, label)
+    }
+
+    /**
+     * Forgets every per-profile entry for [profile] — CCRM-6 (Multi-Account) account
+     * removal, step 4 of [UsageRepository.removeProfile]'s ordering.
+     *
+     * Two paths, because of the legacy exception in [k]. A prefixed profile can be
+     * prefix-scanned, which is exhaustive by construction. The legacy `personal` profile's
+     * entries share the bare namespace with every app-wide setting in this file — `snapshot`
+     * lives at `"rawJson"`, the app's theme at `"themeMode"` — so a prefix scan there would
+     * take the whole app's settings with it. Its names are enumerated instead, including the
+     * three families whose names are built at runtime (per-window and per-model). The
+     * `modelAlert.` scan is bounded to the `Key`/`Threshold` suffixes so it can never reach
+     * the app-wide `sessionAlertThresholds`, which is one plural away from a per-profile key.
+     */
+    fun clearProfile(profile: Profile) {
+        val e = prefs.edit()
+        if (profile.key == Profile.LEGACY_KEY) {
+            for (name in LEGACY_PROFILE_KEYS) e.remove(name)
+            for (window in listOf("Session", "Weekly")) {
+                e.remove("pace${window}Key")
+                e.remove("pace${window}Mask")
+                e.remove("peak$window")
+                e.remove("seen${window}Key")
+            }
+            for (name in prefs.all.keys) {
+                if (name.startsWith("modelAlert.") &&
+                    (name.endsWith("Key") || name.endsWith("Threshold"))
+                ) e.remove(name)
+            }
+        } else {
+            val prefix = "${profile.key}."
+            for (name in prefs.all.keys) if (name.startsWith(prefix)) e.remove(name)
+        }
+        e.apply()
     }
 
     // --- granular alert settings ---
@@ -269,7 +335,7 @@ class UsageCache(context: Context) {
         prefs.edit().putBoolean("pinnedEnabled", enabled).apply()
     }
 
-    fun pinnedProfile(): Profile = Profile.fromKey(prefs.getString("pinnedProfile", null))
+    fun pinnedProfile(): Profile = registry.resolve(prefs.getString("pinnedProfile", null))
 
     fun setPinnedProfile(profile: Profile) {
         prefs.edit().putString("pinnedProfile", profile.key).apply()
@@ -521,14 +587,46 @@ class UsageCache(context: Context) {
         val expiresAt: Long,
     )
 
-    /** Current (unexpired) folded events, newest first. Prunes expired ones on read. */
+    /**
+     * Current (unexpired) folded events, newest first.
+     *
+     * CCBG-18 (Strip Lifetime Stamp): "keep alerts in the shade for" is applied **here**,
+     * at read time, not only at the moment the event was folded. [FoldedEvent.expiresAt]
+     * is stamped once by `Alerts.eventTimeout`, so before this a strip folded under the
+     * default `auto` carried a multi-day expiry — until its 7-day window reset — that
+     * choosing 15m afterwards could never reach. The chip reads as a display rule; it now
+     * behaves like one.
+     *
+     * It can only ever **shorten**. `auto` keeps the stamped ceiling, and an explicit
+     * choice is capped by it, so a longer chip never *extends* something deliberately
+     * short — `Alerts.RESET_STRIP_MS`'s fixed half hour, in particular.
+     *
+     * Pruning the store still uses the hard stamp, so flipping back to `auto` finds the
+     * events still there rather than deleted by a setting the user has since changed.
+     */
     fun foldedEvents(profile: Profile): List<FoldedEvent> {
         val now = System.currentTimeMillis()
         val stored = readFoldedEvents(profile)
-        val live = stored.filter { it.expiresAt > now }
-        if (live.size != stored.size) writeFoldedEvents(profile, live)
-        return live.sortedByDescending { it.firedAt }
+        val kept = stored.filter { it.expiresAt > now }
+        if (kept.size != stored.size) writeFoldedEvents(profile, kept)
+        return kept.filter { effectiveExpiry(it) > now }.sortedByDescending { it.firedAt }
     }
+
+    /**
+     * When [event]'s strip should leave the panel, honouring the current
+     * [alertLifetime] — see [foldedEvents]. Never later than the stamped expiry.
+     */
+    fun effectiveExpiry(event: FoldedEvent): Long =
+        com.robin.claudeusage.notify.StripRules.expiry(
+            event.firedAt, event.expiresAt, alertLifetime(),
+        )
+
+    /**
+     * The soonest any of [profile]'s live strips is due to leave, or 0 if none is —
+     * what CCBG-18's expiry alarm is armed for.
+     */
+    fun nextStripExpiry(profile: Profile): Long =
+        foldedEvents(profile).minOfOrNull { effectiveExpiry(it) } ?: 0L
 
     /** Adds an event, replacing any existing one of the same [FoldedEvent.kind]. */
     fun addFoldedEvent(profile: Profile, event: FoldedEvent) {
@@ -813,8 +911,10 @@ class UsageCache(context: Context) {
 /** Per-widget configuration chosen in the setup screen when a widget is placed. */
 class WidgetPrefs(context: Context) {
 
+    private val appContext = context.applicationContext
+
     private val prefs: SharedPreferences =
-        context.applicationContext.getSharedPreferences("widget_prefs", Context.MODE_PRIVATE)
+        appContext.getSharedPreferences("widget_prefs", Context.MODE_PRIVATE)
 
     /**
      * Whether this instance has a stored override. Prefs are only written on the
@@ -823,8 +923,25 @@ class WidgetPrefs(context: Context) {
      */
     fun has(appWidgetId: Int): Boolean = prefs.contains("w$appWidgetId.profile")
 
+    /**
+     * The account this instance shows. A widget whose account was removed resolves to
+     * [ProfileRegistry.first] — and because slots are never reused it can never resolve to
+     * a *different* new account. Removal repoints the stored key anyway (CCRM-6
+     * (Multi-Account) phase 4); this is the belt to that braces.
+     */
     fun profileFor(appWidgetId: Int): Profile =
-        Profile.fromKey(prefs.getString("w$appWidgetId.profile", null))
+        ProfileRegistry(appContext).resolve(prefs.getString("w$appWidgetId.profile", null))
+
+    /** Repoints every instance aimed at a removed account. */
+    fun repointFrom(deadKey: String, replacement: Profile) {
+        val e = prefs.edit()
+        for ((name, value) in prefs.all) {
+            if (name.endsWith(".profile") && value == deadKey) {
+                e.putString(name, replacement.key)
+            }
+        }
+        e.apply()
+    }
 
     fun barFor(appWidgetId: Int): String =
         prefs.getString("w$appWidgetId.bar", "session") ?: "session"
