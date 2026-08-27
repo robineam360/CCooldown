@@ -12,7 +12,7 @@ to see how close you are.
 
 **📱 Android only (for now)** — an iOS version is on the roadmap. iPhone folks, watch this space.
 
-📄 **Docs:** [User Guide (PDF)](release/docs/CCooldown-User-Guide-v1.3.pdf) — the full
+📄 **Docs:** [User Guide (PDF)](release/docs/CCooldown-User-Guide-v1.4.pdf) — the full
 install → sign-in → widgets walkthrough · [Brochure (PDF)](release/docs/CCooldown-Brochure.pdf) —
 a 2-page overview.
 
@@ -42,8 +42,9 @@ a 2-page overview.
   per-model bars, with a one-tap Refresh
 - **Usage history** 🆕 — a scrollable bar per 5-hour session, week by week (and a per-week
   view across weeks), so you can see how many sessions you ran and which ones hit 100%
-- **Two profiles with editable names** — track a Personal and a Work account side by side in
-  swipeable tabs, and rename them to whatever you like
+- **Multi-account with editable names** 🆕 — Personal and Work to start, "+ Add account" for
+  as many more as you use; each gets its own swipeable tab, widgets, tiles and alerts, and
+  renames from its account card
 - **Quick Settings tiles** — glance at your 5h/7d percentages from the notification shade
 - **Granular alerts** 🆕 — pick exactly which thresholds warn you per window (5-hour, 7-day,
   per-model), turn reset pings off / smart / always, and mute a whole profile — no more
@@ -106,9 +107,10 @@ the account card. Your browser opens Claude's sign-in — log in (Pro, Max, and 
 accounts all work), tap **Authorize**, copy the code the page shows, hop back to the app,
 and tap **Paste → Finish sign-in**. Usage loads immediately.
 
-Tracking two accounts? Do the same on the second card — if you keep each account logged
-in to claude.ai in a different browser, the built-in browser picker lets you route each
-sign-in accordingly (e.g. Work in Chrome, Personal in Brave).
+Tracking more than one account? Do the same on the second card, or tap **"+ Add account"**
+for a third, fourth, or more — if you keep each account logged in to claude.ai in a
+different browser, the built-in browser picker lets you route each sign-in accordingly
+(e.g. Work in Chrome, Personal in Brave).
 
 **3. Add a widget.** Long-press your home screen → **Widgets** → pick a **Claude
 Cooldown** widget.
@@ -240,8 +242,12 @@ About section (it emails <robin@eam360.com>).
 ## Version history
 
 A quick, plain-English tour of what each update added (newest first). The full technical
-changelog lives in the [User Guide](release/docs/CCooldown-User-Guide-v1.3.pdf).
+changelog lives in the [User Guide](release/docs/CCooldown-User-Guide-v1.4.pdf).
 
+- **1.4** — **Multi-account** — "+ Add account" for a third, fourth, or more, each with its own tab, widgets, tiles and alerts. A new clock-hand pace needle on the always-on notification's status-bar icon. Fixed: alerts switched off in Settings now retract their pinned-notification strip instead of leaving it stuck.
+- **1.3** — The status-bar icon rebuilt around its real size, with a theme-coloured pace ring and a dot for when the 7-day window needs a look; every alert for every profile now folds into one pinned-notification panel; new hourglass launcher icon; Used-or-Left and countdown-or-clock display switches.
+- **1.2** — Three new widget faces (Ring, Mini-Rings, Pace); pace marks on every bar and ring; **pace alerts** on the projection, not just the percent; automatic update checks.
+- **1.1** — **Usage credits**, four pinned-notification styles, and a rebuilt **pace chart** with an even-pace line and threshold guides.
 - **1.0** — First official release — everything below, polished into one build and shared with the team.
 - **0.14** — Feedback now opens an email (was WhatsApp); added a **Check for updates** button; the app downloads from GitHub Releases.
 - **0.13** — The big one: **usage history**, an always-on **pinned notification**, and **finer-grained alerts**. Profiles are renameable, and your history & settings now survive a reinstall.
