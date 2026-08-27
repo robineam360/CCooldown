@@ -77,7 +77,9 @@ object Conditions {
     fun panelFor(context: Context, cache: UsageCache, profile: Profile): Panel {
         // The panel carries the other profiles too (revised 2026-08-18): their strips are
         // prefixed with their names, since the header only names the shown profile. Event
-        // titles already carry their profile's label from the alert copy.
+        // strips are prefixed here as well — CCBG-16 (Stale Strip Label) moved that
+        // composition out of the frozen alert copy and onto [StripRules.stripTitle], so an
+        // event now follows a rename exactly as the live conditions below always did.
         //
         // CCRM-6 (Multi-Account) generalised this from exactly one "other" to every other
         // registered account. Ordering is unchanged and deliberate: the *shown* profile's
@@ -87,9 +89,20 @@ object Conditions {
         val others = cache.registry().all().filter { it != profile }
         val staleCondition = stale(cache, profile)
         val events = (listOf(profile) + others)
-            .flatMap { p -> cache.foldedEvents(p).filter { revocable(cache, p, it.kind) } }
-            .sortedByDescending { it.firedAt }
-            .map { Condition(short = it.title, title = it.title, detail = it.detail, error = false) }
+            .flatMap { p ->
+                // The label is read per owning profile, live, at draw time — the point of
+                // CCBG-16 (Stale Strip Label). Events are stored in their own profile's
+                // namespace, so `p` *is* the owner.
+                val label = cache.profileLabel(p)
+                cache.foldedEvents(p)
+                    .filter { revocable(cache, p, it.kind) }
+                    .map { it to label }
+            }
+            .sortedByDescending { (event, _) -> event.firedAt }
+            .map { (event, label) ->
+                val title = StripRules.stripTitle(event.title, event.profileKey, label)
+                Condition(short = title, title = title, detail = event.detail, error = false)
+            }
         val all = listOfNotNull(reauth(cache, profile), staleCondition) +
             others.flatMap { other ->
                 val label = cache.profileLabel(other)

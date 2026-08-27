@@ -188,7 +188,7 @@ object Alerts {
                 keyName = "sessionAlert",
                 thresholds = cache.sessionAlertThresholds().sortedDescending(),
                 notificationId = notifId(profile, 1),
-                title = { pct -> "$label: 5-hour window at $pct%" },
+                title = { pct -> "5-hour window at $pct%" },
                 use24h = use24h,
                 windowLengthMs = Projection.SESSION_MS,
             )
@@ -199,7 +199,7 @@ object Alerts {
                 keyName = "weeklyAlert",
                 thresholds = cache.weeklyAlertThresholds().sortedDescending(),
                 notificationId = notifId(profile, 2),
-                title = { pct -> "$label: 7-day window at $pct%" },
+                title = { pct -> "7-day window at $pct%" },
                 use24h = use24h,
                 windowLengthMs = Projection.WEEKLY_MS,
             )
@@ -237,7 +237,7 @@ object Alerts {
                 keyName = "modelAlert.${cap.modelName}",
                 thresholds = cache.modelCapAlertThresholds().sortedDescending(),
                 notificationId = notifId(profile, MODEL_CAP_KIND_BASE + index),
-                title = { pct -> "$label: ${cap.modelName} 7-day cap at $pct%" },
+                title = { pct -> "${cap.modelName} 7-day cap at $pct%" },
                 use24h = use24h,
                 // Per-model caps are weekly_scoped, so they drift on the 7-day clock.
                 windowLengthMs = Projection.WEEKLY_MS,
@@ -354,7 +354,8 @@ object Alerts {
                 (mode == UsageCache.RESET_SMART && peak >= UsageCache.SMART_RESET_MIN_PCT)
             if (wanted && cache.profileAlertsEnabled(profile)) {
                 val id = notifId(profile, if (windowName == "Session") 4 else 5)
-                val title = "${cache.profileLabel(profile)}: $windowLabel window reset"
+                // Unprefixed — see [checkThresholds]'s `title` and CCBG-16.
+                val title = "$windowLabel window reset"
                 val text = "Usage is back at ${pct.toInt()}%. Next reset ${Fmt.relIn(window.resetsAt)}."
                 if (Conditions.foldedInto(cache)) {
                     // CCRM-44 (One Surface): "you're back" is momentary, so the strip
@@ -363,7 +364,8 @@ object Alerts {
                         expiresAt = System.currentTimeMillis() + RESET_STRIP_MS)
                 } else {
                     notify(
-                        context, profile, id, CHANNEL_RESET, title, text,
+                        context, profile, id, CHANNEL_RESET,
+                        "${cache.profileLabel(profile)}: $title", text,
                         // Under "auto", lives until the fresh window resets in turn — after
                         // which "your window reset" is about a window two generations old.
                         timeoutMs = eventTimeout(cache, window.resetsAt),
@@ -385,6 +387,12 @@ object Alerts {
         keyName: String,
         thresholds: List<Int>,
         notificationId: Int,
+        /**
+         * The alert sentence for a percentage, **without** the account-name prefix —
+         * CCBG-16 (Stale Strip Label). A folded strip stores it as-is and gets its label
+         * at draw time; the standalone notification prefixes it here, where nothing else
+         * names the account.
+         */
         title: (Int) -> String,
         use24h: Boolean,
         windowLengthMs: Long,
@@ -417,7 +425,7 @@ object Alerts {
         } else {
             notify(
                 context, profile, notificationId, CHANNEL_USAGE,
-                title(pct), resetLine(window.resetsAt, use24h),
+                "${cache.profileLabel(profile)}: ${title(pct)}", resetLine(window.resetsAt, use24h),
                 timeoutMs = eventTimeout(cache, window.resetsAt),
             )
         }
@@ -460,8 +468,7 @@ object Alerts {
         )
         var state = step.carry
         step.fire.firstOrNull()?.let { headline ->
-            val label = cache.profileLabel(profile)
-            val (title, text) = paceCopy(headline, label, windowLabel, window, usedPct, estimate, use24h)
+            val (title, text) = paceCopy(headline, windowLabel, window, usedPct, estimate, use24h)
             // CCRM-44 (One Surface): folding always "delivers" — the strip write is a
             // pref, it cannot fail the way a notification post can.
             val posted = if (Conditions.foldedInto(cache)) {
@@ -469,7 +476,8 @@ object Alerts {
                     expiresAt = System.currentTimeMillis() + eventTimeout(cache, window.resetsAt))
                 true
             } else notify(
-                context, profile, notificationId, CHANNEL_PACE, title, text,
+                context, profile, notificationId, CHANNEL_PACE,
+                "${cache.profileLabel(profile)}: $title", text,
                 timeoutMs = eventTimeout(cache, window.resetsAt),
             )
             if (posted) {
@@ -482,7 +490,6 @@ object Alerts {
 
     private fun paceCopy(
         milestone: Projection.PaceMilestone,
-        label: String,
         windowLabel: String,
         window: UsageWindow,
         usedPct: Double,
@@ -491,7 +498,7 @@ object Alerts {
     ): Pair<String, String> = when (milestone) {
         Projection.PaceMilestone.WILL_RUN_OUT -> {
             val hits = estimate?.hitsLimitAtMs
-            "$label: $windowLabel window will run out early" to if (hits != null) {
+            "$windowLabel window will run out early" to if (hits != null) {
                 "At this pace, 100% around ${Fmt.dayTime(Instant.ofEpochMilli(hits), use24h)} — " +
                     "${Fmt.span(window.resetsAt!!.toEpochMilli() - hits)} before the reset."
             } else {
@@ -500,11 +507,11 @@ object Alerts {
             }
         }
         Projection.PaceMilestone.CUTTING_IT_CLOSE ->
-            "$label: cutting it close on the $windowLabel window" to
+            "cutting it close on the $windowLabel window" to
                 "Projected ~${Math.round(estimate?.pctAtReset ?: usedPct)}% by the reset. " +
                 resetLine(window.resetsAt, use24h)
         Projection.PaceMilestone.ALMOST_OUT ->
-            "$label: $windowLabel window almost out" to
+            "$windowLabel window almost out" to
                 "Under 10% left. ${resetLine(window.resetsAt, use24h)}"
     }
 
@@ -545,6 +552,10 @@ object Alerts {
      * notification, and clears any standalone copy of the same alert left over from
      * before the pinned notification was switched on. The panel re-renders at the
      * end of [evaluate], so the strip is visible on the same poll that fired it.
+     *
+     * [title] arrives **unprefixed** and the owning [Profile.key] is stored beside it, so
+     * the account name is composed when the panel draws — CCBG-16 (Stale Strip Label).
+     * Storing finished text was what froze the old name into the strip.
      */
     private fun foldEvent(
         context: Context,
@@ -559,7 +570,7 @@ object Alerts {
         cache.addFoldedEvent(
             profile,
             UsageCache.FoldedEvent(
-                kind = kind, title = title, detail = text,
+                kind = kind, profileKey = profile.key, title = title, detail = text,
                 firedAt = System.currentTimeMillis(), expiresAt = expiresAt,
             ),
         )

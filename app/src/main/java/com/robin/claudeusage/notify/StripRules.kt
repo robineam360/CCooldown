@@ -44,6 +44,25 @@ object StripRules {
         else -> null
     }
 
+    /**
+     * A folded event's strip title, labelled with the account it belongs to —
+     * CCBG-16 (Stale Strip Label).
+     *
+     * The stored [storedTitle] is the alert sentence with no account name in it, so the
+     * name is composed here, at render time, from the live registry label. That is the
+     * whole fix: the frozen copy could not follow a rename, and this cannot fail to.
+     * Deliberately the same `"label: sentence"` shape
+     * [Conditions.labelled][com.robin.claudeusage.notify.Conditions] gives the live
+     * condition strips, so events and faults read as one stack.
+     *
+     * @param profileKey the event's owning account key, or `""` for a record written
+     *   before this fix — whose title already carries a name, possibly a stale one, and is
+     *   therefore returned untouched rather than prefixed twice. Those records live at most
+     *   one `alertLifetime` and need no migration.
+     */
+    fun stripTitle(storedTitle: String, profileKey: String, label: String): String =
+        if (profileKey.isEmpty() || label.isEmpty()) storedTitle else "$label: $storedTitle"
+
     /** Which setting decides whether a strip of a given kind is still allowed on screen. */
     enum class Gate {
         /** Nothing beyond the owning profile's own alerts toggle. */

@@ -11,35 +11,6 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
 
 ## Open
 
-### CCBG-16 · Stale Strip Label — a folded event keeps the account name it fired under
-- **Status:** Open
-- **Severity:** Low (cosmetic; the numbers and the routing are right)
-- **Symptom:** **Observed on the Fold 7, 2026-08-21**, during the CCRM-6 (Multi-Account)
-  device pass. The pinned panel's header read `Personal · 5-hour window` while the folded
-  event strip below it read **`Pro: 7-day window will run out early`** — "Pro" being what
-  that same account was called when the event fired, minutes earlier. Both the collapsed
-  row and the expanded panel show the old name.
-- **Cause:** `UsageCache.FoldedEvent` stores `title` and `detail` as **finished text**,
-  composed at fire time by the alert copy (`"$label: $windowLabel window will run out
-  early"`). A rename updates the registry, so every *live* read of `profileLabel` follows
-  it — but the strings already sitting in the `foldedEvents` pref are frozen. The strip is
-  not re-derived, so it cannot follow.
-- **Where:** `Alerts.foldEvent` / `UsageCache.FoldedEvent` (the store), rendered by
-  `Conditions.panelFor`. Note this is **not** the CCRM-6 label-prefix path
-  (`Condition.labelled`), which reads `cache.profileLabel` live and is correct — the two
-  look identical in the panel, which is what makes this confusing to read.
-- **Pre-dates CCRM-6**, which is why it is filed separately: the frozen-text design came in
-  with CCRM-44 (One Surface). But CCRM-6 made renaming a one-tap action on the account card
-  and gave accounts default names people will want to change, so a state that was
-  near-unreachable is now easy to hit.
-- **Fix options, undecided:** store the profile key on `FoldedEvent` and the *unprefixed*
-  title, then compose the label at render time like `labelled` already does (correct, and
-  needs a migration for events stored by older builds — or just let them age out through
-  the existing prune); or re-title stored events on rename (cheaper, but it has to
-  string-match the old label out of a sentence, which is fragile); or accept it, since
-  events are short-lived by design — the longest is `alertLifetime`, and reset strips live
-  30 minutes.
-
 ### CCBG-15 · Amber Ladder Blindness — the Amber theme's accent is the yellow warning rung
 - **Status:** Open
 - **Severity:** Low (one theme, and the orange/red rungs still land)
@@ -75,6 +46,59 @@ commits. IDs never change or get reused; only status moves. Feature work lives i
 ---
 
 ## Fixed
+
+### CCBG-16 · Stale Strip Label — a folded event keeps the account name it fired under
+- **Status:** Fixed (2026-08-27) · unit-tested (`StripRulesTest`, 4 cases; 255 green) ·
+  **not yet verified on a device** — confirming it means renaming an account on the Fold 7
+  while one of its strips is still in the panel, and watching the strip follow.
+- **Severity:** Low (cosmetic; the numbers and the routing are right)
+- **Symptom:** **Observed on the Fold 7, 2026-08-21**, during the CCRM-6 (Multi-Account)
+  device pass. The pinned panel's header read `Personal · 5-hour window` while the folded
+  event strip below it read **`Pro: 7-day window will run out early`** — "Pro" being what
+  that same account was called when the event fired, minutes earlier. Both the collapsed
+  row and the expanded panel show the old name.
+- **Cause:** `UsageCache.FoldedEvent` stores `title` and `detail` as **finished text**,
+  composed at fire time by the alert copy (`"$label: $windowLabel window will run out
+  early"`). A rename updates the registry, so every *live* read of `profileLabel` follows
+  it — but the strings already sitting in the `foldedEvents` pref are frozen. The strip is
+  not re-derived, so it cannot follow.
+- **Where:** `Alerts.foldEvent` / `UsageCache.FoldedEvent` (the store), rendered by
+  `Conditions.panelFor`. Note this is **not** the CCRM-6 label-prefix path
+  (`Condition.labelled`), which reads `cache.profileLabel` live and is correct — the two
+  look identical in the panel, which is what makes this confusing to read.
+- **Pre-dates CCRM-6**, which is why it is filed separately: the frozen-text design came in
+  with CCRM-44 (One Surface). But CCRM-6 made renaming a one-tap action on the account card
+  and gave accounts default names people will want to change, so a state that was
+  near-unreachable is now easy to hit.
+- **Fixed by option A — the profile key travels with the event, the name is composed at
+  draw time.** Chosen over re-titling stored events on rename (which has to string-match
+  the old label out of the middle of a finished sentence — and the old label is the very
+  thing the rename destroys) and over accepting it (events are short-lived, but CCRM-6
+  (Multi-Account) made renaming a one-tap action, so the window is easy to hit).
+  - `UsageCache.FoldedEvent` gains **`profileKey`**, and `title` is now the alert sentence
+    **without** the account-name prefix. The alert copy in `Alerts` composes unprefixed
+    titles; the **standalone notification path prefixes them at post time**, where nothing
+    else names the account, so that copy is byte-identical to before.
+  - The composition rule is a pure function, `StripRules.stripTitle`, beside the two rules
+    CCBG-17 (Strip Revocation) and CCBG-18 (Strip Lifetime Stamp) already keep there — the
+    same reason: it is the part that can be wrong. `Conditions.panelFor` calls it with the
+    live `profileLabel` of the owning profile, giving events the identical `"label: title"`
+    shape `Condition.labelled` gives the live fault strips.
+  - **No migration.** `profileKey` doubles as the record's version marker: absent means the
+    title is pre-fix finished text, drawn as it stands rather than prefixed twice, and it
+    ages out through `alertLifetime` within one lifetime at most.
+- **Deliberately unchanged:** the shown profile's own event strips still carry their account
+  name, so a single-account panel reads exactly as it did — this fix restores an approved
+  design rather than changing one. Whether that prefix should be *dropped* for the shown
+  profile, to match its unprefixed fault strips and the header that already names it, is a
+  visible change and therefore a separate, wireframe-gated call.
+- **Where:** [UsageCache.kt](app/src/main/java/com/robin/claudeusage/data/UsageCache.kt)
+  (`FoldedEvent` + its JSON),
+  [StripRules.kt](app/src/main/java/com/robin/claudeusage/notify/StripRules.kt)
+  (`stripTitle`),
+  [Conditions.kt](app/src/main/java/com/robin/claudeusage/notify/Conditions.kt)
+  (`panelFor`), [Alerts.kt](app/src/main/java/com/robin/claudeusage/alerts/Alerts.kt)
+  (unprefixed copy, `foldEvent` stores the key).
 
 ### CCBG-18 · Strip Lifetime Stamp — "keep alerts for" is frozen at fire time and never re-read
 - **Status:** Fixed (2026-08-26) · unit-tested (`StripRulesTest`); **not yet verified on

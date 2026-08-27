@@ -581,6 +581,22 @@ class UsageCache(context: Context) {
      */
     data class FoldedEvent(
         val kind: String,
+        /**
+         * Which account this event fired for — CCBG-16 (Stale Strip Label).
+         *
+         * Its presence is also the record's version marker, which is why it has no
+         * default: a record carrying a key holds an **unprefixed** [title], to be labelled
+         * at render time by
+         * [StripRules.stripTitle][com.robin.claudeusage.notify.StripRules.stripTitle]; a
+         * record written before the fix carries `""` and a title with the account name
+         * already frozen into it. There is no migration — the old records are labelled
+         * as they stand and age out through [effectiveExpiry].
+         */
+        val profileKey: String,
+        /**
+         * The alert sentence **without** the account-name prefix (see [profileKey]).
+         * The prefix is composed at render time so it follows a rename.
+         */
         val title: String,
         val detail: String,
         val firedAt: Long,
@@ -642,6 +658,9 @@ class UsageCache(context: Context) {
             val o = arr.optJSONObject(i) ?: return@mapNotNull null
             FoldedEvent(
                 kind = o.optString("kind"),
+                // Absent for a record stored before CCBG-16 (Stale Strip Label) — see
+                // [FoldedEvent.profileKey]. Empty means "the title is already finished text".
+                profileKey = o.optString("profileKey"),
                 title = o.optString("title"),
                 detail = o.optString("detail"),
                 firedAt = o.optLong("firedAt"),
@@ -658,6 +677,7 @@ class UsageCache(context: Context) {
             arr.put(
                 org.json.JSONObject()
                     .put("kind", e.kind)
+                    .put("profileKey", e.profileKey)
                     .put("title", e.title)
                     .put("detail", e.detail)
                     .put("firedAt", e.firedAt)

@@ -101,4 +101,50 @@ class StripRulesTest {
             StripRules.gateFor("modelAlert.claude-3.5-sonnet"),
         )
     }
+
+    // --- CCBG-16: the account name is composed now, not frozen then --------------------
+
+    @Test
+    fun `a strip is labelled from the live name, so a rename follows`() {
+        // The reported case: the event fired while the account was called "Pro", and the
+        // panel header had since moved on to "Personal". The stored sentence carries no
+        // name at all, so the only name that can be drawn is the current one.
+        val stored = "7-day window will run out early"
+        assertEquals(
+            "Pro: 7-day window will run out early",
+            StripRules.stripTitle(stored, "work", "Pro"),
+        )
+        assertEquals(
+            "Personal: 7-day window will run out early",
+            StripRules.stripTitle(stored, "work", "Personal"),
+        )
+    }
+
+    @Test
+    fun `a record written before the fix is drawn as it stands, never prefixed twice`() {
+        // No profileKey means the name is already inside the title — possibly the stale
+        // one. Showing it unchanged is the honest degrade; "Personal: Pro: ..." is not.
+        assertEquals(
+            "Pro: 7-day window will run out early",
+            StripRules.stripTitle("Pro: 7-day window will run out early", "", "Personal"),
+        )
+    }
+
+    @Test
+    fun `an empty label leaves the sentence alone rather than prefixing a colon`() {
+        assertEquals(
+            "5-hour window at 80%",
+            StripRules.stripTitle("5-hour window at 80%", "personal", ""),
+        )
+    }
+
+    @Test
+    fun `event strips take the same shape as the live condition strips`() {
+        // Conditions.labelled composes "label: title" for the other profiles' faults.
+        // Events must match it exactly or one panel shows two grammars.
+        assertEquals(
+            "Work: sign-in stopped working",
+            StripRules.stripTitle("sign-in stopped working", "work", "Work"),
+        )
+    }
 }
