@@ -3,6 +3,7 @@ package com.robin.claudeusage.data
 import android.content.Context
 import androidx.glance.appwidget.updateAll
 import com.robin.claudeusage.alerts.Alerts
+import com.robin.claudeusage.data.source.Sources
 import com.robin.claudeusage.diag.AppLog
 import com.robin.claudeusage.ui.Fmt
 import com.robin.claudeusage.widget.BarWidget
@@ -139,7 +140,8 @@ class UsageRepository(private val context: Context) {
      * Adds an account (CCRM-6 (Multi-Account)). Mints a fresh key and slot, then republishes
      * the shortcuts so the new entry appears the moment it has a token.
      */
-    fun addProfile(label: String? = null): Profile = registry.add(label)
+    fun addProfile(label: String? = null, provider: Provider = Provider.CLAUDE): Profile =
+        registry.add(label, provider)
 
     fun renameProfile(profile: Profile, label: String) = registry.rename(profile.key, label)
 
@@ -476,6 +478,7 @@ class UsageRepository(private val context: Context) {
             }
         }
 
+        val source = Sources.of(profile.provider)
         var token = creds.accessToken
 
         if (creds.expiresAt in 1 until now + EXPIRY_MARGIN_MS) {
@@ -483,13 +486,13 @@ class UsageRepository(private val context: Context) {
         }
 
         return try {
-            var resp = ApiClient.fetchUsage(token)
-            if (resp.code == 401) {
+            var resp = source.fetchUsage(creds.copy(accessToken = token))
+            if (source.isAuthFailure(resp.code)) {
                 token = refreshAccessToken(profile, credStore.load(profile) ?: creds)
                     ?: return authFailure(profile, now)
-                resp = ApiClient.fetchUsage(token)
+                resp = source.fetchUsage(creds.copy(accessToken = token))
             }
-            val parsed = if (resp.code == 200) UsageParser.parse(resp.body) else null
+            val parsed = if (resp.code == 200) source.parseUsage(resp.body) else null
             when {
                 parsed != null -> {
                     val at = System.currentTimeMillis()
@@ -509,7 +512,7 @@ class UsageRepository(private val context: Context) {
                     cache.saveFailure(profile, "Rate limited (429)", now, kind = ErrorKind.RATE_LIMITED)
                     FetchResult.RateLimited()
                 }
-                resp.code == 401 -> authFailure(profile, now)
+                source.isAuthFailure(resp.code) -> authFailure(profile, now)
                 else -> {
                     cache.saveFailure(profile, "HTTP ${resp.code}", now, kind = ErrorKind.SERVER)
                     FetchResult.Error("HTTP ${resp.code}")
@@ -527,8 +530,9 @@ class UsageRepository(private val context: Context) {
     /** Returns a fresh access token, persisting rotated tokens immediately; null on failure. */
     private fun refreshAccessToken(profile: Profile, creds: Credentials): String? {
         lastRefreshFailDetail = null
+        val source = Sources.of(profile.provider)
         return try {
-            val resp = ApiClient.refreshToken(creds.refreshToken)
+            val resp = source.refresh(creds)
             if (resp.code != 200) {
                 lastRefreshFailDetail = "HTTP ${resp.code}"
                 if (resp.code in 400..403) cache.setAuthState(profile, AuthState.REAUTH_NEEDED)
@@ -540,34 +544,27 @@ class UsageRepository(private val context: Context) {
                 )
                 return null
             }
-            val o = JSONObject(resp.body)
-            val newAccess = o.optString("access_token")
-            if (newAccess.isEmpty()) {
+            val grant = source.parseTokenResponse(resp.body, creds) ?: run {
                 lastRefreshFailDetail = "no token in response"
                 return null
             }
-            val rotatedRefresh = o.optString("refresh_token")
-            val newRefresh = rotatedRefresh.ifEmpty { creds.refreshToken }
-            val expiresIn = o.optLong("expires_in", 0L)
-            val expiresAt = if (expiresIn > 0) System.currentTimeMillis() + expiresIn * 1000 else 0L
-            credStore.save(profile, Credentials(newAccess, newRefresh, expiresAt))
+            credStore.save(profile, grant.creds)
             cache.setAuthState(profile, AuthState.OK)
             cache.setLastRenewedAt(profile, System.currentTimeMillis())
             cache.setFirstRefreshFailAt(profile, 0L)
+            val rotated = grant.creds.refreshToken != creds.refreshToken
             // A rotated refresh token gets a new, unknown expiry — the exact date
             // from a pasted desktop token no longer applies. For a native phone
             // sign-in, rotation is healthy self-renewal and the ~30-day family
             // clock still holds from sign-in, so the estimate stays put.
-            if (rotatedRefresh.isNotEmpty() && rotatedRefresh != creds.refreshToken &&
-                !cache.nativeSignIn(profile)
-            ) {
+            if (rotated && !cache.nativeSignIn(profile)) {
                 cache.clearRefreshExpiry(profile)
             }
             AppLog.log(
                 context, AppLog.Level.DEBUG, "auth", profile,
-                "token renewed (rotated=${rotatedRefresh.isNotEmpty() && rotatedRefresh != creds.refreshToken})",
+                "token renewed (rotated=$rotated)",
             )
-            newAccess
+            grant.creds.accessToken
         } catch (e: Exception) {
             lastRefreshFailDetail = e.message ?: e.javaClass.simpleName
             AppLog.log(

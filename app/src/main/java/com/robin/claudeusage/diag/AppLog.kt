@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Build
 import android.os.PowerManager
 import com.robin.claudeusage.data.Profile
+import com.robin.claudeusage.data.Provider
 import com.robin.claudeusage.data.UsageCache
 import java.io.File
 import java.time.Instant
@@ -69,7 +70,12 @@ object AppLog {
     ) {
         try {
             if (!shouldLog(level, Level.fromKey(UsageCache(context).logLevel()))) return
-            val line = formatLine(stamp.format(Instant.now()), level, category, profile?.key, event)
+            // [poll][chatgpt:p3] — prefix the key with the provider only when it isn't
+            // Claude, so every existing Claude log line stays byte-identical.
+            val keyLabel = profile?.let {
+                if (it.provider == Provider.CLAUDE) it.key else "${it.provider.key}:${it.key}"
+            }
+            val line = formatLine(stamp.format(Instant.now()), level, category, keyLabel, event)
             synchronized(lock) {
                 val f = file(context)
                 f.parentFile?.mkdirs()

@@ -27,6 +27,12 @@ data class Profile(
     val key: String,
     val slot: Int,
     val label: String,
+    /**
+     * Which service this account tracks (CCRM-53 (Provider Model)). Not part of identity —
+     * see [equals] — since a key is minted once and the provider travels with it for the
+     * account's whole life; nothing renders a provider switch mid-life.
+     */
+    val provider: Provider = Provider.CLAUDE,
 ) {
     override fun equals(other: Any?): Boolean =
         this === other || (other is Profile && other.key == key)

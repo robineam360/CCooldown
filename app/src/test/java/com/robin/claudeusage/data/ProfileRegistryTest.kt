@@ -222,6 +222,39 @@ class ProfileRegistryTest {
         assertNull(state.profiles.firstOrNull { it.key == "personal" })
     }
 
+    // --- provider (CCRM-53) ---
+
+    @Test
+    fun `encode then decode round-trips the provider`() {
+        val (state, _) = ProfileRegistry.add(seeded(), "Codex", Provider.CHATGPT)
+        val back = ProfileRegistry.decode(ProfileRegistry.encode(state), state.nextSlot)
+        assertEquals(Provider.CHATGPT, back.profiles.first { it.key == "p2" }.provider)
+        assertEquals(Provider.CLAUDE, back.profiles.first { it.key == "personal" }.provider)
+    }
+
+    @Test
+    fun `an absent v decodes to CLAUDE`() {
+        val state = ProfileRegistry.decode("""[{"k":"personal","s":0,"l":"Pro"}]""", 1)
+        assertEquals(Provider.CLAUDE, state.profiles.first().provider)
+    }
+
+    @Test
+    fun `an unknown v decodes to CLAUDE`() {
+        val state = ProfileRegistry.decode("""[{"k":"personal","s":0,"l":"Pro","v":"cursor"}]""", 1)
+        assertEquals(Provider.CLAUDE, state.profiles.first().provider)
+    }
+
+    @Test
+    fun `add without a provider defaults to CLAUDE`() {
+        val (_, profile) = ProfileRegistry.add(seeded(), "Teams")
+        assertEquals(Provider.CLAUDE, profile.provider)
+    }
+
+    @Test
+    fun `encode writes v claude for every Claude account`() {
+        assertTrue(ProfileRegistry.encode(seeded()).contains("\"v\":\"claude\""))
+    }
+
     // --- notification IDs ---
 
     /** Every kind [Alerts] actually posts: 1–8 fixed, 10+n per-model caps, 30/31 pace. */

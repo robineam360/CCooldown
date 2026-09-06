@@ -22,6 +22,21 @@ data class UsageWindow(
 data class ModelCap(val modelName: String, val window: UsageWindow)
 
 /**
+ * A window's kind, by its **duration** — never by which JSON slot it arrived in
+ * (lesson from OpenQuota's `codex/mapper.rs`). A weekly-only account can put its
+ * weekly limit in a `primary_window`-shaped slot, so the shape alone would misread
+ * it as a session window (CCRM-53 (Provider Model)).
+ */
+enum class WindowKind { SESSION, WEEKLY, OTHER }
+
+fun classifyWindow(lengthSeconds: Long?): WindowKind = when (lengthSeconds) {
+    18_000L -> WindowKind.SESSION
+    604_800L -> WindowKind.WEEKLY
+    null -> WindowKind.OTHER
+    else -> WindowKind.OTHER
+}
+
+/**
  * Pay-as-you-go "usage credits" — the spend that covers you once a plan window is
  * exhausted. Unlike the windows above this is *money*, not a rate limit, and the
  * server reports it in minor units (599 with exponent 2 = $5.99).
@@ -49,6 +64,13 @@ data class SpendCredits(
      * which is not the same as a zero balance.
      */
     val balanceMinor: Long? = null,
+    /**
+     * ChatGPT's `credits` reports `{has_credits, unlimited, balance}` — a balance
+     * with no cap and an explicit "unlimited" (CCRM-53 (Provider Model)). An
+     * unlimited account has nothing to measure, so [isReportable] hides it by
+     * review decision — Claude's shape never sets this.
+     */
+    val unlimited: Boolean = false,
 ) {
     /** Whether there is a cap to measure spend against at all. */
     val hasLimit: Boolean
@@ -57,7 +79,7 @@ data class SpendCredits(
     /**
      * Worth showing: either a cap to measure against, or real spend to report. An
      * account with neither has no credit budget and is better off showing nothing than
-     * "$0.00 of $0.00".
+     * "$0.00 of $0.00". `unlimited` overrides both — there is nothing to measure.
      *
      * Note the deliberate gap: an uncapped account that has spent nothing yet stays
      * hidden until its first spend. Conservative on purpose — it can't be told apart
@@ -65,7 +87,7 @@ data class SpendCredits(
      * unverified (CCBG-3).
      */
     val isReportable: Boolean
-        get() = hasLimit || usedMinor > 0L
+        get() = !unlimited && (hasLimit || usedMinor > 0L || (balanceMinor ?: 0L) > 0L)
 
     /**
      * 0-100, computed from the money rather than the server's rounded integer, and

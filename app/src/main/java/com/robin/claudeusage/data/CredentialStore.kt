@@ -10,6 +10,8 @@ data class Credentials(
     val accessToken: String,
     val refreshToken: String,
     val expiresAt: Long, // epoch millis; 0 = unknown
+    /** ChatGPT sends this back as a header (CCRM-53 (Provider Model)); Claude never has one. */
+    val accountId: String? = null,
 )
 
 /** A user paste: core credentials plus informational fields we surface in the UI. */
@@ -46,7 +48,11 @@ class CredentialStore(context: Context) {
     fun load(profile: Profile): Credentials? {
         val access = prefs.getString(k(profile, "accessToken"), null) ?: return null
         val refresh = prefs.getString(k(profile, "refreshToken"), null) ?: return null
-        return Credentials(access, refresh, prefs.getLong(k(profile, "expiresAt"), 0L))
+        return Credentials(
+            access, refresh,
+            prefs.getLong(k(profile, "expiresAt"), 0L),
+            prefs.getString(k(profile, "accountId"), null),
+        )
     }
 
     /**
@@ -58,6 +64,8 @@ class CredentialStore(context: Context) {
             .putString(k(profile, "accessToken"), creds.accessToken)
             .putString(k(profile, "refreshToken"), creds.refreshToken)
             .putLong(k(profile, "expiresAt"), creds.expiresAt)
+        if (creds.accountId != null) e.putString(k(profile, "accountId"), creds.accountId)
+        else e.remove(k(profile, "accountId"))
         if (stampAdded) {
             e.putLong(k(profile, "addedAt"), System.currentTimeMillis())
             e.putString(k(profile, "tokenTail"), creds.accessToken.takeLast(4))
@@ -74,6 +82,7 @@ class CredentialStore(context: Context) {
             .remove(k(profile, "accessToken"))
             .remove(k(profile, "refreshToken"))
             .remove(k(profile, "expiresAt"))
+            .remove(k(profile, "accountId"))
             .remove(k(profile, "addedAt"))
             .remove(k(profile, "tokenTail"))
             .apply()

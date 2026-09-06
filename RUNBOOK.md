@@ -48,7 +48,7 @@ fix it in ROADMAP.md and note it in the step's *Log* line.
 | Step | Item | Model | Effort | Needs Robin | Status |
 |---|---|---|---|---|---|
 | 0 | Commit the current tree | Haiku (or Sonnet) | low | 1 min | ☑ |
-| 1 | CCRM-53 (Provider Model) | Sonnet | medium | no | ☐ |
+| 1 | CCRM-53 (Provider Model) | Sonnet | medium | no | ☑ |
 | 2 | CCRM-54 (ChatGPT Account) part 1 — source, device flow, payload capture | Opus | high | one sign-in on the phone | ☐ |
 | 3 | CCRM-56 (Provider Identity) — rename, icon, marks, accents, Add-account sheet, hidden windows | Sonnet | medium | approve the icon at 48 dp | ☐ |
 | 4 | CCRM-54 (ChatGPT Account) part 2 + CCRM-57 (Provider Plumbing) — the ChatGPT account on every surface | Sonnet | medium | no | ☐ |
@@ -136,6 +136,14 @@ follow the Handover rule and print Step 2.
 - ☐ Status line updated, ticked, committed.
 
 **Log:**
+
+2026-09-06 — built the `Provider` enum, the `provider` field on `Profile` (registry-persisted
+as `"v"`, absent → `CLAUDE`), the `data/source/` `UsageSource` seam with `ClaudeSource`
+wrapping `ApiClient`/`UsageParser` untouched, `Credentials.accountId`, `classifyWindow`, the
+`SpendCredits.unlimited` widening, and the `[poll][provider:key]` log prefix (computed in
+`AppLog.log`, so `AppLog.formatLine`'s pinned shape and its test are untouched). All named
+tests added and green alongside the full existing suite. The release-build device check is
+deferred to Step 5 — no phone to hand this session.
 
 ---
 

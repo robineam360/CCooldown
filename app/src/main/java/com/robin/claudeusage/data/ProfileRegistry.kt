@@ -63,8 +63,8 @@ class ProfileRegistry(context: Context) {
      * the positional default ("Account 3" for the third account), which is also what a
      * cleared rename field restores.
      */
-    fun add(label: String? = null): Profile {
-        val (next, profile) = add(state(), label)
+    fun add(label: String? = null, provider: Provider = Provider.CLAUDE): Profile {
+        val (next, profile) = add(state(), label, provider)
         write(next)
         return profile
     }
@@ -183,12 +183,12 @@ class ProfileRegistry(context: Context) {
             )
         }
 
-        fun add(state: State, label: String?): Pair<State, Profile> {
+        fun add(state: State, label: String?, provider: Provider = Provider.CLAUDE): Pair<State, Profile> {
             val slot = state.nextSlot
             // Positional, not slot-derived: the third account you add reads "Account 3"
             // even if you removed one earlier. It is a starting label, not an identity.
             val default = "Account ${state.profiles.size + 1}"
-            val profile = Profile(key = "p$slot", slot = slot, label = clean(label) ?: default)
+            val profile = Profile(key = "p$slot", slot = slot, label = clean(label) ?: default, provider = provider)
             return State(
                 profiles = state.profiles + profile,
                 nextSlot = slot + 1,
@@ -224,6 +224,7 @@ class ProfileRegistry(context: Context) {
                         .put("s", p.slot)
                         .put("l", p.label)
                         .put("d", state.defaultLabel(p.key))
+                        .put("v", p.provider.key)
                 )
             }
             return arr.toString()
@@ -242,7 +243,8 @@ class ProfileRegistry(context: Context) {
                     val slot = o.optInt("s", -1)
                     if (slot < 0) continue
                     val label = o.optString("l").ifEmpty { key }
-                    val profile = Profile(key, slot, label)
+                    // Absent → CLAUDE: every pre-CCRM-53 (Provider Model) entry has no "v".
+                    val profile = Profile(key, slot, label, Provider.fromKey(o.optString("v")))
                     profiles += profile
                     defaults[key] = o.optString("d").ifEmpty { fallbackLabel(profile) }
                 }

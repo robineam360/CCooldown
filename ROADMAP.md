@@ -64,8 +64,15 @@ session can build it from the text plus the wireframe, without this conversation
 Sessions 1 and 3 can run in parallel; 2 depends on 1; 4 depends on 1–3.
 
 ### CCRM-53 · Provider Model — an account carries which service it tracks
-- **Status:** Planned · medium · pure logic, **no wireframe needed** · filed 2026-09-06 ·
-  **build first**
+- **Status:** Done (2026-09-06). Added the `Provider` enum, the `provider` field on
+  `Profile` with registry persistence (absent → `CLAUDE`), the `data/source/` `UsageSource`
+  seam with `ClaudeSource` wrapping the existing `ApiClient`/`UsageParser` code untouched,
+  `Credentials.accountId`, `classifyWindow`, the `SpendCredits.unlimited` widening and the
+  `[poll][provider:key]` log prefix rule. `./gradlew testDebugUnitTest` green (all existing
+  tests unchanged, plus `WindowKindTest`, `SpendCreditsTest`, `ClaudeSourceTest` and the new
+  `ProfileRegistryTest` provider cases). The device check (a release build over the live
+  install still polling every Claude account with identical `[poll]` lines) is deferred to
+  Step 5 of [RUNBOOK.md](RUNBOOK.md), since it needs the phone in hand.
 - **Why:** [Profile.kt](app/src/main/java/com/robin/claudeusage/data/Profile.kt) is
   `(key, slot, label)`; [ApiClient.kt](app/src/main/java/com/robin/claudeusage/data/ApiClient.kt),
   [OAuthSignIn.kt](app/src/main/java/com/robin/claudeusage/data/OAuthSignIn.kt) and
