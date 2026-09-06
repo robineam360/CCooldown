@@ -101,6 +101,9 @@ class RingWidget : GlanceAppWidget() {
                     snapshot = snapshot,
                     window = window,
                     windowLengthMs = windowLengthMs,
+                    // CCRM-54 (ChatGPT Account) part 2: null unless this account
+                    // fetched fine and simply has no such window.
+                    absentMessage = absentWindowMessage(snapshot.data, weekly = windowKey == "weekly"),
                     use24h = use24h,
                     usageLeft = usageLeft,
                     resetClock = resetClock,
@@ -119,6 +122,7 @@ private fun RingFace(
     snapshot: Snapshot,
     window: UsageWindow?,
     windowLengthMs: Long,
+    absentMessage: String?,
     use24h: Boolean,
     usageLeft: Boolean,
     resetClock: Boolean,
@@ -200,17 +204,21 @@ private fun RingFace(
             val countdownLine: @Composable () -> Unit = {
                 Text(
                     // The "left ·" prefix disambiguates the flipped bore number
-                    // (CCRM-22 rev B) — the one spare line this face has.
+                    // (CCRM-22 rev B) — the one spare line this face has, which is
+                    // also where the absent-window sentence goes.
                     when {
+                        absentMessage != null -> absentMessage
                         percent == null -> "Waiting"
                         usageLeft -> "left · $primaryText"
                         else -> primaryText
                     },
                     style = TextStyle(
                         color = GlanceTheme.colors.onSurfaceVariant,
-                        fontSize = 11.sp,
+                        // The sentence wraps to two lines at the smaller type rather
+                        // than truncating to "No 5-hour wind…", which says nothing.
+                        fontSize = if (absentMessage != null) 10.sp else 11.sp,
                     ),
-                    maxLines = 1,
+                    maxLines = if (absentMessage != null) 2 else 1,
                 )
             }
             val momentLine: @Composable () -> Unit = {
@@ -254,7 +262,7 @@ private fun RingFace(
         ) { RefreshGlyph(profile) }
         // Stale / fetch error keep the ring and overlay one amber pill on its
         // bottom edge (rev-2 wireframe decision).
-        pillText(state, snapshot)?.let { msg ->
+        pillText(state, snapshot, profile)?.let { msg ->
             Box(
                 modifier = GlanceModifier.fillMaxSize().padding(bottom = 9.dp),
                 contentAlignment = Alignment.BottomCenter,

@@ -140,7 +140,7 @@ private fun MiniRingsFace(
                 maxLines = 1,
                 modifier = GlanceModifier.padding(end = 8.dp).defaultWeight(),
             )
-            val pill = pillText(state, snapshot)
+            val pill = pillText(state, snapshot, profile)
             if (pill != null) FacePill(pill)
             else Text(
                 "Updated ${Fmt.ago(snapshot.fetchedAt)}",

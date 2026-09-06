@@ -106,4 +106,29 @@ class SignInExpiryTest {
         val result = line(authState = AuthState.REAUTH_NEEDED, estimated = false, deadAt = signIn + day)
         assertEquals(SignInExpiry.Line.Exact(estimate), result)
     }
+
+    /**
+     * CCRM-57 (Provider Plumbing): the ~30-day family life is Anthropic's, inferred
+     * and never verified. A ChatGPT sign-in leaves `refreshExpiresAt` at 0 and
+     * `estimated` false on purpose — every expiry surface (this line, the pinned
+     * panel's strip, the expiry alert) is gated on that figure being set, so all
+     * three must fall silent rather than invent a date for OpenAI's token family.
+     */
+    @Test
+    fun `an account with no reported family life draws no expiry line`() {
+        assertEquals(
+            SignInExpiry.Line.None,
+            line(refreshExpiresAt = 0L, estimated = false),
+        )
+        // …and stays silent once that sign-in dies: there was never a date to discredit.
+        assertEquals(
+            SignInExpiry.Line.None,
+            line(
+                authState = AuthState.REAUTH_NEEDED,
+                estimated = false,
+                refreshExpiresAt = 0L,
+                deadAt = signIn + day,
+            ),
+        )
+    }
 }

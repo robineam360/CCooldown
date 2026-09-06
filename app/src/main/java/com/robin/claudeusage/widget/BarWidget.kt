@@ -136,6 +136,15 @@ private fun BarContent(
     // "show on widgets" setting — that one is about crowding *other* layouts.
     val credits = if (bar == "credits") data?.credits?.takeIf { it.isReportable } else null
 
+    // CCRM-54 (ChatGPT Account) part 2: the face was configured on a window this
+    // account doesn't have. Only for the two fixed windows — a "model" bar with no
+    // caps is a different question, and "credits" has its own line below.
+    val absentMessage = when (bar) {
+        "weekly", "days" -> absentWindowMessage(data, weekly = true)
+        "model", "credits" -> null
+        else -> absentWindowMessage(data, weekly = false)
+    }
+
     Column(modifier = rootModifier, verticalAlignment = Alignment.CenterVertically) {
         when {
             snapshot.authState == AuthState.NO_CREDENTIALS ->
@@ -143,6 +152,9 @@ private fun BarContent(
             snapshot.authState == AuthState.REAUTH_NEEDED ->
                 CenteredMessage("$profileLabel: re-auth needed", "Tap to open app")
             data == null -> CenteredMessage("No data yet · $profileLabel", "Tap to open app")
+            // Before the credits branch: an absent window must not fall through to a
+            // bar that draws 0% and a reset line reading "Starts when a message is sent".
+            absentMessage != null -> CenteredMessage(absentMessage, "Tap to open app")
             bar == "credits" && credits == null ->
                 CenteredMessage("No credits · $profileLabel", "This account has no credit budget")
             credits != null -> {

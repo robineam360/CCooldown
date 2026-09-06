@@ -58,9 +58,11 @@ internal fun FacePill(text: String, fontSize: androidx.compose.ui.unit.TextUnit 
  * shows CCRM-27 (Error Taxonomy)'s short label rather than the raw status — the
  * remediation and detail live in-app.
  */
-internal fun pillText(state: FaceState, snapshot: Snapshot): String? = when (state) {
+internal fun pillText(state: FaceState, snapshot: Snapshot, profile: Profile): String? = when (state) {
     FaceState.STALE -> "⚠ Updated ${Fmt.ago(snapshot.fetchedAt)}"
-    FaceState.FETCH_ERROR -> "⚠ ${com.robin.claudeusage.data.ErrorKind.fromKey(snapshot.lastStatusKind).short}"
+    // CCRM-57 (Provider Plumbing): the short label names this account's own vendor.
+    FaceState.FETCH_ERROR ->
+        "⚠ ${com.robin.claudeusage.data.ErrorKind.fromKey(snapshot.lastStatusKind).short(profile.provider)}"
     else -> null
 }
 

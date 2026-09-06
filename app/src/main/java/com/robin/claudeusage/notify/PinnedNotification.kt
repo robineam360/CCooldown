@@ -108,7 +108,15 @@ object PinnedNotification {
         val dark = isNightMode(context)
         val theme = Palette.color(Palette.accentName(cache, profile), dark)
         val data = cache.snapshot(profile).data
-        val session = data?.session
+        // CCRM-54 (ChatGPT Account) part 2: the headline is the 5-hour window when
+        // there is one, else the 7-day. An account that has no session window at all
+        // — a ChatGPT Plus or Pro account since OpenAI lifted the 5-hour limit — would
+        // otherwise pin an em dash forever next to a perfectly healthy weekly figure.
+        val headlineWeekly = data != null && data.session == null && data.weekly != null
+        val session = if (headlineWeekly) data.weekly else data?.session
+        val headlineWindowMs =
+            if (headlineWeekly) Projection.WEEKLY_MS else Projection.SESSION_MS
+        val headlineName = if (headlineWeekly) "7-day window" else "5-hour window"
         val pct = session?.percent
         val use24h = cache.use24hTime()
         // CCRM-22 (Used or Left), rev B: every numeric readout flips — the big
@@ -121,7 +129,7 @@ object PinnedNotification {
         // CCRM-43 (Bar Pace Marks): this surface's own red toggle. The even-pace tick
         // draws regardless; only the colour past it is optional.
         val showOverPace = cache.paceOverOnNotification()
-        val sessionElapsed = elapsedPercent(session, Projection.SESSION_MS)
+        val sessionElapsed = elapsedPercent(session, headlineWindowMs)
         // CCRM-49 (Glyph Legibility): the status bar keeps colour, so the glyph wears
         // the same severity colour as the gauge below it — one source of truth, and the
         // two can never disagree. CCRM-51 (Rails Gauge): the marks are neutral ink
@@ -133,8 +141,12 @@ object PinnedNotification {
             sessionElapsed = sessionElapsed,
             fillArgb = fill.toArgb(),
             dark = dark,
-            weeklyPct = data?.weekly?.percent,
-            weeklyElapsed = elapsedPercent(data?.weekly, Projection.WEEKLY_MS),
+            // The hub's flag dot is the *other* window. With weekly promoted to the
+            // headline there is no other window, so the dot is dropped rather than
+            // drawn against the same number the needle already shows.
+            weeklyPct = if (headlineWeekly) null else data?.weekly?.percent,
+            weeklyElapsed =
+                if (headlineWeekly) null else elapsedPercent(data?.weekly, Projection.WEEKLY_MS),
             showOverPace = showOverPace,
         )
         val pctText = if (pct == null) "—" else "${Fmt.usageInt(pct, left)}%"
@@ -168,7 +180,7 @@ object PinnedNotification {
         // the profile identity instead. Every other style keeps the percentage in
         // its own graphic, so the title names the window and the text line resets.
         val progress = style == "progress"
-        val title = if (progress) "$pctShort · $resetShort" else "$label · 5-hour window"
+        val title = if (progress) "$pctShort · $resetShort" else "$label · $headlineName"
 
         // CCRM-44 (One Surface): with the pinned notification on, this panel carries
         // *every* alert for its profile — the CCBG-12 (Status Icon Swap) conditions,
@@ -181,7 +193,7 @@ object PinnedNotification {
         // line as a strip, in the strip's own hue.
         val panelState = Conditions.panelFor(context, cache, profile)
         val stale = panelState.stale
-        val baseText = if (progress) "$label · 5-hour window" else resetLong
+        val baseText = if (progress) "$label · $headlineName" else resetLong
         val collapsedText = panelState.strips.firstOrNull()
             ?.let { withConditionDot(it.short, conditionHue(it, theme, dark)) }
             ?: baseText
@@ -215,6 +227,10 @@ object PinnedNotification {
         val panel = drawPanel(
             context, label, data, theme, dark, use24h, left, resetClock, showOverPace,
             panelState.strips, panelState.overflow,
+            // CCRM-54 (ChatGPT Account) part 2: once the 7-day window has been
+            // promoted to the headline, the panel's 7-day bar would print the same
+            // number twice. Model caps still belong here.
+            skipWeeklyBar = headlineWeekly,
         )
 
         when (style) {
@@ -603,9 +619,11 @@ object PinnedNotification {
      * same way the collapsed row draws the 5-hour window — name on the left, bold
      * percentage on the right, full-width bar underneath, reset time below it.
      *
-     * The 5-hour window is deliberately absent: it's the large icon plus the title
-     * in the header above, and repeating it here would be duplicate info. There's
-     * no profile header either, for the same reason — the title already names it.
+     * The headline window is deliberately absent: it's the large icon plus the title
+     * in the header above, and repeating it here would be duplicate info. That is
+     * normally the 5-hour window, and [skipWeeklyBar] extends the same rule to an
+     * account whose headline *is* the 7-day one. There's no profile header either,
+     * for the same reason — the title already names it.
      */
     private fun drawPanel(
         context: Context,
@@ -621,6 +639,8 @@ object PinnedNotification {
         showOverPace: Boolean,
         conditions: List<Conditions.Condition>,
         overflow: Int = 0,
+        /** True when the header already carries the 7-day figure — see the call site. */
+        skipWeeklyBar: Boolean = false,
     ): Bitmap? {
         val width = dp(context, PANEL_WIDTH_DP).toInt()
         val left = dp(context, 2f)
@@ -661,7 +681,7 @@ object PinnedNotification {
         // expanded panel exists to carry, so it holds its place however many strips appear.
         val barBudget = (4 - conditions.size).coerceAtLeast(1)
         val bars = if (data == null) emptyList() else buildList {
-            add(
+            if (!skipWeeklyBar) add(
                 Bar(
                     "7-day", data.weekly,
                     // CCRM-23 (Reset Display): both forms, chosen first. The panel

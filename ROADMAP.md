@@ -192,7 +192,23 @@ Sessions 1 and 3 can run in parallel; 2 depends on 1; 4 depends on 1–3.
   grammar and must not run on `plan_type: "pro"` (gated in CCRM-57 (Provider Plumbing)).
 
 ### CCRM-54 · ChatGPT Account — Codex device-code sign-in and the two windows
-- **Status:** In progress — part 1 done (2026-09-06). `ChatGptSource` +
+- **Status:** **Done** — part 2 landed 2026-09-06 (368 tests). The device-code sheet
+  replaces the debug path with all five states (waiting / expired / denied /
+  unavailable / done) and a live `m:ss` countdown; the account card is mark + status
+  chip + `PlanChip(plan, tier = null)` with *Sign in with a code* / *Refresh* /
+  *Clear*, no "expires around" line and no backup / paste / QR; the main-screen tab
+  renders Spark rows as model caps and credits as "$X balance"; a Ring or Bar widget
+  configured on a window the account lacks says "No 5-hour window on this account";
+  and the pinned headline and the Quick Settings tile both fall back to the 7-day
+  window. The debug capture button is gone, and `UsageRepository.captureUsagePayload`
+  with it — the fixture is captured and nothing else called it. Copy and the sheet's
+  state table are pure and tested (`DeviceCodeCopy`, `Fmt.mmss`, `absentWindowMessage`)
+  since this module has no Robolectric. **Not built, and deliberately:** the provider
+  mark on the pinned label line exists only in the *Huge number* (`big`) style — the
+  other three styles are plain `NotificationCompat` slots with no ImageView to hang it
+  on, so giving them a mark means converting them to custom RemoteViews, which the
+  wireframe does not show. Filed as a build note, not a defect. See the device pass.
+- **Status of part 1** (2026-09-06). `ChatGptSource` +
   `ChatGptUsageParser`, `CodexDeviceSignIn`, `UsageRepository.completeDeviceSignIn` and
   the `ProbeHost.CHATGPT` allowlist entry are built and green (321 tests). **Signed in on
   the phone with a real account and captured a real payload** — the fixture is
@@ -204,8 +220,7 @@ Sessions 1 and 3 can run in parallel; 2 depends on 1; 4 depends on 1–3.
   not form-encoded as the research file recorded — the code *exchange* at the same URL is
   form-encoded), and **403 and 404 both mean "keep polling"** in `poll_for_token`, with no
   distinct denied status. `/usercode` did **not** 404, so the loopback fallback is not
-  needed and Step 4 stands as written. Part 2 (surfaces) is next, after CCRM-56 (Provider
-  Identity).
+  needed and Step 4 stands as written.
 - **Confirmed live on the phone, 2026-09-06** (Fold 7, release-signed build over the live
   install): device sign-in completes end to end; the usage body is HTTP 200 and carries
   **both** windows on a Plus account (`limit_window_seconds` 18000 and 604800), so the
@@ -578,8 +593,26 @@ Sessions 1 and 3 can run in parallel; 2 depends on 1; 4 depends on 1–3.
   for v1.5 when the first ChatGPT account ships.
 
 ### CCRM-57 · Provider Plumbing — the long tail of Claude-only assumptions
-- **Status:** Planned · small pieces, done in the same session as CCRM-54 (ChatGPT Account)
-  part 2 · filed 2026-09-06
+- **Status:** **Done** 2026-09-06, in the same session as CCRM-54 (ChatGPT Account)
+  part 2 · filed 2026-09-06. Every item below is built. Two of them turned out to be
+  **already satisfied and were verified rather than changed**: the diagnostics prefix
+  (CCRM-53 (Provider Model) shipped `[poll][chatgpt:pN]` and CCRM-56 (Provider Identity)
+  the log subject), and the sign-in expiry gate — `Conditions.expiry` and
+  `Alerts.checkUpcomingExpiry` already return on `refreshExpiresAt <= 0`, and
+  `SignInExpiry.line` yields `Line.None` for a ChatGPT-shaped sign-in, now pinned by a
+  test. `SignInExpiry.line` itself deliberately keeps no `refreshExpiresAt > 0` guard: a
+  Claude sign-in that died before the estimate was ever stamped is a real case the
+  existing tests cover, and an early return would swallow it.
+- **Contract tests, scope:** the CCRM-57 slice landed as `ContractCopyTest` — three
+  provider names, three vendors, the four trademark lines in the About disclaimer, and
+  each mark drawable's ownership header. **CCRM-37 (Contract Tests) stays Planned:** its
+  registry-contract grep and visual-parity assertions are not built. The README's
+  "unofficial" notice still names Anthropic alone and is deliberately *not* asserted —
+  it is rewritten in the v1.5 release step, and a test failing until then is noise.
+- **Beyond the listed items, same class, fixed in passing:** `sendWindowPing` and
+  `PingScheduler.reschedule` now refuse a non-Claude profile at the data layer rather
+  than trusting the UI never to offer it, and the main screen's "No <label> account
+  yet" card no longer tells a ChatGPT account to tap Claude's sign-in button.
 - **Error taxonomy** (CCRM-27 (Error Taxonomy)): `ErrorKind.title`/`short` are fixed strings
   naming Anthropic. Make them functions of the provider — `fun title(p: Provider)`, `fun
   short(p: Provider)` — substituting `p.vendor` ("Couldn't reach OpenAI — check your

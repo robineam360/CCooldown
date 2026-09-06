@@ -309,7 +309,7 @@ private fun PaceFace(
             modifier = GlanceModifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            val pill = pillText(state, snapshot)
+            val pill = pillText(state, snapshot, profile)
             if (pill != null) FacePill(pill)
             else Text(
                 "Updated ${Fmt.ago(snapshot.fetchedAt)}",

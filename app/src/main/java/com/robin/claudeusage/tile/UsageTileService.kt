@@ -67,17 +67,25 @@ abstract class BaseUsageTileService(private val slot: Int) : TileService() {
         val cache = UsageCache(this)
         val snapshot = cache.snapshot(profile)
         val profileLabel = cache.profileLabel(profile)
-        val session = snapshot.data?.session
+        val data = snapshot.data
+        // CCRM-54 (ChatGPT Account) part 2: the tile falls back to the 7-day window
+        // when the account has no 5-hour one, exactly as the pinned notification's
+        // headline does. Without this a ChatGPT Plus or Pro account — no 5-hour limit
+        // since 2026-07-12 — reads "no data" on a tile whose weekly figure is fine.
+        val headlineWeekly = data != null && data.session == null && data.weekly != null
+        val session = if (headlineWeekly) data.weekly else data?.session
+        val headlineWindowMs =
+            if (headlineWeekly) Projection.WEEKLY_MS else Projection.SESSION_MS
         qsTile?.apply {
             when {
                 session?.percent != null -> {
                     state = Tile.STATE_ACTIVE
                     // CCRM-22 (Used or Left): room for the word, so it flips worded.
                     label = "${tileLabel(profile, profileLabel, all)} ${Fmt.usageShort(session.percent, cache.usageLeft())}"
-                    // The 5-hour reset earns the subtitle over the 7-day number:
-                    // it's the one that changes what you do next. The countdown/clock
-                    // choice is the global CCRM-23 (Reset Display) token now — the
-                    // tile reads it, it no longer owns it.
+                    // The headline window's reset earns the subtitle over the other
+                    // number: it's the one that changes what you do next. The
+                    // countdown/clock choice is the global CCRM-23 (Reset Display)
+                    // token now — the tile reads it, it no longer owns it.
                     subtitle = when {
                         session.resetsAt == null -> "not started"
                         cache.resetClock() ->
@@ -101,10 +109,13 @@ abstract class BaseUsageTileService(private val slot: Int) : TileService() {
                         UsageIcon.draw(
                             this@BaseUsageTileService, session.percent,
                             cache.pinnedIconStyle(), cache.usageLeft(),
-                            sessionElapsed = elapsedPercent(session, Projection.SESSION_MS),
-                            weeklyPct = snapshot.data?.weekly?.percent,
-                            weeklyElapsed = elapsedPercent(
-                                snapshot.data?.weekly, Projection.WEEKLY_MS,
+                            sessionElapsed = elapsedPercent(session, headlineWindowMs),
+                            // The hub's flag dot is the *other* window; promoted to the
+                            // needle, weekly is no longer that, and drawing it twice
+                            // would make one figure look like two.
+                            weeklyPct = if (headlineWeekly) null else data?.weekly?.percent,
+                            weeklyElapsed = if (headlineWeekly) null else elapsedPercent(
+                                data?.weekly, Projection.WEEKLY_MS,
                             ),
                         )
                     )

@@ -8,6 +8,8 @@ import android.graphics.Canvas
 import android.graphics.drawable.Drawable
 import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import com.robin.claudeusage.ui.EstimateLine
@@ -98,6 +100,7 @@ import com.robin.claudeusage.data.Profile
 import com.robin.claudeusage.data.ProfileRegistry
 import com.robin.claudeusage.data.Projection
 import com.robin.claudeusage.data.Provider
+import com.robin.claudeusage.data.QuickLinks
 import com.robin.claudeusage.data.SignInExpiry
 import com.robin.claudeusage.data.UpdateCheck
 import com.robin.claudeusage.data.UpdateGate
@@ -107,6 +110,8 @@ import com.robin.claudeusage.data.UsageRepository
 import com.robin.claudeusage.diag.AppLog
 import com.robin.claudeusage.notify.UpdateNotification
 import com.robin.claudeusage.ping.PingScheduler
+import com.robin.claudeusage.ui.DeviceCodeCopy
+import com.robin.claudeusage.ui.DeviceCodeStage
 import com.robin.claudeusage.ui.Fmt
 import com.robin.claudeusage.ui.Palette
 import com.robin.claudeusage.ui.ProviderMark
@@ -123,10 +128,9 @@ import kotlinx.coroutines.withContext
 private const val FEEDBACK_EMAIL = "robin@eam360.com"
 private const val DEBUG_UNLOCK_TAPS = 7
 
-// CCRM-26 (Quick Links) destinations. The status page is shared with the main
-// screen's error state, so it isn't private to this file.
-internal const val ANTHROPIC_STATUS_URL = "https://status.anthropic.com"
-private const val USAGE_DASHBOARD_URL = "https://claude.ai/settings/usage"
+// CCRM-26 (Quick Links) destinations now live in the per-provider table
+// com.robin.claudeusage.data.QuickLinks (CCRM-57 (Provider Plumbing)) — the main
+// screen's error notice reads the same table for its "is it them?" button.
 
 @Composable
 fun SettingsScreen(
@@ -188,7 +192,6 @@ fun SettingsScreen(
                     repo, profile, use24h, onOpenGuide,
                     label = labels.getValue(profile),
                     canRemove = profiles.size > 1,
-                    debugUnlocked = debugUnlocked,
                     onRename = { renaming = profile },
                     onRemove = { removing = profile },
                     autoStartSignIn = profile.key == autoStartProfileKey,
@@ -1064,8 +1067,6 @@ private fun TokenCard(
     onOpenGuide: () -> Unit,
     label: String,
     canRemove: Boolean,
-    /** CCRM-54 (ChatGPT Account) part 1: gates the temporary device-code path below. */
-    debugUnlocked: Boolean,
     onRename: () -> Unit,
     onRemove: () -> Unit,
     /** CCRM-56 (Provider Identity): the Add-account sheet starts sign-in at once. */
@@ -1085,8 +1086,6 @@ private fun TokenCard(
     var codeInput by remember { mutableStateOf("") }
     var authUrl by remember { mutableStateOf<String?>(null) }
     var showBackup by remember { mutableStateOf(false) }
-    var showBrowserPicker by remember { mutableStateOf(false) }
-    var pendingPickUrl by remember { mutableStateOf<String?>(null) }
 
     val hasToken = remember(stateKey) { repo.hasCredentials(profile) }
     val snapshot = remember(stateKey) { repo.snapshot(profile) }
@@ -1101,19 +1100,7 @@ private fun TokenCard(
     val backoffUntil = remember(stateKey) { repo.cacheSettings().backoffUntil(profile) }
     val firstRefreshFailAt = remember(stateKey) { repo.cacheSettings().firstRefreshFailAt(profile) }
 
-    // Open a URL, letting the user pick a browser when they have more than one
-    // (so they can route Work vs Personal through different browsers). Always
-    // opens a real external browser, never an in-app tab. Used for sign-in and
-    // for the usage-dashboard quick link — same routing question either way.
-    fun openWithPicker(url: String) {
-        val browsers = installedBrowsers(context)
-        if (browsers.size >= 2) {
-            pendingPickUrl = url
-            showBrowserPicker = true
-        } else {
-            openInBrowser(context, url, browsers.firstOrNull()?.packageName)
-        }
-    }
+    val openWithPicker = rememberBrowserOpener(label, profile.provider)
 
     fun beginSignIn() {
         message = null
@@ -1200,7 +1187,10 @@ private fun TokenCard(
                 if (hasToken) StatusChip(snapshot.authState)
                 if (hasToken && plan != null) {
                     Spacer(Modifier.width(6.dp))
-                    PlanChip(plan, tier)
+                    // CCRM-57 (Provider Plumbing): tier is Anthropic's `default_5x`
+                    // grammar. No multiplier is invented for OpenAI or Google, so a
+                    // non-Claude account passes null and renders the bare plan.
+                    PlanChip(plan, tier.takeIf { profile.provider == Provider.CLAUDE })
                 }
                 Spacer(Modifier.weight(1f))
                 if (hasToken && tail != null) {
@@ -1288,15 +1278,12 @@ private fun TokenCard(
                 return@Column
             }
 
-            // CCRM-54 (ChatGPT Account) part 1. A non-Claude account has none of the
-            // machinery below it: no authorize URL, no pasted `code#state`, no QR or
-            // desktop-JSON backup, and no ~30-day family estimate to draw an "expires
-            // around" line from. Until part 2 builds the real device-code sheet to the
-            // approved wireframe, this stands in so the payload can be captured on the
-            // phone. Everything above this line — the label, chip, ⋮ menu — is shared.
+            // CCRM-54 (ChatGPT Account) part 2: everything below the shared header —
+            // the label, chip, ⋮ menu — is the provider's own. See ChatGptAccountBody
+            // for what a non-Claude account deliberately does not have.
             if (profile.provider != Provider.CLAUDE) {
                 ChatGptAccountBody(
-                    repo, profile, label, use24h, debugUnlocked,
+                    repo, profile, label, use24h,
                     autoStart = autoStartSignIn,
                 ) { stateKey++ }
                 return@Column
@@ -1459,20 +1446,11 @@ private fun TokenCard(
                     ) { Text("Clear", color = MaterialTheme.colorScheme.error) }
                 }
                 RowDivider()
-                // Quick escapes, not account actions — hence below the divider.
-                // Status goes to the default browser (account-independent); the
-                // dashboard reuses the sign-in picker, because which browser holds
-                // this profile's Claude session is the same question either way.
-                // Flows rather than a Row so the second label drops to its own
-                // line at large font scales instead of wrapping mid-label.
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = {
-                        openInBrowser(context, ANTHROPIC_STATUS_URL, null)
-                    }) { Text("Anthropic status") }
-                    TextButton(onClick = {
-                        openWithPicker(USAGE_DASHBOARD_URL)
-                    }) { Text("Usage dashboard") }
-                }
+                QuickLinksRow(
+                    provider = profile.provider,
+                    onOpenDefault = { openInBrowser(context, it, null) },
+                    onOpenWithPicker = { openWithPicker(it) },
+                )
                 BackupOptions(
                     expanded = showBackup,
                     onToggle = { showBackup = !showBackup },
@@ -1490,17 +1468,33 @@ private fun TokenCard(
             }
         }
     }
+}
 
-    if (showBrowserPicker) {
+/**
+ * "Open this URL in a browser, asking which one when there's more than one" — so a
+ * Work and a Personal account can route through different browsers, which is the
+ * whole reason the choice exists. Always a real external browser, never an in-app
+ * tab. Returns the opener and hosts the dialog itself, so every caller gets the
+ * same behaviour by asking for it once.
+ *
+ * Shared by both sign-ins and by the CCRM-26 (Quick Links) account link: *which
+ * browser holds this profile's session* is the same question on all three.
+ */
+@Composable
+private fun rememberBrowserOpener(label: String, provider: Provider): (String) -> Unit {
+    val context = LocalContext.current
+    var pendingUrl by remember { mutableStateOf<String?>(null) }
+
+    pendingUrl?.let { url ->
         val browsers = remember { installedBrowsers(context) }
         AlertDialog(
-            onDismissRequest = { showBrowserPicker = false },
+            onDismissRequest = { pendingUrl = null },
             title = { Text("Open with") },
             text = {
                 Column {
                     Text(
                         "Pick the browser where you're signed in to the $label " +
-                            "Claude account.",
+                            "${provider.displayName} account.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1511,8 +1505,8 @@ private fun TokenCard(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
                                 .clickable {
-                                    showBrowserPicker = false
-                                    openInBrowser(context, pendingPickUrl ?: authUrl ?: return@clickable, b.packageName)
+                                    pendingUrl = null
+                                    openInBrowser(context, url, b.packageName)
                                 }
                                 .padding(vertical = 12.dp, horizontal = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -1530,22 +1524,30 @@ private fun TokenCard(
             },
             confirmButton = {},
             dismissButton = {
-                TextButton(onClick = { showBrowserPicker = false }) { Text("Cancel") }
+                TextButton(onClick = { pendingUrl = null }) { Text("Cancel") }
             },
         )
+    }
+
+    return { url ->
+        val browsers = installedBrowsers(context)
+        if (browsers.size >= 2) pendingUrl = url
+        else openInBrowser(context, url, browsers.firstOrNull()?.packageName)
     }
 }
 
 /**
- * The temporary ChatGPT account body (CCRM-54 (ChatGPT Account) part 1) — **debug
- * scaffolding, not a design**. Deliberately plain: the real device-code sheet with its
- * five states, the provider mark, the plan chip and the quick links all land in part 2,
- * built to `design/provider-identity-wireframe.html`. Nothing here is drawn to a
- * wireframe, which is why the two buttons that do anything are behind the debug unlock.
+ * A ChatGPT account's card body (CCRM-54 (ChatGPT Account) part 2), built to
+ * `design/provider-identity-wireframe.html` section 4. It shares the card header
+ * above it — mark, label, [StatusChip], [PlanChip] — and replaces everything else,
+ * because a non-Claude account has none of that machinery: no authorize URL, no
+ * pasted `code#state`, no QR or desktop-JSON backup, and no ~30-day family estimate
+ * to draw an "expires around" line from (CCRM-16 (Sign-in Expiry Accuracy)'s rule
+ * that no estimate beats a wrong one — `refreshExpiresAt` stays 0 here).
  *
- * The poll runs in the composition's own scope while the card is on screen and resumes
- * from [UsageRepository.pendingDeviceSignIn] after process death — fifteen minutes does
- * not justify WorkManager.
+ * Sign-in opens the [DeviceCodeSheet]; the poll runs while the sheet is open and
+ * resumes from [UsageRepository.pendingDeviceSignIn] after process death — fifteen
+ * minutes does not justify WorkManager.
  */
 @Composable
 private fun ChatGptAccountBody(
@@ -1553,85 +1555,50 @@ private fun ChatGptAccountBody(
     profile: Profile,
     label: String,
     use24h: Boolean,
-    debugUnlocked: Boolean,
     /** CCRM-56 (Provider Identity): the Add-account sheet starts sign-in at once. */
     autoStart: Boolean = false,
     onStateChanged: () -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val clipboard = LocalClipboardManager.current
+    val openWithPicker = rememberBrowserOpener(label, profile.provider)
     var tick by remember { mutableIntStateOf(0) }
     val hasToken = remember(tick) { repo.hasCredentials(profile) }
     val snapshot = remember(tick) { repo.snapshot(profile) }
-    val plan = remember(tick) { repo.plan(profile) }
+    val addedAt = remember(tick) { repo.tokenAddedAt(profile) }
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
+
+    // A flow interrupted by process death reopens the sheet where it left off.
     var started by remember { mutableStateOf(repo.pendingDeviceSignIn(profile)) }
-    var capture by remember { mutableStateOf<String?>(null) }
+    var stage by remember {
+        mutableStateOf(if (started != null) DeviceCodeStage.WAITING else null)
+    }
+    var detail by remember { mutableStateOf<String?>(null) }
 
     fun bump() {
         tick++
         onStateChanged()
     }
 
-    LaunchedEffect(started?.deviceAuthId) {
-        val flow = started ?: return@LaunchedEffect
-        while (true) {
-            delay(flow.intervalSec * 1000L)
-            val poll = try {
-                repo.pollDeviceSignIn(flow)
-            } catch (e: Exception) {
-                message = "Couldn't reach OpenAI — ${e.javaClass.simpleName}. Still waiting."
-                continue
-            }
-            when (poll) {
-                CodexDeviceSignIn.Poll.Pending -> Unit
-                CodexDeviceSignIn.Poll.Expired -> {
-                    repo.cancelDeviceSignIn()
-                    started = null
-                    message = "That code expired — get a new one."
-                    break
-                }
-                is CodexDeviceSignIn.Poll.Denied -> {
-                    repo.cancelDeviceSignIn()
-                    started = null
-                    message = "Sign-in didn't go through (HTTP ${poll.status}) — start again."
-                    break
-                }
-                is CodexDeviceSignIn.Poll.Granted -> {
-                    busy = true
-                    val result = repo.completeDeviceSignIn(profile, poll)
-                    busy = false
-                    started = null
-                    message = if (result.message == "OK") {
-                        Polling.schedulePeriodic(context, repo.cacheSettings().pollIntervalMinutes())
-                        "$label signed in — usage fetched, polling started."
-                    } else {
-                        result.message
-                    }
-                    bump()
-                    break
-                }
-            }
-        }
-    }
-
     fun beginDeviceSignIn() {
         scope.launch {
-            busy = true
             message = null
-            try {
+            detail = null
+            stage = DeviceCodeStage.STARTING
+            stage = try {
                 started = repo.startDeviceSignIn(profile)
+                DeviceCodeStage.WAITING
             } catch (_: CodexDeviceSignIn.Unavailable) {
-                // The one failure with its own remedy: OpenAI can feature-flag the whole
-                // flow off, and the answer is the browser fallback, not another code.
-                message = "OpenAI has device sign-in switched off for this client — " +
-                    "the browser fallback is needed (CCRM-54)."
+                // The one failure with its own remedy, and the only 404 that means the
+                // flow is off rather than "keep polling" — see CodexDeviceSignIn.
+                started = null
+                DeviceCodeStage.UNAVAILABLE
             } catch (e: Exception) {
-                message = "Couldn't start sign-in — ${e.message ?: e.javaClass.simpleName}"
+                started = null
+                detail = e.message ?: e.javaClass.simpleName
+                DeviceCodeStage.FAILED
             }
-            busy = false
         }
     }
 
@@ -1642,83 +1609,93 @@ private fun ChatGptAccountBody(
         if (autoStart && !hasToken && started == null) beginDeviceSignIn()
     }
 
+    // The poll. Keyed on the flow's own id so a "Get a new code" restarts it and a
+    // recomposition does not; it stops by clearing `started`.
+    LaunchedEffect(started?.deviceAuthId) {
+        val flow = started ?: return@LaunchedEffect
+        while (true) {
+            delay(flow.intervalSec * 1000L)
+            val poll = try {
+                repo.pollDeviceSignIn(flow)
+            } catch (_: Exception) {
+                // A dropped connection mid-wait is not a dead flow: the 15-minute cap
+                // bounds it, so keep polling rather than throwing the code away.
+                continue
+            }
+            when (poll) {
+                CodexDeviceSignIn.Poll.Pending -> Unit
+                CodexDeviceSignIn.Poll.Expired -> {
+                    repo.cancelDeviceSignIn()
+                    started = null
+                    stage = DeviceCodeStage.EXPIRED
+                    break
+                }
+                is CodexDeviceSignIn.Poll.Denied -> {
+                    repo.cancelDeviceSignIn()
+                    started = null
+                    detail = "HTTP ${poll.status}"
+                    stage = DeviceCodeStage.DENIED
+                    break
+                }
+                is CodexDeviceSignIn.Poll.Granted -> {
+                    busy = true
+                    val result = repo.completeDeviceSignIn(profile, poll)
+                    busy = false
+                    started = null
+                    if (result.message == "OK") {
+                        Polling.schedulePeriodic(context, repo.cacheSettings().pollIntervalMinutes())
+                        // Done: the sheet closes and the account's own tab takes over.
+                        stage = null
+                        message = "$label signed in — usage fetched, polling started."
+                    } else {
+                        detail = result.message
+                        stage = DeviceCodeStage.FAILED
+                    }
+                    bump()
+                    break
+                }
+            }
+        }
+    }
+
     Spacer(Modifier.height(8.dp))
-    val flow = started
-    if (flow != null) {
-        Text("Finish signing in", style = MaterialTheme.typography.titleSmall)
-        Spacer(Modifier.height(6.dp))
-        Text(
-            "Open the page below in any browser — it can be a different device — sign in " +
-                "to ChatGPT, and enter this code.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(8.dp))
-        SelectionContainer {
-            Text(
-                flow.userCode,
-                fontFamily = FontFamily.Monospace,
-                fontSize = 24.sp,
-                style = MaterialTheme.typography.titleLarge,
-            )
-        }
-        Spacer(Modifier.height(2.dp))
-        Text(
-            flow.verifyUrl,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(8.dp))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = {
-                clipboard.setText(androidx.compose.ui.text.AnnotatedString(flow.userCode))
-            }) { Text("Copy code") }
-            OutlinedButton(onClick = {
-                openInBrowser(context, flow.verifyUrl, null)
-            }) { Text("Open in browser") }
-            TextButton(onClick = {
-                repo.cancelDeviceSignIn()
-                started = null
-                message = null
-            }) { Text("Cancel") }
-        }
-        Spacer(Modifier.height(6.dp))
-        Text(
-            "Waiting for you to finish… code expires in ${Fmt.dhm(flow.expiresAtMs)}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    } else if (!hasToken) {
+    if (!hasToken) {
         Text(
             "Not signed in",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(12.dp))
-        // CCRM-56 (Provider Identity): the Add-account sheet is now the sanctioned
-        // way to create this card, so signing in from it is no longer debug-gated
-        // (Step 4's device-code sheet with its five states replaces this rough one).
         Button(enabled = !busy, onClick = { beginDeviceSignIn() }) {
             Text("Sign in with a code")
         }
+        Spacer(Modifier.height(2.dp))
+        Text(
+            "Shows a short code to type at auth.openai.com — on this phone or any " +
+                "other device.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     } else {
         Text(
             "Last checked: ${Fmt.dayTimeWithAgo(snapshot.lastAttemptAt, use24h)}",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        if (plan != null) {
-            Text(
-                "Plan: $plan",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        // No "expires around" line, deliberately: OpenAI's token family has no fixed
-        // life we know of, and CCRM-16 (Sign-in Expiry Accuracy) says no estimate beats
-        // a wrong one.
+        Text(
+            "Added: ${if (addedAt > 0) Fmt.date(addedAt) else "—"}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        // No "expires around" line, deliberately (CCRM-57 (Provider Plumbing)): the
+        // ~30-day family estimate is Anthropic's, and OpenAI's token family has no
+        // fixed life we know of. `refreshExpiresAt` stays 0, which is what every
+        // expiry surface — this line, the panel strip, the alert — is gated on.
         Spacer(Modifier.height(10.dp))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(enabled = !busy, onClick = { beginDeviceSignIn() }) {
+                Text("Sign in with a code")
+            }
             OutlinedButton(
                 enabled = !busy,
                 onClick = {
@@ -1731,69 +1708,172 @@ private fun ChatGptAccountBody(
                     }
                 },
             ) { Text("Refresh") }
-            OutlinedButton(enabled = !busy, onClick = { beginDeviceSignIn() }) {
-                Text("Sign in with a code")
-            }
             TextButton(
                 enabled = !busy,
                 onClick = {
                     repo.clearCredentials(profile)
                     message = "$label signed out."
-                    capture = null
                     bump()
                 },
             ) { Text("Clear", color = MaterialTheme.colorScheme.error) }
         }
-        if (debugUnlocked) {
-            Spacer(Modifier.height(4.dp))
-            Button(
-                enabled = !busy,
-                onClick = {
-                    scope.launch {
-                        busy = true
-                        capture = "Capturing…"
-                        val resp = repo.captureUsagePayload(profile)
-                        capture = when (resp) {
-                            null -> "No credentials for $label"
-                            else -> "HTTP ${resp.code}\n\n${resp.body}"
-                        }
-                        busy = false
-                    }
-                },
-            ) { Text("Capture ChatGPT payload") }
-            Spacer(Modifier.height(2.dp))
-            Text(
-                "Writes the usage body to the diagnostics log at DEBUG — set the log " +
-                    "level to Debug first, then export it from Diagnostics. No token " +
-                    "material, and the account's id and email are redacted: OpenAI " +
-                    "returns them alongside the percentages.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            capture?.let { text ->
-                Spacer(Modifier.height(8.dp))
-                SelectionContainer {
-                    Text(
-                        text,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp,
-                        lineHeight = 15.sp,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(
-                                MaterialTheme.colorScheme.surfaceVariant,
-                                RoundedCornerShape(8.dp),
-                            )
-                            .padding(12.dp),
-                    )
-                }
-            }
-        }
+        RowDivider()
+        QuickLinksRow(
+            provider = profile.provider,
+            onOpenDefault = { openInBrowser(context, it, null) },
+            onOpenWithPicker = openWithPicker,
+        )
+        // No Backup method, paste or QR: those move a *desktop* Claude Code token onto
+        // the phone. OpenAI's refresh tokens rotate, and redeeming an imported one
+        // invalidates the whole family (`refresh_token_reused`) — the phone mints its
+        // own, and there is deliberately no other way in.
     }
 
     message?.let {
         Spacer(Modifier.height(6.dp))
         Text(it, style = MaterialTheme.typography.bodySmall)
+    }
+
+    stage?.let { current ->
+        DeviceCodeSheet(
+            stage = current,
+            started = started,
+            detail = detail,
+            busy = busy,
+            onOpenPage = openWithPicker,
+            onRetry = { beginDeviceSignIn() },
+            onDismiss = {
+                repo.cancelDeviceSignIn()
+                started = null
+                stage = null
+            },
+        )
+    }
+}
+
+/**
+ * The device-code sheet (CCRM-54 (ChatGPT Account) part 2), built to
+ * `design/provider-identity-wireframe.html` section 5. One bottom sheet, five
+ * states, all of them the same three parts: the sentence, the code (when there is
+ * one), and the buttons. Copy and the state table live in [DeviceCodeCopy] so both
+ * are pinned by a test rather than only by eye.
+ *
+ * The *done* state is the absence of this sheet — the caller drops it the moment the
+ * token lands, and the account's own tab takes over behind it.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DeviceCodeSheet(
+    stage: DeviceCodeStage,
+    started: CodexDeviceSignIn.Started?,
+    detail: String?,
+    busy: Boolean,
+    /** The same browser picker Claude's sign-in uses — see [rememberBrowserOpener]. */
+    onOpenPage: (String) -> Unit,
+    onRetry: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val clipboard = LocalClipboardManager.current
+    val showsCode = DeviceCodeCopy.showsCode(stage) && started != null
+
+    // The code's own clock, ticking in seconds because the user is watching it —
+    // Fmt.dhm would sit on "14m" for a minute at a time (noted in CCRM-54 part 1).
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(showsCode, started?.deviceAuthId) {
+        while (showsCode) {
+            now = System.currentTimeMillis()
+            delay(1_000)
+        }
+    }
+
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        // Scrollable because the 30 sp code plus the buttons can outgrow a short
+        // sheet at large font scales, and a clipped "Copy code" is a dead end.
+        Column(
+            Modifier
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 28.dp)
+        ) {
+            Text(DeviceCodeCopy.TITLE, style = MaterialTheme.typography.titleLarge)
+            Spacer(Modifier.height(12.dp))
+            Text(
+                DeviceCodeCopy.body(stage, detail),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            if (showsCode) {
+                val flow = started
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    DeviceCodeCopy.INSTRUCTION_PREFIX,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                SelectionContainer {
+                    Text(
+                        flow.verifyUrl.removePrefix("https://"),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                Text(
+                    DeviceCodeCopy.INSTRUCTION_SUFFIX,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(14.dp))
+                SelectionContainer {
+                    Text(
+                        flow.userCode,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 30.sp,
+                        letterSpacing = 2.sp,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+                Spacer(Modifier.height(10.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "Code expires in ${Fmt.mmss(flow.expiresAtMs, now)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        DeviceCodeCopy.WAITING_NOTE,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.height(16.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { onOpenPage(flow.verifyUrl) }) {
+                        Text("Open in browser")
+                    }
+                    OutlinedButton(onClick = {
+                        clipboard.setText(androidx.compose.ui.text.AnnotatedString(flow.userCode))
+                    }) { Text("Copy code") }
+                }
+            }
+
+            if (stage == DeviceCodeStage.STARTING || busy) {
+                Spacer(Modifier.height(16.dp))
+                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+            }
+
+            DeviceCodeCopy.primaryLabel(stage)?.let { primary ->
+                Spacer(Modifier.height(16.dp))
+                Button(enabled = !busy, onClick = onRetry) { Text(primary) }
+            }
+
+            Spacer(Modifier.height(4.dp))
+            TextButton(onClick = onDismiss) {
+                Text(if (showsCode) "Cancel" else "Close")
+            }
+        }
     }
 }
 
@@ -1871,6 +1951,31 @@ private fun BackupOptions(
             OutlinedButton(enabled = !busy, onClick = onScan) { Text("Scan QR") }
         }
         TextButton(onClick = onOpenGuide) { Text("How do I get my token?") }
+    }
+}
+
+/**
+ * CCRM-26 (Quick Links), per provider (CCRM-57 (Provider Plumbing)): the two
+ * escapes below an account card's divider — quick escapes, not account actions.
+ *
+ * The status page goes to the default browser (it is account-independent); the
+ * dashboard reuses the sign-in picker, because which browser holds *this
+ * profile's* session is the same question either way. A FlowRow rather than a Row
+ * so the second label drops to its own line at large font scales instead of
+ * wrapping mid-label.
+ */
+@Composable
+private fun QuickLinksRow(
+    provider: Provider,
+    onOpenDefault: (String) -> Unit,
+    onOpenWithPicker: (String) -> Unit,
+) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        for (link in QuickLinks.forProvider(provider)) {
+            TextButton(onClick = {
+                if (link.usePicker) onOpenWithPicker(link.url) else onOpenDefault(link.url)
+            }) { Text(link.label) }
+        }
     }
 }
 
@@ -3110,6 +3215,11 @@ private fun AppLogCard(cache: UsageCache) {
  *
  * Currently unreferenced: the feature is hard-disabled over Anthropic ToS risk
  * (see UsageCache.pingEnabled) and the section is not rendered.
+ *
+ * CCRM-57 (Provider Plumbing): **Claude accounts only.** A ping is an inference
+ * request that opens a window; there is no endpoint we would send one to for
+ * OpenAI or Google, and inventing one would spend someone else's quota on a guess.
+ * With no Claude account signed in the section renders one line and no controls.
  */
 @Suppress("unused")
 @Composable
@@ -3121,7 +3231,16 @@ private fun WindowPingsSection(
     val context = LocalContext.current
     val cacheSettings = repo.cacheSettings()
     val scope = rememberCoroutineScope()
-    val profiles = remember { repo.profiles() }
+    val profiles = remember { repo.profiles().filter { it.provider == Provider.CLAUDE } }
+    if (profiles.isEmpty()) {
+        Text(
+            "Window pings open a 5-hour window by sending a one-word message, which " +
+                "only Claude accounts support. Add a Claude account to use them.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        return
+    }
     var profile by remember { mutableStateOf(profiles.first()) }
     var tick by remember { mutableIntStateOf(0) }
 

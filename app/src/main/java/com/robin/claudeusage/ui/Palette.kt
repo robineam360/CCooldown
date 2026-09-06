@@ -340,6 +340,17 @@ object Fmt {
         }
     }
 
+    /**
+     * "14:32" — a countdown fine enough to watch tick, for the device-code sheet's
+     * 15-minute code (CCRM-54 (ChatGPT Account)). [dhm] rounds to whole minutes,
+     * which reads as a frozen "14m" for a minute at a time on a clock the user is
+     * actively waiting on. Clamps at "0:00" rather than going negative.
+     */
+    fun mmss(untilEpochMs: Long, nowMs: Long = System.currentTimeMillis()): String {
+        val secs = ((untilEpochMs - nowMs) / 1000L).coerceAtLeast(0L)
+        return "${secs / 60}:${(secs % 60).toString().padStart(2, '0')}"
+    }
+
     /** Plain duration between two moments: "1d 2h" / "1h 20m" / "12m" */
     fun span(ms: Long): String {
         val mins = ms / 60_000

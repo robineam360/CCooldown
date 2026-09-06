@@ -40,6 +40,14 @@ sealed class PingResult(val message: String, val sent: Boolean, val failed: Bool
     class AuthNeeded : PingResult("Ping failed — sign-in needs renewing", false, true)
     class NoCredentials : PingResult("Ping failed — not signed in", false, true)
     class Error(detail: String) : PingResult("Ping failed — $detail", false, true)
+
+    /**
+     * CCRM-57 (Provider Plumbing): a ping is an Anthropic inference request. There is
+     * no equivalent we would send for OpenAI or Google, so a non-Claude profile is
+     * refused here rather than relying on the UI never offering it.
+     */
+    class WrongProvider(vendor: String) :
+        PingResult("Window pings are Claude-only — this is a $vendor account", false, true)
 }
 
 /**
@@ -412,48 +420,6 @@ class UsageRepository(private val context: Context) {
     }
 
     /**
-     * Debug-only payload capture (CCRM-54 (ChatGPT Account) part 1). Fetches the usage
-     * body with this profile's token and writes it to the diagnostics log at DEBUG so it
-     * can be exported from the phone and become the parser's fixture.
-     *
-     * The **one** deliberate exception to the "never log bodies" rule, and only the body:
-     * no tokens, no headers, no `id_token`. Nothing is parsed or cached, so an unexpected
-     * shape can't poison the snapshot; the rate gates are untouched, as with
-     * [probeEndpoint], because this isn't a usage read either.
-     */
-    suspend fun captureUsagePayload(profile: Profile): HttpResult? = withContext(Dispatchers.IO) {
-        mutex.withLock {
-            val creds = credStore.load(profile) ?: return@withLock null
-            val source = Sources.of(profile.provider)
-            val now = System.currentTimeMillis()
-            var token = creds.accessToken
-            if (creds.expiresAt in 1 until now + EXPIRY_MARGIN_MS) {
-                token = refreshAccessToken(profile, creds) ?: return@withLock null
-            }
-            val resp = try {
-                var r = source.fetchUsage(creds.copy(accessToken = token))
-                if (source.isAuthFailure(r.code)) {
-                    val fresh = refreshAccessToken(profile, credStore.load(profile) ?: creds)
-                    if (fresh != null) r = source.fetchUsage(creds.copy(accessToken = fresh))
-                }
-                r
-            } catch (e: IOException) {
-                HttpResult(0, e.message ?: "no network")
-            } catch (e: Exception) {
-                HttpResult(0, e.message ?: "unexpected error")
-            }
-            // Redact first, then flatten to one line so it survives the log's
-            // line-based trim intact.
-            val safe = AppLog.redactPayload(resp.body).replace(Regex("\\s*\\R\\s*"), " ")
-            AppLog.log(
-                context, AppLog.Level.DEBUG, "capture", profile,
-                "usage body (HTTP ${resp.code}): $safe",
-            )
-            resp.copy(body = safe)
-        }
-    }
-
-    /**
      * Sends a window ping (CCRM-17). **Does not verify** — see [verifyWindowPing].
      *
      * Splitting these is the CCBG-5 fix. A 200 from `/v1/messages` only says the request
@@ -465,6 +431,9 @@ class UsageRepository(private val context: Context) {
      * stamps the send time so [PingSchedule.tooSoonToSend] can prevent a burst.
      */
     suspend fun sendWindowPing(profile: Profile): PingResult = withContext(Dispatchers.IO) {
+        if (profile.provider != Provider.CLAUDE) {
+            return@withContext PingResult.WrongProvider(profile.provider.vendor)
+        }
         val result = mutex.withLock {
             val before = cache.snapshot(profile).data?.session?.resetsAt
             val now = System.currentTimeMillis()

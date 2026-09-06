@@ -149,6 +149,28 @@ fun windowRows(data: UsageData, max: Int = 4): List<WindowRow> {
     return rows.take(max)
 }
 
+/**
+ * CCRM-54 (ChatGPT Account) part 2: what a Ring or Bar widget says when it is
+ * configured on a window **this account does not have** — a ChatGPT Plus or Pro
+ * account since OpenAI lifted the 5-hour limit on 2026-07-12, or any account whose
+ * payload simply omits one.
+ *
+ * The distinction that matters is between *absent* and *not fetched yet*: both draw
+ * a null window, but "—" reads as "wait a moment" and would never stop being wrong.
+ * A null [data] is the not-fetched case and keeps the em dash; only a payload that
+ * arrived and had no such window gets a sentence.
+ *
+ * Returns null when there is nothing to say — the window is present, or there is no
+ * payload to judge it by.
+ */
+fun absentWindowMessage(data: UsageData?, weekly: Boolean): String? {
+    if (data == null) return null
+    val present = if (weekly) data.weekly != null else data.session != null
+    if (present) return null
+    return if (weekly) "No 7-day window on this account"
+    else "No 5-hour window on this account"
+}
+
 // --- face layout (CCBG-10 (Mini-Rings Emptiness) / CCBG-11 (Ring Face Clutter)) ---
 //
 // Both faces used to size their rings with a constant, which is how one ended up

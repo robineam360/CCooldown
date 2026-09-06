@@ -51,7 +51,7 @@ fix it in ROADMAP.md and note it in the step's *Log* line.
 | 1 | CCRM-53 (Provider Model) | Sonnet | medium | no | ☑ |
 | 2 | CCRM-54 (ChatGPT Account) part 1 — source, device flow, payload capture | Opus | high | one sign-in on the phone | ☑ |
 | 3 | CCRM-56 (Provider Identity) — rename, icon, marks, accents, Add-account sheet, hidden windows | Sonnet | medium | approve the icon at 48 dp | ☑ |
-| 4 | CCRM-54 (ChatGPT Account) part 2 + CCRM-57 (Provider Plumbing) — the ChatGPT account on every surface | Sonnet | medium | no | ☐ |
+| 4 | CCRM-54 (ChatGPT Account) part 2 + CCRM-57 (Provider Plumbing) — the ChatGPT account on every surface | Sonnet | medium | no | ☑ |
 | 5 | Device pass on the Fold 7 | Sonnet | medium | phone in hand | ☐ |
 | 6 | Release v1.5 — README, guide, brochure, tag | Sonnet | medium | keystore, upload | ☐ |
 | A | *Any time:* CCRM-55 (Antigravity Account) spike — terminal on the Mac | Sonnet | low | Antigravity signed in on the Mac | ☐ |
@@ -356,12 +356,58 @@ follow the Handover rule and print Step 5.
 ```
 
 **Done when:**
-- ☐ Device-code sheet shows waiting / expired / denied / unavailable / done correctly.
-- ☐ ChatGPT tab shows real numbers; credits card shows a balance or is hidden.
-- ☐ Errors on a ChatGPT account say "OpenAI", never "Anthropic".
-- ☐ Tests green, both Status lines updated, ticked, committed.
+- ☑ Device-code sheet shows waiting / expired / denied / unavailable / done correctly.
+- ☑ ChatGPT tab shows real numbers; credits card shows a balance or is hidden.
+- ☑ Errors on a ChatGPT account say "OpenAI", never "Anthropic".
+- ☑ Tests green, both Status lines updated, ticked, committed.
 
 **Log:**
+
+2026-09-06 — built CCRM-54 (ChatGPT Account) part 2 and every CCRM-57 (Provider
+Plumbing) item; 368 tests green (was 333). **Sheet:** `DeviceCodeSheet` is a real
+`ModalBottomSheet` with the five states and a live `m:ss` countdown (`Fmt.mmss` — part
+1's `Fmt.dhm` sat frozen on "14m", exactly as its log predicted). Its copy and state
+table are pure in `ui/DeviceCodeCopy.kt` and pinned by `DeviceCodeCopyTest`, because
+with no Robolectric a five-branch sheet is otherwise only checked by eye — the failure
+CCRM-15 (Above-Pace Verification) exists to remember. A **sixth** stage, `FAILED`
+(couldn't reach OpenAI to *start*), reuses the expired state's layout with the
+network's own sentence rather than inventing a layout the wireframe doesn't show.
+**Card:** `ChatGptAccountBody` rewritten to the wireframe — the shared header's
+`PlanChip` now takes `tier = null` off Claude, so "Plus" never becomes "Plus 5x"; no
+"expires around" line; *Sign in with a code* / *Refresh* / *Clear*; per-provider quick
+links; no backup/paste/QR. The debug capture button is gone and so is
+`UsageRepository.captureUsagePayload` — the button was its only caller, and an
+unreferenced function that writes a usage body to the log is worse left in.
+**Surfaces:** `absentWindowMessage` in `WidgetFace.kt` distinguishes *absent* from *not
+fetched yet* (the Bar drew a fake `0% used` plus "Starts when a message is sent"; the
+Ring drew "—"); pinned headline and the QS tile fall back to the 7-day window, and both
+drop the gauge's weekly flag dot when weekly *is* the headline, so one figure never
+renders as two. The pinned panel skips its 7-day bar in that case for the same reason.
+**Verified, not rebuilt:** `PaceWidget`'s `hasSession`/`hasWeekly` gate — it hides the
+absent chip *and* auto-selects the side that exists.
+
+Rode along, same class of defect, beyond the listed items: `sendWindowPing` and
+`PingScheduler.reschedule` now refuse a non-Claude profile at the data layer (a ping is
+an Anthropic inference request), and the main screen's empty-account card no longer
+tells a ChatGPT account to tap Claude's sign-in button. The browser picker was
+extracted from `TokenCard` into `rememberBrowserOpener` so the device-code sheet's
+"Open in browser" gets the same picker Claude's sign-in uses, as CCRM-54 specifies —
+its dialog copy now names the account's own provider instead of always "Claude".
+
+Two things Step 5 needs to look at rather than assume: **(1)** the provider mark on the
+pinned label line exists only in the *Huge number* (`big`) style — the other three are
+plain `NotificationCompat` slots with no ImageView, so a mark there means custom
+RemoteViews, which the wireframe doesn't show; recorded in CCRM-54's status, not filed
+as a defect. **(2)** the absent-window sentence is 31 characters in an 11 sp single-line
+slot on a 110 dp ring face, so it renders at 10 sp over two lines — worth an eye at the
+smallest placement. Also unchanged and noted: a caps-only account (weekly window absent
+but model caps present) still titles the Pace face "7-day window" with a null window —
+pre-existing, not reachable from the captured fixture, left alone.
+
+CCRM-37 (Contract Tests) is **still Planned**: only its CCRM-57 slice was built, as
+`ContractCopyTest` (three names, three vendors, four trademark lines, drawable
+ownership headers), reading raw source the way CCRM-37 itself describes. The README's
+notice still names Anthropic alone and is not asserted — Step 6 rewrites it.
 
 ---
 

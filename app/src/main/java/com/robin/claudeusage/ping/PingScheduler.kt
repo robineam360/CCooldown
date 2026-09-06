@@ -8,6 +8,7 @@ import android.os.Build
 import com.robin.claudeusage.data.PingSchedule
 import com.robin.claudeusage.data.Profile
 import com.robin.claudeusage.data.ProfileRegistry
+import com.robin.claudeusage.data.Provider
 import com.robin.claudeusage.data.UsageCache
 import java.time.ZoneId
 
@@ -40,7 +41,10 @@ object PingScheduler {
     fun reschedule(context: Context, profile: Profile) {
         val cache = UsageCache(context)
         val config = cache.pingConfig(profile)
-        if (!config.enabled) {
+        // CCRM-57 (Provider Plumbing): only Claude has an inference endpoint we would
+        // send a ping to. An alarm on any other provider is cancelled, not armed —
+        // including one left over from before an account's provider was known.
+        if (profile.provider != Provider.CLAUDE || !config.enabled) {
             cancel(context, profile)
             return
         }

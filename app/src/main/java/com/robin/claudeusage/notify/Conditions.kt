@@ -237,7 +237,7 @@ object Conditions {
             title = "Usage data is stale",
             // CCRM-27 (Error Taxonomy): the kind's short label, not the raw status.
             detail = "Nothing fetched since ${Fmt.dayTimeWithAgo(snapshot.fetchedAt, use24h)}. " +
-                "Last error: ${com.robin.claudeusage.data.ErrorKind.fromKey(snapshot.lastStatusKind).short}",
+                "Last error: ${com.robin.claudeusage.data.ErrorKind.fromKey(snapshot.lastStatusKind).short(profile.provider)}",
             error = true,
         )
     }

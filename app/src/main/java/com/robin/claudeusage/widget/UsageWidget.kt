@@ -281,7 +281,7 @@ private fun WidgetContent(
                         }
                     }
                     Spacer(GlanceModifier.height(4.dp))
-                    FooterRow(snapshot, data.weekly, use24h, resetClock)
+                    FooterRow(snapshot, profile, data.weekly, use24h, resetClock)
                 }
             }
             medium -> {
@@ -309,7 +309,7 @@ private fun WidgetContent(
                         widgetWidthDp = widgetWidthDp,
                     )
                     Spacer(GlanceModifier.height(2.dp))
-                    FooterRow(snapshot, data.weekly, use24h, resetClock)
+                    FooterRow(snapshot, profile, data.weekly, use24h, resetClock)
                 }
             }
             else -> {
@@ -554,6 +554,8 @@ internal fun SubTextRow(left: String, right: String) {
 @Composable
 internal fun FooterRow(
     snapshot: Snapshot,
+    /** CCRM-57 (Provider Plumbing): whose server the error label should name. */
+    profile: Profile,
     weekly: UsageWindow?,
     use24h: Boolean,
     resetClock: Boolean = false,
@@ -569,7 +571,7 @@ internal fun FooterRow(
             // the full remediation and detail live in-app.
             if (failed) {
                 "updated ${Fmt.ago(snapshot.fetchedAt)} · ⚠ " +
-                    ErrorKind.fromKey(snapshot.lastStatusKind).short
+                    ErrorKind.fromKey(snapshot.lastStatusKind).short(profile.provider)
             } else "updated ${Fmt.ago(snapshot.fetchedAt)}",
             style = TextStyle(
                 color = if (stale) staleColor else GlanceTheme.colors.onSurfaceVariant,

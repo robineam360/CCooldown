@@ -87,6 +87,8 @@ import android.text.format.DateFormat
 import com.robin.claudeusage.data.ErrorKind
 import com.robin.claudeusage.data.Profile
 import com.robin.claudeusage.data.ProfileRegistry
+import com.robin.claudeusage.data.Provider
+import com.robin.claudeusage.data.QuickLinks
 import com.robin.claudeusage.ping.PingScheduler
 import com.robin.claudeusage.data.Projection
 import com.robin.claudeusage.data.UsageRepository
@@ -619,10 +621,18 @@ private fun ProfileScreen(
             Column(Modifier.padding(16.dp)) {
                 Text("No $label account yet", fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(4.dp))
+                // CCRM-57 (Provider Plumbing): the two sign-ins are different flows
+                // with different buttons, so this can't name one of them for both.
                 Text(
-                    "Open Settings and tap \"Sign in on this phone\" for the " +
-                        "$label account. It opens Claude's sign-in in your " +
-                        "browser — no computer needed.",
+                    if (profile.provider == Provider.CLAUDE) {
+                        "Open Settings and tap \"Sign in on this phone\" for the " +
+                            "$label account. It opens Claude's sign-in in your " +
+                            "browser — no computer needed."
+                    } else {
+                        "Open Settings and tap \"Sign in with a code\" for the " +
+                            "$label account. It shows a short code to type at " +
+                            "auth.openai.com — on this phone or any other device."
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
@@ -731,11 +741,18 @@ private fun ProfileScreen(
                         Text("Usage credits", style = MaterialTheme.typography.titleSmall)
                         Spacer(Modifier.width(6.dp))
                         Text(
-                            if (credits.limitMinor != null) {
-                                "${Fmt.money(credits.usedMinor, credits.exponent, credits.currency)} / " +
-                                    Fmt.money(credits.limitMinor, credits.exponent, credits.currency)
-                            } else {
-                                "${Fmt.money(credits.usedMinor, credits.exponent, credits.currency)} spent"
+                            when {
+                                credits.limitMinor != null ->
+                                    "${Fmt.money(credits.usedMinor, credits.exponent, credits.currency)} / " +
+                                        Fmt.money(credits.limitMinor, credits.exponent, credits.currency)
+                                // CCRM-54 (ChatGPT Account) part 2: OpenAI reports a
+                                // pot, not a meter — nothing has been "spent" from it
+                                // and there is no cap to spend against, so the balance
+                                // is the whole story. "$0.00 spent" would say nothing.
+                                credits.usedMinor == 0L && credits.balanceMinor != null ->
+                                    "${Fmt.money(credits.balanceMinor, credits.exponent, credits.currency)} balance"
+                                else ->
+                                    "${Fmt.money(credits.usedMinor, credits.exponent, credits.currency)} spent"
                             },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -785,6 +802,11 @@ private fun ProfileScreen(
                         when {
                             remaining == null ->
                                 "No monthly spend limit — credits cover you when you hit your plan limits"
+                            // The balance branch above already prints the amount; saying
+                            // "$12.40 left" under "$12.40 balance" is the same fact twice.
+                            credits.usedMinor == 0L && credits.limitMinor == null &&
+                                credits.balanceMinor != null ->
+                                "Covers you when you hit your plan limits"
                             remaining > 0L ->
                                 "${Fmt.money(remaining, credits.exponent, credits.currency)} left · " +
                                     if (credits.limitMinor != null) {
@@ -859,6 +881,7 @@ private fun ProfileScreen(
         Spacer(Modifier.height(6.dp))
         ErrorNotice(
             snapshot = snapshot,
+            provider = profile.provider,
             backoffUntil = repo.cacheSettings().backoffUntil(profile),
             use24h = use24h,
             onOpenSettings = onOpenSettings,
@@ -875,6 +898,8 @@ private fun ProfileScreen(
 @Composable
 private fun ErrorNotice(
     snapshot: com.robin.claudeusage.data.Snapshot,
+    /** CCRM-57 (Provider Plumbing): the copy and the status link both key on it. */
+    provider: com.robin.claudeusage.data.Provider,
     backoffUntil: Long,
     use24h: Boolean,
     onOpenSettings: () -> Unit,
@@ -897,7 +922,7 @@ private fun ErrorNotice(
     ) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
             Text(
-                kind.title,
+                kind.title(provider),
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = tint,
@@ -911,8 +936,10 @@ private fun ErrorNotice(
                 // CCRM-26 (Quick Links): the "is it me or is it them" escape stays,
                 // now scoped to the kinds where it answers the question.
                 ErrorKind.NETWORK, ErrorKind.SERVER ->
-                    TextButton(onClick = { openInBrowser(context, ANTHROPIC_STATUS_URL, null) }) {
-                        Text("Check Anthropic status")
+                    TextButton(onClick = {
+                        openInBrowser(context, QuickLinks.statusUrl(provider), null)
+                    }) {
+                        Text(QuickLinks.statusLabel(provider))
                     }
                 ErrorKind.AUTH ->
                     TextButton(onClick = onOpenSettings) { Text("Open Settings") }
