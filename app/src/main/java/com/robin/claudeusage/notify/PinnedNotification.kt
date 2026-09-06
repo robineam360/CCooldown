@@ -26,6 +26,7 @@ import com.robin.claudeusage.MainActivity
 import com.robin.claudeusage.R
 import com.robin.claudeusage.data.Profile
 import com.robin.claudeusage.data.Projection
+import com.robin.claudeusage.data.Provider
 import com.robin.claudeusage.data.UsageCache
 import com.robin.claudeusage.data.UsageData
 import com.robin.claudeusage.data.UsageWindow
@@ -35,6 +36,7 @@ import com.robin.claudeusage.ui.Fmt
 import com.robin.claudeusage.ui.Palette
 import com.robin.claudeusage.ui.UsageIcon
 import com.robin.claudeusage.ui.elapsedPercent
+import com.robin.claudeusage.ui.providerMarkRes
 
 /**
  * The optional always-on notification: one profile's 5-hour usage as a filled
@@ -64,11 +66,19 @@ object PinnedNotification {
     const val ACTION_REFRESH = "com.robin.claudeusage.PINNED_REFRESH"
 
     /** The official Claude Android app — the optional tap target (CCRM-2). */
-    const val CLAUDE_PACKAGE = "com.anthropic.claude"
+    val CLAUDE_PACKAGE = Provider.CLAUDE.appPackage
 
     /** Resolves Claude's launcher intent, or null when it isn't installed. */
     fun claudeLaunchIntent(context: Context): Intent? =
         context.packageManager.getLaunchIntentForPackage(CLAUDE_PACKAGE)
+
+    /**
+     * Resolves any provider's launcher intent, or null when it isn't installed
+     * (CCRM-56 (Provider Identity) — the "app"/"provider" tap target generalises
+     * from Claude-only to whichever provider owns the pinned profile).
+     */
+    fun providerLaunchIntent(context: Context, provider: Provider): Intent? =
+        context.packageManager.getLaunchIntentForPackage(provider.appPackage)
 
     fun ensureChannel(context: Context) {
         val nm = context.getSystemService(NotificationManager::class.java)
@@ -96,7 +106,7 @@ object PinnedNotification {
         val profile = cache.pinnedProfile()
         val label = cache.profileLabel(profile)
         val dark = isNightMode(context)
-        val theme = Palette.color(cache.themeColorName(), dark)
+        val theme = Palette.color(Palette.accentName(cache, profile), dark)
         val data = cache.snapshot(profile).data
         val session = data?.session
         val pct = session?.percent
@@ -224,6 +234,7 @@ object PinnedNotification {
                     bigNumberView(
                         context, R.layout.notif_big_number, pctText, title, collapsedText,
                         pct, sessionElapsed, fill, theme, dark, showOverPace, null, stale,
+                        profile.provider,
                         leftCaption = left && pct != null,
                     )
                 )
@@ -232,6 +243,7 @@ object PinnedNotification {
                         context, R.layout.notif_big_number_expanded,
                         pctText, title, expandedText,
                         pct, sessionElapsed, fill, theme, dark, showOverPace, panel, stale,
+                        profile.provider,
                         leftCaption = left && pct != null,
                     )
                 )
@@ -283,14 +295,17 @@ object PinnedNotification {
     }
 
     /**
-     * Where a tap on the notification body goes (CCRM-2). "claude" jumps straight
-     * into the Claude app; anything else — including "claude" when it isn't
-     * installed — opens our own breakdown on the pinned profile.
+     * Where a tap on the notification body goes (CCRM-2). "provider" jumps
+     * straight into the pinned account's own provider app; anything else —
+     * including "provider" when that app isn't installed — opens our own
+     * breakdown on the pinned profile. (CCRM-56 (Provider Identity): the stored
+     * value "claude" from pre-multi-provider installs reads as "provider".)
      */
     private fun tapIntent(context: Context, cache: UsageCache, profile: Profile): PendingIntent {
         val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        if (cache.pinnedTapTarget() == "claude") {
-            val launch = claudeLaunchIntent(context)
+        val target = cache.pinnedTapTarget()
+        if (target == "provider" || target == "claude") {
+            val launch = providerLaunchIntent(context, profile.provider)
             if (launch != null) {
                 // Launched from a notification, so it needs its own task.
                 launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -335,9 +350,12 @@ object PinnedNotification {
         showOverPace: Boolean,
         panel: Bitmap?,
         stale: Boolean,
+        provider: Provider,
         /** CCRM-22: the small "LEFT" caption under the number in Left mode. */
         leftCaption: Boolean = false,
     ): RemoteViews = RemoteViews(context.packageName, layout).apply {
+        setImageViewResource(R.id.provider_mark, providerMarkRes(provider))
+        setInt(R.id.provider_mark, "setColorFilter", theme.toArgb())
         setTextViewText(R.id.pct, pctText)
         setTextColor(R.id.pct, fill.toArgb())
         setViewVisibility(

@@ -42,6 +42,7 @@ import com.robin.claudeusage.data.UsageCache
 import com.robin.claudeusage.data.UsageWindow
 import com.robin.claudeusage.data.WidgetPrefs
 import com.robin.claudeusage.ui.Fmt
+import com.robin.claudeusage.ui.Palette
 import com.robin.claudeusage.ui.elapsedPercent
 import com.robin.claudeusage.work.Polling
 
@@ -81,7 +82,7 @@ class RingWidget : GlanceAppWidget() {
         val use24h = cache.use24hTime()
         val usageLeft = cache.usageLeft()
         val resetClock = cache.resetClock()
-        val themeName = cache.themeColorName()
+        val themeName = Palette.accentName(cache, profile)
         // Single-account users don't need to be told which account.
         val multiProfile = cache.registry().all().count {
             cache.snapshot(it).authState != AuthState.NO_CREDENTIALS

@@ -40,6 +40,7 @@ import com.robin.claudeusage.data.Snapshot
 import com.robin.claudeusage.data.UsageCache
 import com.robin.claudeusage.data.WidgetPrefs
 import com.robin.claudeusage.ui.Fmt
+import com.robin.claudeusage.ui.Palette
 import com.robin.claudeusage.ui.elapsedPercent
 import com.robin.claudeusage.work.Polling
 
@@ -81,7 +82,7 @@ class MiniRingsWidget : GlanceAppWidget() {
         val snapshot = cache.snapshot(profile)
         val use24h = cache.use24hTime()
         val usageLeft = cache.usageLeft()
-        val themeName = cache.themeColorName()
+        val themeName = Palette.accentName(cache, profile)
         // Three, not four (CCBG-10 (Mini-Rings Emptiness)): fewer columns is what
         // lets each ring be big enough to read as a gauge at a glance.
         val rows = snapshot.data?.let { windowRows(it, max = 3) } ?: emptyList()

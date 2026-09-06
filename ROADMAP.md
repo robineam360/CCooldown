@@ -434,9 +434,13 @@ Sessions 1 and 3 can run in parallel; 2 depends on 1; 4 depends on 1–3.
 - **ToS posture:** the highest of the three. Disclose it as plainly as the Anthropic box does.
 
 ### CCRM-56 · Provider Identity — Cooldown: the name, the three-sand hourglass, the marks and the accents
-- **Status:** Planned · **wireframe rev B `design/provider-identity-wireframe.html` approved
-  2026-09-06** (decisions 1–7 and B1–B3 recorded at its foot) · gates every visible part of
-  CCRM-54 (ChatGPT Account) · keep the wireframe until the device pass is signed off.
+- **Status:** Done (2026-09-06) — name, icon (rev C: 1.3x scale on review), marks (Claude/Gemini
+  paths from Simple Icons, ChatGPT from Wikimedia Commons — all cross-checked against a real
+  source rather than recalled), three-level accents, Add-account sheet, hidden windows. Device
+  pass and the two narrative-only refinements below are open follow-ups, not blockers · wireframe
+  rev B `design/provider-identity-wireframe.html` approved 2026-09-06 (decisions 1–7 and B1–B3
+  recorded at its foot) · gated every visible part of CCRM-54 (ChatGPT Account) · keep the
+  wireframe until the device pass is signed off.
 - **What cannot change — settle this first:** `applicationId com.robin.claudeusage`. Changing
   it is a **different app** to Android: every install, placed widget, tile, credential and
   year of history is lost, and the update checker can never reach the old installs. Package,
@@ -478,6 +482,12 @@ Sessions 1 and 3 can run in parallel; 2 depends on 1; 4 depends on 1–3.
     layer, alpha survives, so "three" survives without colour. `drawable/ic_launcher.xml`
     (About screen) redrawn to match. Preview at 48 dp before committing: the three bands must
     each be at least 3 dp tall on a 48 dp tile or the middle one vanishes.
+  - **Rev C, confirmed on the 48 dp render (2026-09-06):** all the geometry above stays
+    exactly as specified, but the whole glyph now sits inside a `<group android:scaleX="1.3"
+    android:scaleY="1.3" android:pivotX="54" android:pivotY="54">` in all three colour/mono
+    files — Robin found the unscaled render too small/padded at 48 dp. Container effectively
+    r≈40, intentionally past the nominal 66dp safe circle; accepted as a tradeoff since modern
+    launcher masks are lenient in practice.
 - **Build — 3, the marks (review decision 4: logos, not dots).** `ui/ProviderMark.kt`:
   `@Composable fun ProviderMark(provider: Provider, size: Dp = 16.dp, tint: Color? = null)`
   drawing `drawable/ic_provider_claude.xml`, `ic_provider_chatgpt.xml`,
@@ -494,7 +504,16 @@ Sessions 1 and 3 can run in parallel; 2 depends on 1; 4 depends on 1–3.
   `ImageView` in the Huge-number layout row; drawn into the panel bitmap for the gauge style),
   in widget labels when `multiProfile` and in the widget config picker; **28 dp** in the
   Add-account sheet. Tiles cannot carry it (icon slot is the gauge) — the tile's label rule in
-  step 1 covers it. Status-bar and QS gauge glyphs untouched.
+  step 1 covers it. Status-bar and QS gauge glyphs untouched. **Landed:** cards, tab strips
+  (Main + History), the pinned Huge-number label line (both collapsed and expanded layouts),
+  the widget config picker, the Add-account sheet, and Settings' own "Show profile" chip row
+  (the pinned notification's profile picker — not literally inside the panel bitmap, but the
+  same 14dp chip treatment). **Deferred, follow-up:** the mark in the four bar-face widgets'
+  own `"5-hour · $profileLabel"`-style labels (baked into a plain string passed to a shared
+  bar-row composable — needs that row to take a leading icon slot first) and on the pinned
+  panel's own folded condition strips (decision 7's "carries its mark in ink" — needs
+  `Conditions.Condition` to carry a `Provider` through several construction sites). Neither
+  blocks CCRM-54 (ChatGPT Account) part 2.
 - **Build — 4, the accents (review decision 1).** Today `themeColor` is one global pref
   read at eight sites (`MainActivity:178`, `PinnedNotification:99`, `BarWidget:71`,
   `RingWidget:84`, `UsageWidget:107`, `MiniRingsWidget:84`, `PaceWidget:112`,

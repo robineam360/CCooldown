@@ -34,16 +34,31 @@ abstract class BaseUsageTileService(private val slot: Int) : TileService() {
         private const val FRESH_ENOUGH_MS = 3 * 60_000L
     }
 
-    private fun profileForSlot(): Profile? =
-        ProfileRegistry(this).all().firstOrNull { it.slot == slot }
+    private fun allProfiles(): List<Profile> = ProfileRegistry(this).all()
+
+    private fun profileForSlot(all: List<Profile>): Profile? = all.firstOrNull { it.slot == slot }
+
+    /**
+     * CCRM-56 (Provider Identity): the tile carries no mark (its icon slot is the
+     * gauge), so a "Provider · " prefix is the only way it says which service a
+     * label belongs to — and it's only worth saying once accounts span more than
+     * one provider.
+     */
+    private fun tileLabel(profile: Profile, profileLabel: String, all: List<Profile>): String =
+        if (all.map { it.provider }.distinct().size > 1) {
+            "${profile.provider.displayName} · $profileLabel"
+        } else {
+            profileLabel
+        }
 
     override fun onStartListening() {
-        val profile = profileForSlot() ?: run {
+        val all = allProfiles()
+        val profile = profileForSlot(all) ?: run {
             // No account in this slot — never placed, or removed since. Greyed out and
             // inert, which is the only honest thing a tile bound to nothing can be.
             qsTile?.apply {
                 state = Tile.STATE_UNAVAILABLE
-                label = "Claude account ${slot + 1}"
+                label = "Cooldown account ${slot + 1}"
                 subtitle = "no account"
                 updateTile()
             }
@@ -58,7 +73,7 @@ abstract class BaseUsageTileService(private val slot: Int) : TileService() {
                 session?.percent != null -> {
                     state = Tile.STATE_ACTIVE
                     // CCRM-22 (Used or Left): room for the word, so it flips worded.
-                    label = "$profileLabel ${Fmt.usageShort(session.percent, cache.usageLeft())}"
+                    label = "${tileLabel(profile, profileLabel, all)} ${Fmt.usageShort(session.percent, cache.usageLeft())}"
                     // The 5-hour reset earns the subtitle over the 7-day number:
                     // it's the one that changes what you do next. The countdown/clock
                     // choice is the global CCRM-23 (Reset Display) token now — the
@@ -96,7 +111,7 @@ abstract class BaseUsageTileService(private val slot: Int) : TileService() {
                 }
                 else -> {
                     state = Tile.STATE_INACTIVE
-                    label = "Claude $profileLabel"
+                    label = tileLabel(profile, profileLabel, all)
                     subtitle = "no data"
                 }
             }
@@ -114,7 +129,7 @@ abstract class BaseUsageTileService(private val slot: Int) : TileService() {
     @Suppress("DEPRECATION")
     @SuppressLint("StartActivityAndCollapseDeprecated")
     override fun onClick() {
-        val profile = profileForSlot() ?: return
+        val profile = profileForSlot(allProfiles()) ?: return
         val intent = Intent(this, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             .putExtra("profile", profile.key)

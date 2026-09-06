@@ -3,6 +3,8 @@ package com.robin.claudeusage.ui
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.robin.claudeusage.data.Profile
+import com.robin.claudeusage.data.UsageCache
 import com.robin.claudeusage.data.UsageWindow
 import java.time.Duration
 import java.time.Instant
@@ -49,6 +51,14 @@ object Palette {
     const val DYNAMIC = "Material You"
     const val DEFAULT = "Claude Orange"
 
+    /**
+     * Pseudo-option (CCRM-56 (Provider Identity), decision 1): each account renders
+     * in its own provider's colour rather than one global theme. Not a [ThemeOption]
+     * — [byName] never resolves it; callers go through [accentName] instead, which
+     * peels this and every other resolution layer apart before a color is chosen.
+     */
+    const val PER_PROVIDER = "Per provider"
+
     val options = listOf(
         ThemeOption("Claude Orange", Color(0xFFD97757), Color(0xFFE59980)),
         ThemeOption("Blue", Color(0xFF1A73E8), Color(0xFF8AB4F8), PACE_SPRING_LIGHT, PACE_SPRING_DARK),
@@ -62,13 +72,44 @@ object Palette {
         ThemeOption("Pink", Color(0xFFD81B60), Color(0xFFF48FB1)),
         ThemeOption("Purple", Color(0xFF8E24AA), Color(0xFFCE93D8)),
         ThemeOption("Brown", Color(0xFF6D4C41), Color(0xFFBCAAA4)),
+        // Provider-only (CCRM-56 (Provider Identity)): resolvable by name via
+        // [byName]/[color] so `Provider.themeName` works, but excluded from
+        // [selectableOptions] — picking a provider's own colour as a manual
+        // override or global choice isn't a pick either grid offers; "Provider
+        // colour (default)" (the account picker) or "Per provider" (the global
+        // picker) already cover that intent.
+        ThemeOption("ChatGPT Green", Color(0xFF10A37F), Color(0xFF19C39A), PACE_VIOLET_LIGHT, PACE_VIOLET_DARK),
+        ThemeOption("Gemini Blue", Color(0xFF4285F4), Color(0xFF8AB4F8), PACE_SPRING_LIGHT, PACE_SPRING_DARK),
     )
+
+    private val PROVIDER_ONLY_NAMES = setOf("ChatGPT Green", "Gemini Blue")
+
+    /** [options] minus the provider-only entries — what a colour grid iterates. */
+    val selectableOptions: List<ThemeOption> get() = options.filterNot { it.name in PROVIDER_ONLY_NAMES }
 
     fun byName(name: String): ThemeOption =
         options.firstOrNull { it.name == name } ?: options.first()
 
     fun color(name: String, dark: Boolean): Color =
         byName(name).let { if (dark) it.dark else it.light }
+
+    /**
+     * The three-level accent resolution (CCRM-56 (Provider Identity), decision 1):
+     * an account's own [UsageCache.accountAccent] override, if set; else the global
+     * theme choice, if it isn't [PER_PROVIDER]; else the account's provider colour.
+     * Thin wrapper over [resolveAccent] — see that function for the testable core.
+     */
+    fun accentName(cache: UsageCache, profile: Profile): String =
+        resolveAccent(cache.accountAccent(profile), cache.themeColorName(), profile.provider.themeName)
+
+    /**
+     * The pure form of [accentName], with no `UsageCache`/`Profile` dependency so
+     * `AccentResolutionTest` can exercise it without Robolectric: [accountOverride]
+     * wins if set, else [globalChoice] wins unless it is [PER_PROVIDER], else
+     * [providerThemeName].
+     */
+    fun resolveAccent(accountOverride: String?, globalChoice: String, providerThemeName: String): String =
+        accountOverride ?: globalChoice.takeIf { it != PER_PROVIDER } ?: providerThemeName
 
     /**
      * The theme's pace-line partner (CCRM-50 (Weekly Flag)). Resolves through

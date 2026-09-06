@@ -34,9 +34,11 @@ class SurfaceTokensTest {
     }
 
     @Test
-    fun `the default accent is the one the cache falls back to`() {
-        // UsageCache.themeColorName() hard-codes this string as its default; if the two
-        // ever disagree, a fresh install themes the widgets differently from the app.
+    fun `the default accent is the one a fresh Claude install lands on`() {
+        // CCRM-56 (Provider Identity): UsageCache.themeColorName() now defaults to
+        // Palette.PER_PROVIDER, not this string directly — but a fresh install's
+        // only account is Provider.CLAUDE, whose themeName resolves right back
+        // here, so a Claude-only install still lands on Claude Orange.
         assertEquals("Claude Orange", Palette.DEFAULT)
         assertEquals(Palette.DEFAULT, Palette.options.first().name)
     }

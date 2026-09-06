@@ -26,6 +26,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -44,6 +45,7 @@ import com.robin.claudeusage.data.UsageRepository
 import com.robin.claudeusage.ui.Fmt
 import com.robin.claudeusage.ui.LocalWidthClass
 import com.robin.claudeusage.ui.Palette
+import com.robin.claudeusage.ui.ProviderTabLabel
 import com.robin.claudeusage.ui.twoPane
 import java.time.Instant
 import java.time.LocalDate
@@ -57,7 +59,7 @@ import java.time.format.DateTimeFormatter
  * plus the current open window, so it fills in going forward.
  */
 @Composable
-fun HistoryScreen(repo: UsageRepository, tick: Int) {
+fun HistoryScreen(repo: UsageRepository, tick: Int, onProfileChange: (Profile) -> Unit = {}) {
     // CCRM-6 (Multi-Account): configured accounts only, same rule as the main tab strip.
     val profiles = repo.configuredProfiles().ifEmpty { listOf(repo.registry().first()) }
     var tab by rememberSaveable { mutableIntStateOf(0) }
@@ -67,6 +69,9 @@ fun HistoryScreen(repo: UsageRepository, tick: Int) {
     // an unclamped read walks off the end. Falls back to the first tab rather than trying to
     // follow the account that vanished.
     val profile = profiles[tab.coerceIn(0, profiles.lastIndex)]
+    // CCRM-56 (Provider Identity): reports the visible tab's account up so the app
+    // shell can theme from it, matching Main's ProfileTabs.
+    LaunchedEffect(profile) { onProfileChange(profile) }
     val zone = remember { ZoneId.systemDefault() }
     val use24h = repo.cacheSettings().use24hTime()
 
@@ -102,7 +107,7 @@ fun HistoryScreen(repo: UsageRepository, tick: Int) {
                 Tab(
                     selected = selected == index,
                     onClick = { tab = index },
-                    text = { Text(repo.cacheSettings().profileLabel(p)) },
+                    text = { ProviderTabLabel(repo.cacheSettings(), p) },
                 )
             }
         }
@@ -116,7 +121,18 @@ fun HistoryScreen(repo: UsageRepository, tick: Int) {
     // single-account view doesn't start hard against the app bar.
     Spacer(Modifier.height(16.dp))
 
-    if (!sideBySide) {
+    // CCRM-56 (Provider Identity), decision 6: a window the account does not
+    // have gets no toggle option and no pane — applies to Claude too (a session-
+    // only or weekly-only account, today's "—", now simply omits the other side).
+    val hasSession = data?.session != null
+    val hasWeekly = data?.weekly != null || (data?.modelCaps?.isNotEmpty() == true)
+    val effectiveWeekly = when {
+        hasSession && hasWeekly -> weekly
+        hasWeekly -> true
+        else -> false
+    }
+
+    if (!sideBySide && hasSession && hasWeekly) {
         Row {
             FilterChip(selected = !weekly, onClick = { weekly = false }, label = { Text("5-hour") })
             Spacer(Modifier.width(8.dp))
@@ -133,7 +149,7 @@ fun HistoryScreen(repo: UsageRepository, tick: Int) {
         WeeklyView(HistoryStats.bars(records, SessionLog.WEEKLY, openBar(SessionLog.WEEKLY)), zone, use24h)
     }
 
-    if (sideBySide) {
+    if (sideBySide && hasSession && hasWeekly) {
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             // With the chips gone, each pane has to say which window it's showing.
             Column(Modifier.weight(1f)) {
@@ -145,7 +161,7 @@ fun HistoryScreen(repo: UsageRepository, tick: Int) {
                 weeks()
             }
         }
-    } else if (weekly) {
+    } else if (effectiveWeekly) {
         weeks()
     } else {
         sessions()
@@ -286,7 +302,7 @@ private fun PaneLabel(text: String) {
 @Composable
 private fun EmptyHistory() {
     Text(
-        "No sessions recorded yet. History builds up as you use Claude and each " +
+        "No sessions recorded yet. History builds up as you use the account and each " +
             "5-hour or 7-day window closes — check back later.",
         style = MaterialTheme.typography.bodyMedium,
     )

@@ -109,22 +109,31 @@ class PaceWidget : GlanceAppWidget() {
         val use24h = cache.use24hTime()
         val usageLeft = cache.usageLeft()
         val resetClock = cache.resetClock()
-        val themeName = cache.themeColorName()
-        val weekly = windowKey == "weekly"
-        val window = snapshot.data?.let { if (weekly) it.weekly else it.session }
-        val windowLengthMs = if (weekly) Projection.WEEKLY_MS else Projection.SESSION_MS
+        val themeName = Palette.accentName(cache, profile)
+        // CCRM-56 (Provider Identity), decision 6: hide the toggle side the
+        // account doesn't have (e.g. a ChatGPT Plus/Pro account with no 5-hour
+        // window) rather than switch to it and draw an empty face.
+        val hasSession = snapshot.data?.session != null
+        val hasWeekly = snapshot.data?.weekly != null || snapshot.data?.modelCaps?.isNotEmpty() == true
+        val effectiveWeekly = when {
+            hasSession && hasWeekly -> windowKey == "weekly"
+            hasWeekly -> true
+            else -> false
+        }
+        val window = snapshot.data?.let { if (effectiveWeekly) it.weekly else it.session }
+        val windowLengthMs = if (effectiveWeekly) Projection.WEEKLY_MS else Projection.SESSION_MS
         val resetMs = window?.resetsAt?.toEpochMilli()
         val samples = if (resetMs != null) {
             val points = HistoryStore(context).points(profile)
-            if (weekly) Projection.weeklySamples(points, resetMs, windowLengthMs)
+            if (effectiveWeekly) Projection.weeklySamples(points, resetMs, windowLengthMs)
             else Projection.sessionSamples(points, resetMs, windowLengthMs)
         } else emptyList()
         resetMs?.let { Polling.armResetRedraw(context, it) }
         provideContent {
             GlanceTheme {
                 PaceFace(
-                    profile, snapshot, window, windowKey, windowLengthMs, samples,
-                    use24h, usageLeft, resetClock, themeName,
+                    profile, snapshot, window, effectiveWeekly, hasSession, hasWeekly,
+                    windowLengthMs, samples, use24h, usageLeft, resetClock, themeName,
                 )
             }
         }
@@ -136,7 +145,9 @@ private fun PaceFace(
     profile: Profile,
     snapshot: Snapshot,
     window: UsageWindow?,
-    windowKey: String,
+    weekly: Boolean,
+    hasSession: Boolean,
+    hasWeekly: Boolean,
     windowLengthMs: Long,
     samples: List<Pair<Long, Double>>,
     use24h: Boolean,
@@ -178,7 +189,7 @@ private fun PaceFace(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                if (windowKey == "weekly") "7-day window" else "5-hour window",
+                if (weekly) "7-day window" else "5-hour window",
                 style = TextStyle(
                     color = GlanceTheme.colors.onSurface,
                     fontSize = 13.sp,
@@ -187,9 +198,11 @@ private fun PaceFace(
                 maxLines = 1,
                 modifier = GlanceModifier.padding(end = 8.dp).defaultWeight(),
             )
-            WindowChip("5h", "session", windowKey == "session", accent, dark)
-            Spacer(GlanceModifier.width(4.dp))
-            WindowChip("7d", "weekly", windowKey == "weekly", accent, dark)
+            // CCRM-56 (Provider Identity), decision 6: hide the toggle side this
+            // account doesn't have rather than switch to an empty face.
+            if (hasSession) WindowChip("5h", "session", !weekly, accent, dark)
+            if (hasSession && hasWeekly) Spacer(GlanceModifier.width(4.dp))
+            if (hasWeekly) WindowChip("7d", "weekly", weekly, accent, dark)
         }
         Spacer(GlanceModifier.height(4.dp))
 

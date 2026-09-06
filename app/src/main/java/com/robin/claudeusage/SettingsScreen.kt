@@ -37,11 +37,13 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
@@ -68,7 +70,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -105,6 +109,7 @@ import com.robin.claudeusage.notify.UpdateNotification
 import com.robin.claudeusage.ping.PingScheduler
 import com.robin.claudeusage.ui.Fmt
 import com.robin.claudeusage.ui.Palette
+import com.robin.claudeusage.ui.ProviderMark
 import com.robin.claudeusage.ui.UsageIcon
 import com.robin.claudeusage.ui.hasTwoColumns
 import com.robin.claudeusage.widget.BarWidgetReceiver
@@ -169,6 +174,10 @@ fun SettingsScreen(
     // than by length: what the accounts are on one side, how this device
     // surfaces them on the other.
     val accountSections: @Composable () -> Unit = {
+        var showAddSheet by remember { mutableStateOf(false) }
+        // CCRM-56 (Provider Identity): the account the sheet just minted, so its
+        // card starts sign-in itself the moment it mounts.
+        var autoStartProfileKey by remember { mutableStateOf<String?>(null) }
         SectionLabel("Accounts")
         for (profile in profiles) {
             // Keyed on the account, not on its position: removing a card from the middle
@@ -182,6 +191,7 @@ fun SettingsScreen(
                     debugUnlocked = debugUnlocked,
                     onRename = { renaming = profile },
                     onRemove = { removing = profile },
+                    autoStartSignIn = profile.key == autoStartProfileKey,
                 )
             }
             Spacer(Modifier.height(10.dp))
@@ -189,14 +199,23 @@ fun SettingsScreen(
         // CCRM-6 (Multi-Account): the card appears immediately with a positional default
         // label, in its familiar not-signed-in state — no name-first dialog, because the
         // next tap the user wants is "Sign in on this phone". Renaming is a later thought.
+        // CCRM-56 (Provider Identity), decision 5: the sheet picks the provider now too.
         OutlinedButton(
-            onClick = {
-                repo.addProfile()
-                namesTick++
-                Shortcuts.publish(context)
-            },
+            onClick = { showAddSheet = true },
             modifier = Modifier.fillMaxWidth(),
         ) { Text("+ Add account") }
+        if (showAddSheet) {
+            AddAccountSheet(
+                onDismiss = { showAddSheet = false },
+                onPick = { provider ->
+                    val newProfile = repo.addProfile(provider = provider)
+                    namesTick++
+                    Shortcuts.publish(context)
+                    autoStartProfileKey = newProfile.key
+                    showAddSheet = false
+                },
+            )
+        }
         // The old "Profile names" section lived here. Names are registry-owned now and each
         // card renames itself through ⋮ → Rename, so a second editor for the same field
         // would only raise the question of which one is authoritative.
@@ -367,6 +386,7 @@ fun SettingsScreen(
                 // phone width, and the old Row clipped the last chip out of reach entirely.
                 // Lists every registered account, signed in or not — this is Settings, where
                 // accounts live, so the setting stays visible while an account is signed out.
+                val pinnedPickerDark = appDark()
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     for (p in profiles) {
                         FilterChip(
@@ -377,6 +397,13 @@ fun SettingsScreen(
                                 refreshPinned()
                             },
                             label = { Text(labels.getValue(p)) },
+                            leadingIcon = {
+                                ProviderMark(
+                                    p.provider,
+                                    size = 14.dp,
+                                    tint = Palette.color(Palette.accentName(cacheSettings, p), pinnedPickerDark),
+                                )
+                            },
                         )
                     }
                 }
@@ -421,13 +448,17 @@ fun SettingsScreen(
                 RowDivider()
                 Text("Tapping the notification opens", style = MaterialTheme.typography.bodyLarge)
                 Spacer(Modifier.height(8.dp))
-                val claudeInstalled = remember {
-                    com.robin.claudeusage.notify.PinnedNotification.claudeLaunchIntent(context) != null
+                val pinnedProviderApp = pinnedProfile.provider
+                val providerAppInstalled = remember(pinnedProviderApp) {
+                    com.robin.claudeusage.notify.PinnedNotification.providerLaunchIntent(context, pinnedProviderApp) != null
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for ((value, text) in listOf("app" to "Claude Cooldown", "claude" to "Claude app")) {
+                    // The stored value "claude" from pre-multi-provider installs
+                    // is read as "provider" (PinnedNotification.tapIntent), so the
+                    // chip below simply renders under its new name and label.
+                    for ((value, text) in listOf("app" to "Cooldown", "provider" to "${pinnedProviderApp.displayName} app")) {
                         FilterChip(
-                            selected = tapTarget == value,
+                            selected = tapTarget == value || (value == "provider" && tapTarget == "claude"),
                             onClick = {
                                 tapTarget = value
                                 cacheSettings.setPinnedTapTarget(value)
@@ -437,10 +468,10 @@ fun SettingsScreen(
                         )
                     }
                 }
-                if (tapTarget == "claude" && !claudeInstalled) {
+                if ((tapTarget == "provider" || tapTarget == "claude") && !providerAppInstalled) {
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        "The Claude app isn't installed — taps will open Claude Cooldown instead.",
+                        "The ${pinnedProviderApp.displayName} app isn't installed — taps will open Cooldown instead.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1037,6 +1068,8 @@ private fun TokenCard(
     debugUnlocked: Boolean,
     onRename: () -> Unit,
     onRemove: () -> Unit,
+    /** CCRM-56 (Provider Identity): the Add-account sheet starts sign-in at once. */
+    autoStartSignIn: Boolean = false,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -1154,6 +1187,14 @@ private fun TokenCard(
     Card {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // CCRM-56 (Provider Identity), decision 4: the mark, not a dot,
+                // identifies the service — 20dp before the label on account cards.
+                val cardDark = appDark()
+                val cardAccent = remember(stateKey, cardDark) {
+                    Palette.color(Palette.accentName(repo.cacheSettings(), profile), cardDark)
+                }
+                ProviderMark(profile.provider, size = 20.dp, tint = cardAccent)
+                Spacer(Modifier.width(6.dp))
                 Text(label, style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.width(10.dp))
                 if (hasToken) StatusChip(snapshot.authState)
@@ -1178,6 +1219,7 @@ private fun TokenCard(
                 // from "Clear" in the button row below. Clear signs out and keeps the
                 // history; Remove destroys it. Side by side, that is a fat-finger disaster.
                 var menuOpen by remember { mutableStateOf(false) }
+                var showAccentPicker by remember { mutableStateOf(false) }
                 Box {
                     IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(28.dp)) {
                         Icon(
@@ -1191,6 +1233,11 @@ private fun TokenCard(
                         DropdownMenuItem(
                             text = { Text("Rename…") },
                             onClick = { menuOpen = false; onRename() },
+                        )
+                        // CCRM-56 (Provider Identity), decision 1: the per-account override.
+                        DropdownMenuItem(
+                            text = { Text("Accent colour…") },
+                            onClick = { menuOpen = false; showAccentPicker = true },
                         )
                         // Hidden on the last remaining card: the registry always keeps one
                         // account, which is what makes the zero-configured fallback work.
@@ -1206,6 +1253,14 @@ private fun TokenCard(
                             )
                         }
                     }
+                }
+                if (showAccentPicker) {
+                    AccentColorDialog(
+                        profile = profile,
+                        cache = repo.cacheSettings(),
+                        onDismiss = { showAccentPicker = false },
+                        onPicked = { showAccentPicker = false; stateKey++ },
+                    )
                 }
             }
 
@@ -1240,8 +1295,17 @@ private fun TokenCard(
             // approved wireframe, this stands in so the payload can be captured on the
             // phone. Everything above this line — the label, chip, ⋮ menu — is shared.
             if (profile.provider != Provider.CLAUDE) {
-                ChatGptAccountBody(repo, profile, label, use24h, debugUnlocked) { stateKey++ }
+                ChatGptAccountBody(
+                    repo, profile, label, use24h, debugUnlocked,
+                    autoStart = autoStartSignIn,
+                ) { stateKey++ }
                 return@Column
+            }
+
+            // CCRM-56 (Provider Identity): the Add-account sheet's Claude row lands
+            // here and starts sign-in immediately, matching ChatGPT's autoStart.
+            LaunchedEffect(Unit) {
+                if (autoStartSignIn && !hasToken && !awaitingCode) beginSignIn()
             }
 
             if (!hasToken) {
@@ -1490,6 +1554,8 @@ private fun ChatGptAccountBody(
     label: String,
     use24h: Boolean,
     debugUnlocked: Boolean,
+    /** CCRM-56 (Provider Identity): the Add-account sheet starts sign-in at once. */
+    autoStart: Boolean = false,
     onStateChanged: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -1569,6 +1635,13 @@ private fun ChatGptAccountBody(
         }
     }
 
+    // CCRM-56 (Provider Identity): the Add-account sheet's ChatGPT row lands here
+    // and starts sign-in immediately, matching Claude's beginSignIn() on its own
+    // freshly minted card.
+    LaunchedEffect(Unit) {
+        if (autoStart && !hasToken && started == null) beginDeviceSignIn()
+    }
+
     Spacer(Modifier.height(8.dp))
     val flow = started
     if (flow != null) {
@@ -1622,16 +1695,11 @@ private fun ChatGptAccountBody(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(12.dp))
-        if (debugUnlocked) {
-            Button(enabled = !busy, onClick = { beginDeviceSignIn() }) {
-                Text("Sign in with a code")
-            }
-        } else {
-            Text(
-                "ChatGPT sign-in lands in CCRM-54 part 2.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        // CCRM-56 (Provider Identity): the Add-account sheet is now the sanctioned
+        // way to create this card, so signing in from it is no longer debug-gated
+        // (Step 4's device-code sheet with its five states replaces this rough one).
+        Button(enabled = !busy, onClick = { beginDeviceSignIn() }) {
+            Text("Sign in with a code")
         }
     } else {
         Text(
@@ -1663,10 +1731,8 @@ private fun ChatGptAccountBody(
                     }
                 },
             ) { Text("Refresh") }
-            if (debugUnlocked) {
-                OutlinedButton(enabled = !busy, onClick = { beginDeviceSignIn() }) {
-                    Text("Sign in with a code")
-                }
+            OutlinedButton(enabled = !busy, onClick = { beginDeviceSignIn() }) {
+                Text("Sign in with a code")
             }
             TextButton(
                 enabled = !busy,
@@ -1885,21 +1951,25 @@ private fun PollingSection(repo: UsageRepository) {
     }
 }
 
+/**
+ * CCRM-56 (Provider Identity), decision 1: the global picker, plus a leading
+ * "Per provider" tri-colour swatch — where an install that never touched this
+ * picker lands, and a Claude-only account then renders pixel-identical to before
+ * this existed. [providerOnlySwatch] draws it; ordinary swatches are otherwise
+ * unchanged, minus the two provider-only [Palette] entries (see
+ * [Palette.selectableOptions]).
+ */
 @Composable
 private fun ThemeColorPicker(themeName: String, onTheme: (String) -> Unit) {
     val context = LocalContext.current
     val dark = appDark()
-    val allOptions = listOf(Palette.DYNAMIC) + Palette.options.map { it.name }
+    val allOptions = listOf(Palette.PER_PROVIDER, Palette.DYNAMIC) + Palette.selectableOptions.map { it.name }
     for (rowNames in allOptions.chunked(6)) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             for (name in rowNames) {
-                val dotColor = if (name == Palette.DYNAMIC) {
-                    if (dark) dynamicDarkColorScheme(context).primary
-                    else dynamicLightColorScheme(context).primary
-                } else Palette.color(name, dark)
                 val selected = name == themeName
                 // The amber/yellow dots need a dark check for contrast.
                 val checkTint = if (name == "Amber") Color(0xFF412402) else Color.White
@@ -1907,7 +1977,16 @@ private fun ThemeColorPicker(themeName: String, onTheme: (String) -> Unit) {
                     modifier = Modifier
                         .size(40.dp)
                         .clip(CircleShape)
-                        .background(dotColor)
+                        .then(
+                            when (name) {
+                                Palette.PER_PROVIDER -> Modifier.background(providerOnlySwatch(dark))
+                                Palette.DYNAMIC -> Modifier.background(
+                                    if (dark) dynamicDarkColorScheme(context).primary
+                                    else dynamicLightColorScheme(context).primary
+                                )
+                                else -> Modifier.background(Palette.color(name, dark))
+                            }
+                        )
                         .then(
                             if (selected) Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
                             else Modifier
@@ -1931,6 +2010,149 @@ private fun ThemeColorPicker(themeName: String, onTheme: (String) -> Unit) {
         "Selected: $themeName" + if (themeName == Palette.DYNAMIC) " (follows your wallpaper)" else "",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+/** The tri-colour "Per provider" dot: a sweep of the three providers' own colours. */
+private fun providerOnlySwatch(dark: Boolean): Brush = Brush.sweepGradient(
+    listOf(
+        Palette.color(Provider.CLAUDE.themeName, dark),
+        Palette.color(Provider.CHATGPT.themeName, dark),
+        Palette.color(Provider.ANTIGRAVITY.themeName, dark),
+        Palette.color(Provider.CLAUDE.themeName, dark),
+    )
+)
+
+/**
+ * CCRM-56 (Provider Identity), decision 5: "+ Add account" opens this sheet
+ * instead of minting a Claude profile directly. Antigravity is present and
+ * greyed rather than hidden, so the app says what it is *for* — CCRM-55
+ * (Antigravity Account) flips it live the day that unblocks.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AddAccountSheet(onDismiss: () -> Unit, onPick: (Provider) -> Unit) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
+            Text("Add account", style = MaterialTheme.typography.titleLarge)
+            Spacer(Modifier.height(16.dp))
+            AddAccountRow(
+                Provider.CLAUDE,
+                "Signs in through your browser, then paste the code back — as before.",
+                enabled = true,
+                onClick = { onPick(Provider.CLAUDE) },
+            )
+            Spacer(Modifier.height(14.dp))
+            AddAccountRow(
+                Provider.CHATGPT,
+                "Shows a short code to type at auth.openai.com — on this phone or any other device.",
+                enabled = true,
+                onClick = { onPick(Provider.CHATGPT) },
+            )
+            Spacer(Modifier.height(14.dp))
+            AddAccountRow(
+                Provider.ANTIGRAVITY,
+                "Not available yet — Google's sign-in for Antigravity can't finish on a phone. " +
+                    "Coming when it can.",
+                enabled = false,
+                onClick = {},
+            )
+        }
+    }
+}
+
+@Composable
+private fun AddAccountRow(provider: Provider, subtitle: String, enabled: Boolean, onClick: () -> Unit) {
+    val dark = appDark()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .alpha(if (enabled) 1f else 0.55f)
+            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        ProviderMark(provider, size = 28.dp, tint = Palette.color(provider.themeName, dark))
+        Spacer(Modifier.width(14.dp))
+        Column {
+            Text(provider.displayName, style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(2.dp))
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/**
+ * CCRM-56 (Provider Identity), decision 1: the ⋮ → "Accent colour…" sheet. Same
+ * grid as [ThemeColorPicker] minus "Per provider"/"Material You" — Material You
+ * is global-only — plus a leading "Provider colour (default)" swatch, drawn in
+ * the provider's own colour, that clears the override.
+ */
+@Composable
+private fun AccentColorDialog(
+    profile: Profile,
+    cache: UsageCache,
+    onDismiss: () -> Unit,
+    onPicked: () -> Unit,
+) {
+    val dark = appDark()
+    val current = cache.accountAccent(profile)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+        title = { Text("Accent colour · ${profile.provider.displayName}") },
+        text = {
+            Column {
+                val allNames = listOf<String?>(null) + Palette.selectableOptions.map { it.name }
+                for (rowNames in allNames.chunked(6)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        for (name in rowNames) {
+                            val selected = name == current
+                            val dotColor = name?.let { Palette.color(it, dark) }
+                                ?: Palette.color(profile.provider.themeName, dark)
+                            val checkTint = if (name == "Amber") Color(0xFF412402) else Color.White
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(dotColor)
+                                    .then(
+                                        if (selected) {
+                                            Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                                        } else Modifier
+                                    )
+                                    .clickable {
+                                        cache.setAccountAccent(profile, name)
+                                        onPicked()
+                                    },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                if (selected) {
+                                    Icon(
+                                        Icons.Filled.Check,
+                                        contentDescription = (name ?: "Provider colour (default)") + " selected",
+                                        tint = checkTint,
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                Text(
+                    "Selected: " + (current ?: "Provider colour (default)"),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
     )
 }
 
@@ -2128,7 +2350,7 @@ private fun AboutCard(debugUnlocked: Boolean, onDebugUnlock: () -> Unit) {
                 modifier = Modifier.size(56.dp),
             )
             Spacer(Modifier.height(8.dp))
-            Text("Claude Cooldown", style = MaterialTheme.typography.titleMedium)
+            Text("Cooldown", style = MaterialTheme.typography.titleMedium)
             Text(
                 "Version $versionName",
                 style = MaterialTheme.typography.bodySmall,
@@ -2160,7 +2382,7 @@ private fun AboutCard(debugUnlocked: Boolean, onDebugUnlock: () -> Unit) {
             OutlinedButton(onClick = {
                 val email = Intent(Intent.ACTION_SENDTO).apply {
                     data = Uri.parse("mailto:$FEEDBACK_EMAIL")
-                    putExtra(Intent.EXTRA_SUBJECT, "CCooldown feedback (v$versionName)")
+                    putExtra(Intent.EXTRA_SUBJECT, "Cooldown feedback (v$versionName)")
                 }
                 try {
                     context.startActivity(
@@ -2173,7 +2395,9 @@ private fun AboutCard(debugUnlocked: Boolean, onDebugUnlock: () -> Unit) {
             }) { Text("Share feedback") }
             Spacer(Modifier.height(12.dp))
             Text(
-                "Not affiliated with or endorsed by Anthropic",
+                "Unofficial. Not affiliated with, endorsed by, or supported by Anthropic, OpenAI or " +
+                    "Google. \"Claude\" is a trademark of Anthropic, PBC. \"ChatGPT\" is a trademark of " +
+                    "OpenAI. \"Gemini\" and \"Antigravity\" are trademarks of Google LLC.",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -2865,7 +3089,7 @@ private fun AppLogCard(cache: UsageCache) {
                 }
                 val send = Intent(Intent.ACTION_SEND)
                     .setType("text/plain")
-                    .putExtra(Intent.EXTRA_SUBJECT, "Claude Cooldown app log")
+                    .putExtra(Intent.EXTRA_SUBJECT, "Cooldown app log")
                     .putExtra(Intent.EXTRA_TEXT, body.ifEmpty { "(log is empty)" })
                 context.startActivity(Intent.createChooser(send, "Share app log"))
             }) { Text("Share") }

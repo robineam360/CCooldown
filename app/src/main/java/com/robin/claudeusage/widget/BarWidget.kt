@@ -30,6 +30,7 @@ import com.robin.claudeusage.data.UsageCache
 import com.robin.claudeusage.data.UsageWindow
 import com.robin.claudeusage.data.WidgetPrefs
 import com.robin.claudeusage.ui.Fmt
+import com.robin.claudeusage.ui.Palette
 import com.robin.claudeusage.ui.elapsedPercent
 
 class BarWidgetReceiver : GlanceAppWidgetReceiver() {
@@ -68,7 +69,7 @@ class BarWidget : GlanceAppWidget() {
         val use24h = cache.use24hTime()
         val usageLeft = cache.usageLeft()
         val resetClock = cache.resetClock()
-        val themeName = cache.themeColorName()
+        val themeName = Palette.accentName(cache, profile)
         val profileLabel = cache.profileLabel(profile)
         val showOverPace = cache.paceOverOnWidgets()
         // SizeMode.Single makes LocalSize the *minimum* size, not the real one, and the

@@ -3,6 +3,7 @@ package com.robin.claudeusage.data
 import android.content.Context
 import android.content.SharedPreferences
 import com.robin.claudeusage.data.source.Sources
+import com.robin.claudeusage.ui.Palette
 
 enum class AuthState { NO_CREDENTIALS, OK, REAUTH_NEEDED }
 
@@ -72,7 +73,7 @@ class UsageCache(context: Context) {
             "pingEnabled", "pingFirstMinute", "pingCutoffMinute", "pingRenewals",
             "pingDay", "pingWindowsStarted", "pingRetryIndex", "pingLastSentAt",
             "pingLastAttemptAt", "pingLastResult", "pingLastFailed", "pingRevision",
-            "pingPendingBefore", "pingVerifyAttempt",
+            "pingPendingBefore", "pingVerifyAttempt", "accent",
         )
     }
 
@@ -527,10 +528,27 @@ class UsageCache(context: Context) {
         prefs.edit().putString("logLevel", level).apply()
     }
 
-    fun themeColorName(): String = prefs.getString("themeColor", "Claude Orange") ?: "Claude Orange"
+    /**
+     * The global theme choice (CCRM-56 (Provider Identity), decision 1). Migration
+     * without a flag: an install that never touched the picker has no "themeColor"
+     * key, so it reads as [Palette.PER_PROVIDER] (a Claude account then renders
+     * Claude Orange, pixel-identical to before this existed); once a key is
+     * written — even to "Claude Orange" — that explicit choice stays the global
+     * override for every account.
+     */
+    fun themeColorName(): String = prefs.getString("themeColor", Palette.PER_PROVIDER) ?: Palette.PER_PROVIDER
 
     fun setThemeColorName(name: String) {
         prefs.edit().putString("themeColor", name).apply()
+    }
+
+    /** Per-account accent override (CCRM-56 (Provider Identity), decision 1). */
+    fun accountAccent(profile: Profile): String? = prefs.getString(k(profile, "accent"), null)
+
+    fun setAccountAccent(profile: Profile, name: String?) {
+        prefs.edit().apply {
+            if (name == null) remove(k(profile, "accent")) else putString(k(profile, "accent"), name)
+        }.apply()
     }
 
     // --- automatic update checks (CCRM-28): app-global, deliberately not per-profile ---

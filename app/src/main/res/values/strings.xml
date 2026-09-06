@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">CCooldown</string>
-    <string name="widget_description">Claude Cooldown — 5-hour and 7-day windows (pick a profile)</string>
-    <string name="bar_widget_description">Claude Cooldown — one bar (pick profile and window)</string>
+    <string name="app_name">Cooldown</string>
+    <string name="widget_description">Cooldown — 5-hour and 7-day windows (pick a profile)</string>
+    <string name="bar_widget_description">Cooldown — one bar (pick profile and window)</string>
     <string name="ring_widget_label">Ring</string>
     <string name="ring_widget_description">One window as a ring with a pace tick (pick profile and window)</string>
     <string name="mini_rings_widget_label">Mini-rings</string>

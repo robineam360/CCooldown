@@ -104,7 +104,7 @@ class UsageWidget : GlanceAppWidget() {
         val use24h = cache.use24hTime()
         val usageLeft = cache.usageLeft()
         val resetClock = cache.resetClock()
-        val themeName = cache.themeColorName()
+        val themeName = Palette.accentName(cache, profile)
         // Both gates: the per-profile switch decides whether credits exist for this
         // account at all, the widget switch whether they're worth the height here.
         val showCredits = cache.creditsOnWidgets() && cache.creditsVisible(profile)
@@ -203,7 +203,7 @@ private fun WidgetContent(
 
     Column(modifier = rootModifier, verticalAlignment = Alignment.CenterVertically) {
         when {
-            needsSetup -> CenteredMessage("Claude Cooldown · $profileLabel", "Tap to set up")
+            needsSetup -> CenteredMessage("Cooldown · $profileLabel", "Tap to set up")
             needsReauth -> CenteredMessage("$profileLabel: re-auth needed", "Tap to open app")
             snapshot.data == null -> CenteredMessage("No data yet · $profileLabel", "Tap to open app")
             // RemoteViews containers allow at most 10 children — every block below

@@ -1,13 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- CCRM-45 (Tracker Icon): themed-icon layer. The launcher strips colour and tints
-     this, so the hourglass ships as ONE solid silhouette (the wireframe's 16px
-     status-strip variant) — no strokes to thin out under tint + downscale. -->
+     this, so the hourglass ships mostly as solid silhouette — no strokes to thin
+     out under tint + downscale.
+     CCRM-56 (Provider Identity): the lower bulb splits into three fillAlpha bands
+     (orange 1.0, green 0.65, blue 0.35, top to bottom) so "three" survives
+     tinting, which strips colour but keeps alpha — the upper bulb + cap stay one
+     solid alpha-1.0 fill so the split doesn't double-fill the lower bulb. Per
+     design/provider-identity-wireframe.html section 3. Glyph scaled 1.3x from
+     centre, matching ic_launcher_foreground.xml's icon-review bump. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:pathData="M38,32 h32 v3 c0,10 -9,13 -12,19 c3,6 12,9 12,19 v3 h-32 v-3 c0,-10 9,-13 12,-19 c-3,-6 -12,-9 -12,-19 z"
-        android:fillColor="#FFFFFF" />
+    <group
+        android:pivotX="54"
+        android:pivotY="54"
+        android:scaleX="1.3"
+        android:scaleY="1.3">
+        <!-- top cap + upper bulb, down to the neck pinch -->
+        <path
+            android:pathData="M38,32 h32 v3 c0,10 -9,13 -12,19 h-8 c-3,-6 -12,-9 -12,-19 v-3 z"
+            android:fillColor="#FFFFFF" />
+        <!-- lower bulb + bottom cap: three alpha bands, clipped to the bulb's silhouette -->
+        <group>
+            <clip-path android:pathData="M58,54 c3,6 12,9 12,19 v3 h-32 v-3 c0,-10 9,-13 12,-19 z" />
+            <path android:pathData="M34,55 h40 v7 h-40 z" android:fillColor="#FFFFFF" android:fillAlpha="1.0" />
+            <path android:pathData="M34,62 h40 v7 h-40 z" android:fillColor="#FFFFFF" android:fillAlpha="0.65" />
+            <path android:pathData="M34,69 h40 v7 h-40 z" android:fillColor="#FFFFFF" android:fillAlpha="0.35" />
+        </group>
+    </group>
 </vector>

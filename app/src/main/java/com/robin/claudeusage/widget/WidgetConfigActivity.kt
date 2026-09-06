@@ -43,6 +43,8 @@ import com.robin.claudeusage.data.UsageCache
 import com.robin.claudeusage.data.WidgetPrefs
 import com.robin.claudeusage.ui.LocalAppDark
 import com.robin.claudeusage.ui.Palette
+import com.robin.claudeusage.ui.ProviderMark
+import com.robin.claudeusage.ui.appDark
 import com.robin.claudeusage.ui.resolveDark
 import kotlinx.coroutines.launch
 
@@ -114,7 +116,10 @@ class WidgetConfigActivity : ComponentActivity() {
                         .isAppearanceLightStatusBars = !dark
                 }
             }
-            val themeName = remember { cache.themeColorName() }
+            // CCRM-56 (Provider Identity): themes from the widget's initial profile
+            // rather than the global choice, so configuring a ChatGPT widget shows
+            // ChatGPT green immediately even under "Per provider".
+            val themeName = remember { Palette.accentName(cache, widgetPrefs.profileFor(appWidgetId)) }
             val scheme = when {
                 themeName == Palette.DYNAMIC && dark -> dynamicDarkColorScheme(this@WidgetConfigActivity)
                 themeName == Palette.DYNAMIC -> dynamicLightColorScheme(this@WidgetConfigActivity)
@@ -190,12 +195,22 @@ private fun ConfigScreen(
         val pickable = remember {
             repo.configuredProfiles().ifEmpty { repo.profiles() }
         }
+        // CCRM-56 (Provider Identity): the mark, not a dot, before the label —
+        // the picker is exactly where an account's provider matters most.
+        val configDark = appDark()
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             for (p in pickable) {
                 FilterChip(
                     selected = profile == p,
                     onClick = { profile = p },
                     label = { Text(cache.profileLabel(p)) },
+                    leadingIcon = {
+                        ProviderMark(
+                            p.provider,
+                            size = 16.dp,
+                            tint = Palette.color(Palette.accentName(cache, p), configDark),
+                        )
+                    },
                 )
             }
         }

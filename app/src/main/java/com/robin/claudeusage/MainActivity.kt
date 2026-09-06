@@ -101,6 +101,7 @@ import com.robin.claudeusage.ui.Fmt
 import com.robin.claudeusage.ui.LocalWidthClass
 import com.robin.claudeusage.ui.LocalWindowHeight
 import com.robin.claudeusage.ui.Palette
+import com.robin.claudeusage.ui.ProviderTabLabel
 import com.robin.claudeusage.ui.ProvideWidthClass
 import com.robin.claudeusage.ui.UsageSparkline
 import com.robin.claudeusage.ui.WideMaxWidth
@@ -176,6 +177,10 @@ private fun App(startProfile: Profile) {
     // Deliberately not persisted: the debug easter egg re-locks on every launch.
     var debugUnlocked by remember { mutableStateOf(false) }
     var themeName by remember { mutableStateOf(cache.themeColorName()) }
+    // CCRM-56 (Provider Identity): the account whose tab is showing on Main or
+    // History — MaterialTheme.primary follows it there, so a ChatGPT tab tints
+    // the whole shell green even when the global theme is "Per provider".
+    var selectedProfile by remember { mutableStateOf(startProfile) }
     // CCRM-29 (Display Mode): the two three-way modes, hoisted so the Settings
     // chips recompose the whole app; the booleans every render site reads are
     // derived below.
@@ -244,15 +249,23 @@ private fun App(startProfile: Profile) {
             }
         }
     }
+    // CCRM-56 (Provider Identity), decision 1: Main and History follow the
+    // selected tab's own resolved accent; Settings (and the guide) show the
+    // global choice, with "Per provider" resolving to the plain default there —
+    // there is no single account to resolve it against on that screen.
+    val effectiveAccent = when (screen) {
+        Screen.MAIN, Screen.HISTORY -> Palette.accentName(cache, selectedProfile)
+        else -> themeName.takeIf { it != Palette.PER_PROVIDER } ?: Palette.DEFAULT
+    }
     val scheme = when {
-        themeName == Palette.DYNAMIC && dark -> dynamicDarkColorScheme(context)
-        themeName == Palette.DYNAMIC -> dynamicLightColorScheme(context)
+        effectiveAccent == Palette.DYNAMIC && dark -> dynamicDarkColorScheme(context)
+        effectiveAccent == Palette.DYNAMIC -> dynamicLightColorScheme(context)
         dark -> darkColorScheme(
-            primary = Palette.color(themeName, true),
+            primary = Palette.color(effectiveAccent, true),
             onPrimary = Color(0xFF1F1F1F),
         )
         else -> lightColorScheme(
-            primary = Palette.color(themeName, false),
+            primary = Palette.color(effectiveAccent, false),
             onPrimary = Color.White,
         )
     }
@@ -269,7 +282,7 @@ private fun App(startProfile: Profile) {
                                     Screen.SETTINGS -> "Settings"
                                     Screen.GUIDE -> "Get your token"
                                     Screen.HISTORY -> "Usage history"
-                                    Screen.MAIN -> "Claude Cooldown"
+                                    Screen.MAIN -> "Cooldown"
                                 }
                             )
                         },
@@ -308,6 +321,7 @@ private fun App(startProfile: Profile) {
                             repo, use24h, usageLeft, resetClock, paceOverInApp, tick,
                             startProfile, { screen = Screen.SETTINGS },
                             Modifier.padding(innerPadding),
+                            onProfileChange = { selectedProfile = it },
                         )
                     else -> ContentColumn(
                         modifier = Modifier.padding(innerPadding),
@@ -315,7 +329,7 @@ private fun App(startProfile: Profile) {
                     ) {
                         Spacer(Modifier.height(8.dp))
                         if (screen == Screen.HISTORY) {
-                            HistoryScreen(repo, tick)
+                            HistoryScreen(repo, tick, onProfileChange = { selectedProfile = it })
                         } else if (screen == Screen.SETTINGS) {
                             SettingsScreen(
                                 repo = repo,
@@ -371,6 +385,7 @@ private fun ProfileTabs(
     startProfile: Profile,
     onOpenSettings: () -> Unit,
     modifier: Modifier,
+    onProfileChange: (Profile) -> Unit,
 ) {
     // CCRM-6 (Multi-Account): only accounts with a token get a tab. Someone with one
     // account sees no strip at all and gains its ~48 dp; a new account appears the moment
@@ -394,6 +409,11 @@ private fun ProfileTabs(
         if (pagerState.currentPage > profiles.lastIndex) {
             pagerState.scrollToPage(profiles.lastIndex.coerceAtLeast(0))
         }
+    }
+    // CCRM-56 (Provider Identity): reports the visible tab's account up so the app
+    // shell can theme from it — a swipe counts the same as a tab tap.
+    LaunchedEffect(pagerState.currentPage, profiles) {
+        profiles.getOrNull(pagerState.currentPage.coerceIn(0, profiles.lastIndex))?.let(onProfileChange)
     }
     val scope = rememberCoroutineScope()
     // Read inside the click, never captured at composition: the user can flip the
@@ -425,7 +445,7 @@ private fun ProfileTabs(
                                 }
                             }
                         },
-                        text = { Text(repo.cacheSettings().profileLabel(profile)) },
+                        text = { ProviderTabLabel(repo.cacheSettings(), profile) },
                     )
                 }
             }
@@ -614,65 +634,77 @@ private fun ProfileScreen(
         Text("No data yet — try Refresh now.", style = MaterialTheme.typography.bodyMedium)
         Spacer(Modifier.height(12.dp))
     } else {
-        Card {
-            Column(Modifier.padding(16.dp)) {
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text("5-hour window", style = MaterialTheme.typography.titleSmall)
-                    Spacer(Modifier.weight(1f))
-                    Text(
-                        Fmt.usageWorded(data.session?.percent, usageLeft),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-                Spacer(Modifier.height(8.dp))
-                UsageBarLine(
-                    percent = data.session?.percent,
-                    fillColor = barFill(data.session?.percent),
-                    elapsedPercent = elapsedPercent(data.session, SESSION_MS),
-                    showOverPace = showOverPace,
-                )
-                data.session?.let { w ->
-                    TrendBlock(
-                        window = w,
-                        samples = w.resetsAt?.let {
-                            Projection.sessionSamples(history, it.toEpochMilli(), SESSION_MS)
-                        } ?: emptyList(),
-                        windowLengthMs = SESSION_MS,
-                        use24h = use24h,
-                        usageLeft = usageLeft,
-                    )
-                }
-                Spacer(Modifier.height(8.dp))
-                ResetRow(data.session, use24h, resetClock)
-            }
-        }
-        Spacer(Modifier.height(12.dp))
+        // CCRM-56 (Provider Identity), decision 6: a window the account does not
+        // have is not shown at all — no placeholder card, no dash — on any
+        // surface, Claude included (today it draws "—"). ChatGPT's Plus/Pro
+        // accounts lack a 5-hour window since OpenAI lifted it 2026-07-12; the
+        // rule applies uniformly rather than special-casing the provider.
+        val hasSession = data.session != null
+        val hasWeekly = data.weekly != null || data.modelCaps.isNotEmpty()
 
-        Card {
-            Column(Modifier.padding(16.dp)) {
-                Text("7-day window", style = MaterialTheme.typography.titleSmall)
-                Spacer(Modifier.height(10.dp))
-                SubBar("All models", data.weekly, usageLeft, showOverPace)
-                for (cap in data.modelCaps) {
-                    SubBar(cap.modelName, cap.window, usageLeft, showOverPace)
-                }
-                data.weekly?.let { w ->
-                    TrendBlock(
-                        window = w,
-                        samples = w.resetsAt?.let {
-                            Projection.weeklySamples(history, it.toEpochMilli(), WEEKLY_MS)
-                        } ?: emptyList(),
-                        windowLengthMs = WEEKLY_MS,
-                        use24h = use24h,
-                        usageLeft = usageLeft,
+        if (hasSession) {
+            Card {
+                Column(Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text("5-hour window", style = MaterialTheme.typography.titleSmall)
+                        Spacer(Modifier.weight(1f))
+                        Text(
+                            Fmt.usageWorded(data.session?.percent, usageLeft),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    UsageBarLine(
+                        percent = data.session?.percent,
+                        fillColor = barFill(data.session?.percent),
+                        elapsedPercent = elapsedPercent(data.session, SESSION_MS),
+                        showOverPace = showOverPace,
                     )
+                    data.session?.let { w ->
+                        TrendBlock(
+                            window = w,
+                            samples = w.resetsAt?.let {
+                                Projection.sessionSamples(history, it.toEpochMilli(), SESSION_MS)
+                            } ?: emptyList(),
+                            windowLengthMs = SESSION_MS,
+                            use24h = use24h,
+                            usageLeft = usageLeft,
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    ResetRow(data.session, use24h, resetClock)
                 }
-                Spacer(Modifier.height(2.dp))
-                HorizontalDivider()
-                Spacer(Modifier.height(8.dp))
-                ResetRow(data.weekly, use24h, resetClock)
+            }
+            Spacer(Modifier.height(12.dp))
+        }
+
+        if (hasWeekly) {
+            Card {
+                Column(Modifier.padding(16.dp)) {
+                    Text("7-day window", style = MaterialTheme.typography.titleSmall)
+                    Spacer(Modifier.height(10.dp))
+                    SubBar("All models", data.weekly, usageLeft, showOverPace)
+                    for (cap in data.modelCaps) {
+                        SubBar(cap.modelName, cap.window, usageLeft, showOverPace)
+                    }
+                    data.weekly?.let { w ->
+                        TrendBlock(
+                            window = w,
+                            samples = w.resetsAt?.let {
+                                Projection.weeklySamples(history, it.toEpochMilli(), WEEKLY_MS)
+                            } ?: emptyList(),
+                            windowLengthMs = WEEKLY_MS,
+                            use24h = use24h,
+                            usageLeft = usageLeft,
+                        )
+                    }
+                    Spacer(Modifier.height(2.dp))
+                    HorizontalDivider()
+                    Spacer(Modifier.height(8.dp))
+                    ResetRow(data.weekly, use24h, resetClock)
+                }
             }
         }
 
@@ -771,6 +803,16 @@ private fun ProfileScreen(
                     )
                 }
             }
+        }
+
+        // CCRM-56 (Provider Identity), decision 6: with no window and no credits,
+        // one honest line rather than three empty cards.
+        if (!hasSession && !hasWeekly && credits == null) {
+            Text(
+                "This account reports no usage windows right now.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         Spacer(Modifier.height(16.dp))
     }

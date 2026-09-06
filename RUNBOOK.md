@@ -50,7 +50,7 @@ fix it in ROADMAP.md and note it in the step's *Log* line.
 | 0 | Commit the current tree | Haiku (or Sonnet) | low | 1 min | ☑ |
 | 1 | CCRM-53 (Provider Model) | Sonnet | medium | no | ☑ |
 | 2 | CCRM-54 (ChatGPT Account) part 1 — source, device flow, payload capture | Opus | high | one sign-in on the phone | ☑ |
-| 3 | CCRM-56 (Provider Identity) — rename, icon, marks, accents, Add-account sheet, hidden windows | Sonnet | medium | approve the icon at 48 dp | ☐ |
+| 3 | CCRM-56 (Provider Identity) — rename, icon, marks, accents, Add-account sheet, hidden windows | Sonnet | medium | approve the icon at 48 dp | ☑ |
 | 4 | CCRM-54 (ChatGPT Account) part 2 + CCRM-57 (Provider Plumbing) — the ChatGPT account on every surface | Sonnet | medium | no | ☐ |
 | 5 | Device pass on the Fold 7 | Sonnet | medium | phone in hand | ☐ |
 | 6 | Release v1.5 — README, guide, brochure, tag | Sonnet | medium | keystore, upload | ☐ |
@@ -272,14 +272,54 @@ print Step 4.
 ```
 
 **Done when:**
-- ☐ Robin approved the 48 dp icon screenshot (light, dark, monochrome).
-- ☐ App label reads *Cooldown* on the launcher and top bar; About names four trademarks.
-- ☐ Settings theme grid leads with *Per provider*; ⋮ on an account shows *Accent colour…*.
-- ☐ *+ Add account* opens the three-row sheet with Gemini greyed.
-- ☐ A Claude account still looks pixel-identical with the picker untouched.
-- ☐ Tests green, Status updated, ticked, committed.
+- ☑ Robin approved the 48 dp icon screenshot (light, dark, monochrome).
+- ☑ App label reads *Cooldown* on the launcher and top bar; About names four trademarks.
+- ☑ Settings theme grid leads with *Per provider*; ⋮ on an account shows *Accent colour…*.
+- ☑ *+ Add account* opens the three-row sheet with Gemini greyed.
+- ☑ A Claude account still looks pixel-identical with the picker untouched (absent
+  `themeColor` key still resolves through `Palette.accentName` to `Provider.CLAUDE.themeName`
+  = "Claude Orange", byte-identical to the old hardcoded default).
+- ☑ Tests green (333 cases), Status updated, ticked, committed.
 
 **Log:**
+
+2026-09-06 — built all six steps. **1 name:** the copy sweep, plus the tap-target pair
+generalised from "app"/"claude" to "app"/"provider" (`PinnedNotification.providerLaunchIntent`,
+keyed off the pinned account's own provider — `Provider.appPackage` is new, `CLAUDE_PACKAGE`
+now derives from it). **2 icon:** built exactly to spec, then Robin's live review asked for
+"much bigger, less padding" — the mockup preview also had a rendering bug (an opaque HTML
+backdrop bleeding through the rounded corners on the light tile, an artifact of the preview
+harness, not the real asset). Fixed by moving the backdrop inside the SVG and wrapping the
+real vector's content in a `<group android:scaleX="1.3" android:scaleY="1.3" pivotX/Y="54">` —
+approved on the second render; recorded in ROADMAP.md as "rev C". **3 marks:** could not
+safely recall exact brand path data from memory (one attempt at transcribing the OpenAI knot
+from memory produced garbled, wrong-looking output when caught in review) — switched to
+fetching real reference artwork: Simple Icons' CC0 "Claude" and "Google Gemini" traces
+(v16.30.0, verified against jsdelivr), and Wikimedia Commons'
+`File:OpenAI logo 2025 (symbol).svg` for the OpenAI blossom mark (re-centred into the 24dp
+viewport via a translate group — Android vector drawables have no viewBox offset — path data
+itself untouched). **4 accents:** `Palette.accentName` added as a thin wrapper over a new
+pure `Palette.resolveAccent(override, global, providerTheme)` — this repo has no Robolectric,
+so the pure split is what let `AccentResolutionTest` exist at all. `ChatGPT Green`/`Gemini
+Blue` live in `Palette.options` (so `Provider.themeName` resolves) but are excluded from both
+colour grids via a new `Palette.selectableOptions` — picking a provider's own colour manually
+isn't a choice either grid was meant to offer. Found in passing: CCRM-51 (Rails Gauge) already
+made every ring/bar pace tick neutral ink app-wide, so decision 7 needed no code change on
+Android — `RingRenderer` and the pinned panel's bar ticks were already there. **5 Add-account
+sheet:** wired `repo.addProfile(provider=...)` to a real `ModalBottomSheet`; picking a row now
+auto-starts that provider's sign-in on the freshly minted card via a `LaunchedEffect(Unit)`
+gated on a parent-tracked `autoStartProfileKey`. Un-gated ChatGPT's "Sign in with a code"
+button from `debugUnlocked` and removed the debug-only "+ Add ChatGPT account" button — both
+were explicitly scaffolding "until CCRM-56 builds the real Add-account sheet" per CCRM-54 part
+1's own log; the debug-only *payload capture* button stays, per RUNBOOK Step 4. **6 hidden
+windows:** `ProfileScreen`, `HistoryScreen`'s 5h/7d toggle, and the Pace widget's on-face
+toggle all gained the same `hasSession`/`hasWeekly` gate.
+
+**Deferred, noted in ROADMAP.md rather than guessed:** the provider mark inside the four
+bar-face widgets' own baked-in-string labels, and on the pinned panel's folded condition
+strips (would need `Conditions.Condition` to carry a `Provider` through several construction
+sites) — both are decision-7/build-note details, not numbered Build-step deliverables, and
+neither blocks Step 4.
 
 ---
 

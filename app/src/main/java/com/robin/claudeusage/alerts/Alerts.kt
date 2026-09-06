@@ -77,12 +77,12 @@ object Alerts {
         nm.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_USAGE, "Usage alerts", NotificationManager.IMPORTANCE_DEFAULT
-            ).apply { description = "Warnings when a Claude usage window is nearly exhausted" }
+            ).apply { description = "Warnings when a usage window is nearly exhausted" }
         )
         nm.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_RESET, "Window resets", NotificationManager.IMPORTANCE_DEFAULT
-            ).apply { description = "A usage window has reset — Claude is fresh again" }
+            ).apply { description = "A usage window has reset — fresh again" }
         )
         nm.createNotificationChannel(
             NotificationChannel(
@@ -109,7 +109,7 @@ object Alerts {
         nm.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_UPDATE, "App updates", NotificationManager.IMPORTANCE_LOW
-            ).apply { description = "A newer Claude Cooldown release is on GitHub" }
+            ).apply { description = "A newer Cooldown release is on GitHub" }
         )
     }
 
@@ -155,7 +155,7 @@ object Alerts {
             } else if (cache.authAlertsEnabled() && !cache.reauthNotified(profile)) {
                 notify(
                     context, profile, notifId(profile, 3), CHANNEL_AUTH,
-                    "$label: Claude Cooldown needs re-auth",
+                    "$label: Cooldown needs re-auth",
                     "The saved token stopped working. Open the app and paste a fresh one.",
                 )
                 cache.setReauthNotified(profile, true)

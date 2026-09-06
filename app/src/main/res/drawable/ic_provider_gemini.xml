@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- CCRM-56 (Provider Identity), decision 4: the provider's own mark, not a dot,
+     identifies the service. Single-colour trace of the public Gemini spark,
+     unmodified in shape — so `tint` renders it in the account's accent (or ink on
+     a monochrome surface). Path verified against Simple Icons' "Google Gemini"
+     glyph (CC0, simple-icons v16.30.0), itself traced from Google's public mark.
+     Brand reference and usage terms: https://about.google/brand-resource-center/
+     — "Gemini" and "Antigravity" are trademarks of Google LLC; used here only to
+     identify the account's service, alongside the app's "not affiliated" notice
+     (ROADMAP.md CCRM-56). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M11.04,19.32 Q12,21.51 12,24 q0,-2.49 0.93,-4.68 0.96,-2.19 2.58,-3.81 t3.81,-2.55 Q21.51,12 24,12 q-2.49,0 -4.68,-0.93 a12.3,12.3 0 0 1 -3.81,-2.58 a12.3,12.3 0 0 1 -2.58,-3.81 Q12,2.49 12,0 q0,2.49 -0.96,4.68 -0.93,2.19 -2.55,3.81 a12.3,12.3 0 0 1 -3.81,2.58 Q2.49,12 0,12 q2.49,0 4.68,0.96 2.19,0.93 3.81,2.55 t2.55,3.81 Z"
+        android:fillColor="#FF000000" />
+</vector>
