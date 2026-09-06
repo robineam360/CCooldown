@@ -421,15 +421,29 @@ release-signed build over the live install, cover screen, **Huge number** pinned
 **Paste into a fresh session:**
 
 ```
-Read CLAUDE.md, then RUNBOOK.md — its Conventions block and Step 5 — then the "Device pass"
-bullets of ROADMAP.md items CCRM-54 (ChatGPT Account) and CCRM-56 (Provider Identity). Build a
-release-signed APK, install it over the live install on the Fold 7 via wireless adb, and walk
-both lists with me one state at a time, capturing a screenshot for each (screencap needs -d;
-the inner screen captures black while folded). Record each outcome as a table row at the foot
-of design/provider-identity-wireframe.html the way design/multi-account-wireframe.html does;
-file any defect as a new CCBG in BUGS.md with the next free number; update both items' Status
-lines. Close per the Close-out rule (commit as docs(CCRM-56): device pass), then follow the
-Handover rule and print Step 6.
+Read CLAUDE.md, then RUNBOOK.md — its Conventions block and Step 5, including Step 4's Log —
+then the "Device pass" bullets of ROADMAP.md items CCRM-54 (ChatGPT Account) and CCRM-56
+(Provider Identity). Build a release-signed APK, install it over the live install on the
+Fold 7 via wireless adb, and walk both lists with me one state at a time, capturing a
+screenshot for each (screencap needs -d; the inner screen captures black while folded). The
+phone already carries a debug-made ChatGPT account labelled "Account 4" (key p5) from Step 2,
+which is what the ChatGPT states are walked on.
+
+Three things Step 4 left for this pass, on top of the two lists — look, don't assume:
+(1) the absent-window sentence "No 5-hour window on this account" renders at 10 sp over two
+lines in a Ring face's countdown slot; check it at the smallest placement (110x110) and on
+the Bar face, and file a CCBG if it truncates or crowds the ring. (2) The provider mark on
+the pinned label line exists only in the Huge number style — confirm that, and confirm the
+other three styles still read correctly without it; it is recorded as a build note in
+CCRM-54's Status, so decide with me whether it becomes a CCBG or stays a note. (3) The
+device-code sheet's five states: waiting and done happen naturally, expired needs a 15-minute
+wait or a clock change, denied and unavailable can't be provoked from the phone — mark those
+two "not seen, because …" rather than leaving them blank.
+
+Record each outcome as a table row at the foot of design/provider-identity-wireframe.html the
+way design/multi-account-wireframe.html does; file any defect as a new CCBG in BUGS.md with
+the next free number; update both items' Status lines. Close per the Close-out rule (commit as
+docs(CCRM-56): device pass), then follow the Handover rule and print Step 6.
 ```
 
 **Done when:**
