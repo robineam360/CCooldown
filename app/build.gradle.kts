@@ -74,7 +74,7 @@ dependencies {
     // QR token import (bundles the camera capture activity + permission flow).
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     // Custom Tabs for the in-app OAuth sign-in browser trip.
-    implementation("androidx.browser:browser:1.8.0")
+    implementation("androidx.browser:browser:1.10.0")
 
     testImplementation("junit:junit:4.13.2")
     // Android's org.json is a stub in unit tests; the real one lets UsageParser
