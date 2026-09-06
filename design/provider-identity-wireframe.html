@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Provider Identity — Cooldown: name, icon, marks, accents — CCRM-56 · rev B</title>
+<style>
+  :root {
+    --bg: #FAF8F6; --ink: #26211E; --muted: #6E6660; --accent: #C15F3C;
+    --hair: #E7E1DC; --card: #FFFFFF; --good: #188038; --bad: #C62828;
+    --claude: #D97757; --chatgpt: #10A37F; --gemini: #4285F4;
+    --surface: #FFFFFF; --surface2: #F3EFEB;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171513; --ink: #EDE8E4; --muted: #9B928B; --accent: #E59980;
+      --hair: #2C2825; --card: #201D1B; --good: #81C995; --bad: #F28B82;
+      --claude: #E59980; --chatgpt: #19C39A; --gemini: #8AB4F8;
+      --surface: #201D1B; --surface2: #2A2624;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171513; --ink: #EDE8E4; --muted: #9B928B; --accent: #E59980;
+    --hair: #2C2825; --card: #201D1B; --good: #81C995; --bad: #F28B82;
+    --claude: #E59980; --chatgpt: #19C39A; --gemini: #8AB4F8;
+    --surface: #201D1B; --surface2: #2A2624;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    margin: 0; padding: 48px 24px 96px; line-height: 1.5; }
+  .page { max-width: 1240px; margin: 0 auto; }
+  .eyebrow { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11px;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin: 0 0 10px; }
+  h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 8px; }
+  .lede { color: var(--muted); max-width: 72ch; margin: 0 0 12px; font-size: 14px; }
+  h2 { font-size: 19px; font-weight: 650; margin: 56px 0 4px; }
+  h2 small { font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: var(--muted); font-weight: 500; margin-left: 8px; }
+  .sub { color: var(--muted); font-size: 13px; max-width: 84ch; margin: 0 0 16px; }
+  .row { display: flex; flex-wrap: wrap; gap: 26px; align-items: flex-start; }
+  .opt { width: 280px; background: var(--card); border: 1px solid var(--hair); border-radius: 16px; padding: 18px; }
+  .opt.rec { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .opt h3 { margin: 0 0 2px; font-size: 15px; }
+  .opt .why { font-size: 12.5px; color: var(--muted); margin: 0 0 14px; }
+  .tag { display: inline-block; font-family: ui-monospace, Menlo, monospace; font-size: 10px; letter-spacing: .08em;
+    text-transform: uppercase; padding: 2px 7px; border-radius: 999px; background: var(--accent); color: #fff; margin-left: 6px; vertical-align: middle; }
+  .tag.ok { background: var(--good); }
+  .tilerow { display: flex; gap: 14px; align-items: flex-end; margin-bottom: 12px; flex-wrap: wrap; }
+  .tile { width: 100px; height: 100px; border-radius: 27px; overflow: hidden; display: grid; place-items: center; }
+  .tile.small { width: 48px; height: 48px; border-radius: 14px; }
+  .tile.mono { background: #EFE7DA; }
+  .tile.light { background: #F4F1EC; }
+  .tile svg { display: block; width: 100%; height: 100%; }
+  .verdict { font-size: 12px; margin-top: 10px; color: var(--muted); }
+  .sw { display: inline-block; width: 44px; height: 44px; border-radius: 12px; }
+  .swl { font-family: ui-monospace, Menlo, monospace; font-size: 9px; color: var(--muted); text-align: center; margin-top: 4px; }
+  .palette { display: flex; gap: 10px; flex-wrap: wrap; margin: 10px 0 4px; }
+  .hr { height: 1px; background: var(--hair); margin: 46px 0 0; border: 0; }
+  table.rules { border-collapse: collapse; font-size: 13px; max-width: 980px; }
+  table.rules th, table.rules td { border-bottom: 1px solid var(--hair); text-align: left; padding: 8px 12px 8px 0; vertical-align: top; }
+  table.rules th { color: var(--muted); font-weight: 600; font-size: 12px; }
+  code { font-family: ui-monospace, Menlo, monospace; font-size: 12px; background: var(--surface2); padding: 1px 5px; border-radius: 4px; }
+
+  /* provider marks — placeholders approximating the public marks; the app traces the real ones */
+  .mk { width: 20px; height: 20px; flex: none; display: inline-block; vertical-align: -4px; }
+  .mk.s { width: 14px; height: 14px; vertical-align: -2px; }
+  .mk.l { width: 28px; height: 28px; }
+  .mk.c { color: var(--claude); } .mk.g { color: var(--chatgpt); } .mk.b { color: var(--gemini); }
+  .mk.ink { color: currentColor; }
+
+  /* phone mocks — 360 dp cover-screen width */
+  .phone { width: 360px; background: var(--surface); border: 1px solid var(--hair); border-radius: 22px; padding: 14px; font-size: 13px; }
+  .phone .title { font-size: 20px; font-weight: 650; margin: 4px 0 12px; }
+  .card { background: var(--surface2); border-radius: 14px; padding: 12px 14px; margin-bottom: 10px; }
+  .card .hd { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+  .card .meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .more { margin-left: auto; color: var(--muted); font-weight: 700; letter-spacing: 1px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--hair); font-size: 12px; margin: 0 6px 6px 0; }
+  .chip.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .tabs { display: flex; border-bottom: 1px solid var(--hair); margin: 0 -14px 12px; }
+  .tab { flex: 1; text-align: center; padding: 10px 0 8px; color: var(--muted); font-weight: 600; font-size: 13px; display: flex; gap: 6px; align-items: center; justify-content: center; }
+  .tab.on { color: var(--ink); border-bottom: 2px solid var(--ink); }
+  .bar { height: 10px; background: var(--hair); border-radius: 5px; overflow: hidden; margin: 6px 0 2px; position: relative; }
+  .bar i { display: block; height: 100%; border-radius: 5px; }
+  .bar .tick { position: absolute; top: -3px; width: 2px; height: 16px; background: #0288D1; }
+  .bar .tick.ink { background: var(--ink); }
+  .lbl { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+  .lbl b { color: var(--ink); }
+  .btn { display: inline-block; padding: 8px 16px; border-radius: 999px; background: var(--ink); color: var(--bg); font-weight: 600; font-size: 13px; }
+  .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--hair); }
+  .big { font-size: 44px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
+  .notif { background: #1C1B1F; color: #E6E1E5; border-radius: 18px; padding: 12px 14px; width: 360px; font-size: 13px; }
+  .notif .app { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #C8C3CD; margin-bottom: 6px; }
+  .notif .bar { background: #3A3840; }
+  .notif .lbl { color: #C8C3CD; } .notif .lbl b { color: #FFFFFF; }
+  .strip { background: #2B2930; border-radius: 10px; padding: 8px 10px; margin: 8px 0; font-size: 12px; display: flex; gap: 8px; align-items: center; }
+  .code { font-family: ui-monospace, Menlo, monospace; font-size: 30px; letter-spacing: .18em; font-weight: 700; text-align: center; padding: 14px 0 8px; }
+  .mini { width: 148px; height: 148px; border-radius: 26px; background: var(--surface2); display: grid; place-items: center; }
+  .grid { display: flex; gap: 10px; flex-wrap: wrap; margin: 8px 0; }
+  .grid .d { width: 36px; height: 36px; border-radius: 50%; border: 3px solid transparent; }
+  .grid .d.sel { border-color: var(--ink); }
+  .tri { background: conic-gradient(var(--claude) 0 120deg, var(--chatgpt) 120deg 240deg, var(--gemini) 240deg 360deg); }
+  .warn { color: var(--bad); }
+  .ok { color: var(--good); }
+  .menu { position: relative; background: var(--card); border: 1px solid var(--hair); border-radius: 10px; padding: 6px 0; width: 180px; font-size: 13px; }
+  .menu div { padding: 8px 14px; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <!-- Placeholder marks. Rev B stand-ins for the public marks; the app ships hand-traced paths of the real ones. -->
+    <symbol id="mk-claude" viewBox="0 0 24 24">
+      <g stroke="currentColor" stroke-width="2.6" stroke-linecap="round" fill="none">
+        <path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6L5.6 18.4"/>
+      </g>
+    </symbol>
+    <symbol id="mk-chatgpt" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="6.2 2.2" transform="rotate(-8 12 12)"/>
+    </symbol>
+    <symbol id="mk-gemini" viewBox="0 0 24 24">
+      <path fill="currentColor" d="M12 1.5C12 7.5 16.5 12 22.5 12C16.5 12 12 16.5 12 22.5C12 16.5 7.5 12 1.5 12C7.5 12 12 7.5 12 1.5Z"/>
+    </symbol>
+    <radialGradient id="slateBg" cx="30%" cy="25%" r="95%">
+      <stop offset="0%" stop-color="#3A4356"/><stop offset="60%" stop-color="#242B38"/><stop offset="100%" stop-color="#12161E"/>
+    </radialGradient>
+    <linearGradient id="topSand" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#E59980"/><stop offset="100%" stop-color="#D97757"/>
+    </linearGradient>
+    <clipPath id="lowerBulb"><path d="M45,71 c0,-9 7,-12 9,-17 c2,5 9,8 9,17 z"/></clipPath>
+    <clipPath id="lowerBulb48"><path d="M43,73 c0,-11 8,-14 11,-19 c3,5 11,8 11,19 z"/></clipPath>
+  </defs>
+</svg>
+<div class="page">
+  <p class="eyebrow">CCRM-56 · Provider Identity · wireframe rev B · <b>approved 2026-09-06</b> · decisions 1–7 and B1–B3 recorded below</p>
+  <h1>Cooldown — one app, three cooldowns</h1>
+  <p class="lede">Rev A was reviewed 2026-09-06 and every question answered (table at the foot). Rev B redraws the three
+    things that changed on review, so they can be confirmed before build: <b>provider logos</b> where rev A had a dot,
+    a <b>per-account accent</b> override where rev A only had the default, and <b>hidden</b> where rev A had a placeholder
+    card for a window the account does not have. The account stays the unit; a provider is a field on it. Toggle your OS
+    theme to see the dark set.</p>
+  <p class="lede"><b>Fixed:</b> <code>applicationId com.robin.claudeusage</code>, the namespace and the <code>CCooldown</code> repo
+    do not change — a new id is a new app and every install, widget and year of history is lost. Only the label, icon and docs move.</p>
+
+  <!-- ============================ 1 · PALETTE ============================ -->
+  <h2>1 · Palette <small>three accents · one warning ladder · decisions 1 and 7</small></h2>
+  <p class="sub">Claude keeps the existing default theme value. ChatGPT takes OpenAI green (the value OpenQuota also uses).
+    Gemini takes Google blue — the Antigravity colour, because Gemini's own blue→violet gradient is unreadable at 10 dp.
+    The 80 / 90 / 100 warning ladder stays <b>fixed across providers</b>.</p>
+  <div class="palette">
+    <div><span class="sw" style="background:#D97757"></span><div class="swl">Claude Orange<br>#D97757</div></div>
+    <div><span class="sw" style="background:#E59980"></span><div class="swl">dark<br>#E59980</div></div>
+    <div style="width:14px"></div>
+    <div><span class="sw" style="background:#10A37F"></span><div class="swl">ChatGPT Green<br>#10A37F</div></div>
+    <div><span class="sw" style="background:#19C39A"></span><div class="swl">dark<br>#19C39A</div></div>
+    <div style="width:14px"></div>
+    <div><span class="sw" style="background:#4285F4"></span><div class="swl">Gemini Blue<br>#4285F4</div></div>
+    <div><span class="sw" style="background:#8AB4F8"></span><div class="swl">dark<br>#8AB4F8</div></div>
+    <div style="width:28px"></div>
+    <div><span class="sw" style="background:#F9A825"></span><div class="swl">&gt;80<br>#F9A825</div></div>
+    <div><span class="sw" style="background:#F57C00"></span><div class="swl">&gt;90<br>#F57C00</div></div>
+    <div><span class="sw" style="background:#C62828"></span><div class="swl">100<br>#C62828</div></div>
+  </div>
+  <p class="sub"><b>Decision 1 — three-level accent.</b> An account's bars, ring and theme use: its own <i>Accent colour…</i>
+    override if set → else the global theme choice if it is not "Per provider" → else the provider's colour. The global
+    picker is what exists today, plus a first swatch <b>Per provider</b>; existing installs that never touched the picker
+    land on it and look pixel-identical. The per-account override is new (section 4).</p>
+  <p class="sub"><b>Decision 7 (taken under recommendation, confirm here).</b> The Blue family's pace-line partner is
+    spring green, a near neighbour of the ChatGPT accent. On any face that draws <b>more than one account</b>
+    (Mini-Rings, the pinned panel's folded strips) pace ticks are <b>neutral ink</b> — what CCRM-51 (Rails Gauge) already
+    does on the status bar. Single-account faces keep the theme's cool partner.</p>
+
+  <!-- ============================ 2 · NAME ============================ -->
+  <h2>2 · Name <small>decision 2 · Cooldown</small></h2>
+  <div class="row">
+    <div class="opt rec">
+      <h3>Cooldown <span class="tag ok">chosen</span></h3>
+      <p class="why">Keeps the equity, drops the qualifier. Under the tile, in the top bar, on the About screen. "CCooldown"
+        remains the repo and package short form.</p>
+      <div class="tilerow"><div class="tile"><svg viewBox="0 0 108 108"><rect width="108" height="108" fill="url(#slateBg)"/>
+        <circle cx="54" cy="54" r="31" fill="#1E2430"/>
+        <g clip-path="url(#lowerBulb)"><rect x="40" y="66.5" width="28" height="6" fill="#4285F4"/><rect x="40" y="62.5" width="28" height="4" fill="#10A37F"/><rect x="40" y="58.5" width="28" height="4" fill="#D97757"/></g>
+        <path d="M48.5,41 c1,4 4,6 5.5,8.5 c1.5,-2.5 4.5,-4.5 5.5,-8.5 z" fill="url(#topSand)"/>
+        <path d="M53.2,52 a0.8,0.8 0 0 1 1.6,0 v6.5 a0.8,0.8 0 0 1 -1.6,0 z" fill="#E59980"/>
+        <path d="M45,37 c0,9 7,12 9,17 c2,-5 9,-8 9,-17 M45,71 c0,-9 7,-12 9,-17 c2,5 9,8 9,17" fill="none" stroke="#FFF6F1" stroke-width="5.7" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M42,35 h24 M42,73 h24" stroke="#FFF6F1" stroke-width="7.6" stroke-linecap="round"/>
+      </svg></div>
+        <div><div style="font-weight:600">Cooldown</div><div class="verdict">About: <b>Cooldown 1.5</b><br>Claude · ChatGPT · Gemini usage windows</div></div></div>
+    </div>
+    <div class="opt" style="opacity:.6">
+      <h3>Considered</h3>
+      <p class="why">Cooldowns (plural in the name, awkward to say) · AI Cooldown (says "any AI", the scope is three) ·
+        Cooldown Trio (truncates under the tile, dates itself). Anything with "Quota" is OpenQuota's word.</p>
+    </div>
+  </div>
+
+  <!-- ============================ 3 · ICON ============================ -->
+  <h2>3 · Icon <small>decision 3 · hourglass, three sands, all three colours now</small></h2>
+  <p class="sub">Rev A's sands were thin. Rev B fills the lower bulb higher and gives each colour a band that survives 48 dp:
+    blue at the base, green, then the orange that is <b>pouring</b> — the top sand and the falling grain turn orange too,
+    so the icon reads "the Claude window is running" without a percentage. The ground moves from burnt orange to slate so all
+    three colours sit on neutral. Constraints from CCRM-45 (Tracker Icon) hold: no readable percentage at 16 px, no third
+    party's mark in the launcher icon.</p>
+  <div class="row">
+    <div class="opt rec">
+      <h3>A · Hourglass, three sands <span class="tag ok">chosen</span></h3>
+      <p class="why">100 dp · 48 dp · 48 dp on a light launcher · monochrome (themed) at 48 dp.</p>
+      <div class="tilerow">
+        <div class="tile"><svg viewBox="0 0 108 108">
+          <rect width="108" height="108" fill="url(#slateBg)"/>
+          <circle cx="54" cy="54" r="31" fill="#1E2430"/>
+          <g clip-path="url(#lowerBulb)">
+            <rect x="40" y="66.5" width="28" height="6" fill="#4285F4"/>
+            <rect x="40" y="62.5" width="28" height="4" fill="#10A37F"/>
+            <rect x="40" y="58.5" width="28" height="4" fill="#D97757"/>
+          </g>
+          <path d="M48.5,41 c1,4 4,6 5.5,8.5 c1.5,-2.5 4.5,-4.5 5.5,-8.5 z" fill="url(#topSand)"/>
+          <path d="M53.2,52 a0.8,0.8 0 0 1 1.6,0 v6.5 a0.8,0.8 0 0 1 -1.6,0 z" fill="#E59980"/>
+          <path d="M45,37 c0,9 7,12 9,17 c2,-5 9,-8 9,-17 M45,71 c0,-9 7,-12 9,-17 c2,5 9,8 9,17" fill="none" stroke="#FFF6F1" stroke-width="5.7" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M42,35 h24 M42,73 h24" stroke="#FFF6F1" stroke-width="7.6" stroke-linecap="round"/>
+        </svg></div>
+        <div class="tile small"><svg viewBox="0 0 108 108">
+          <rect width="108" height="108" fill="url(#slateBg)"/>
+          <g clip-path="url(#lowerBulb48)">
+            <rect x="38" y="67" width="32" height="7" fill="#4285F4"/>
+            <rect x="38" y="62" width="32" height="5" fill="#10A37F"/>
+            <rect x="38" y="57" width="32" height="5" fill="#D97757"/>
+          </g>
+          <path d="M47,40 c1,5 5,7 7,10 c2,-3 6,-5 7,-10 z" fill="url(#topSand)"/>
+          <path d="M43,35 c0,11 8,14 11,19 c3,-5 11,-8 11,-19 M43,73 c0,-11 8,-14 11,-19 c3,5 11,8 11,19" fill="none" stroke="#FFF6F1" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M39,32 h30 M39,76 h30" stroke="#FFF6F1" stroke-width="8.5" stroke-linecap="round"/>
+        </svg></div>
+        <div class="tile small light"><svg viewBox="0 0 108 108">
+          <rect width="108" height="108" fill="url(#slateBg)" rx="30"/>
+          <g clip-path="url(#lowerBulb48)">
+            <rect x="38" y="67" width="32" height="7" fill="#4285F4"/>
+            <rect x="38" y="62" width="32" height="5" fill="#10A37F"/>
+            <rect x="38" y="57" width="32" height="5" fill="#D97757"/>
+          </g>
+          <path d="M47,40 c1,5 5,7 7,10 c2,-3 6,-5 7,-10 z" fill="url(#topSand)"/>
+          <path d="M43,35 c0,11 8,14 11,19 c3,-5 11,-8 11,-19 M43,73 c0,-11 8,-14 11,-19 c3,5 11,8 11,19" fill="none" stroke="#FFF6F1" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M39,32 h30 M39,76 h30" stroke="#FFF6F1" stroke-width="8.5" stroke-linecap="round"/>
+        </svg></div>
+        <div class="tile small mono"><svg viewBox="0 0 108 108">
+          <g clip-path="url(#lowerBulb48)">
+            <rect x="38" y="67" width="32" height="7" fill="#3B2A22" opacity=".35"/>
+            <rect x="38" y="62" width="32" height="5" fill="#3B2A22" opacity=".65"/>
+            <rect x="38" y="57" width="32" height="5" fill="#3B2A22"/>
+          </g>
+          <path d="M47,40 c1,5 5,7 7,10 c2,-3 6,-5 7,-10 z" fill="#3B2A22"/>
+          <path d="M43,35 c0,11 8,14 11,19 c3,-5 11,-8 11,-19 M43,73 c0,-11 8,-14 11,-19 c3,5 11,8 11,19" fill="none" stroke="#3B2A22" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M39,32 h30 M39,76 h30" stroke="#3B2A22" stroke-width="8.5" stroke-linecap="round"/>
+        </svg></div>
+      </div>
+      <p class="verdict">Build note: three slabs clipped by the lower-glass path in <code>ic_launcher_foreground.xml</code>;
+        the monochrome layer carries the same slabs at alpha 1 / .65 / .35 so "three" survives launcher tinting. Each band is
+        ≥ 3 dp at 48 dp. About-screen <code>drawable/ic_launcher.xml</code> redrawn to match.</p>
+    </div>
+    <div class="opt" style="opacity:.6">
+      <h3>Considered</h3>
+      <p class="why">B three arcs (reads as progress — the reason CCRM-42 (App Icon) was retired) · C banded ground
+        (a flag; fails monochrome) · D three steps (an accidental ranking). All dropped on review.</p>
+    </div>
+  </div>
+
+  <!-- ============================ 4 · MARKS + ACCENTS ============================ -->
+  <h2>4 · The mark, and the accent, on every surface <small>decisions 4 and 1 · confirm the logos in place</small></h2>
+  <p class="sub"><b>Decision 4:</b> the provider's <b>logo</b>, not a dot, identifies the service — <b>20 dp</b> before the label on
+    cards and tabs, <b>14 dp</b> in chips, on the pinned label line and in widget labels, <b>28 dp</b> in the Add-account sheet
+    (B1: bumped from 16 / 12 / 24 on review). The glyphs
+    below are stand-ins; the app ships hand-traced single-colour paths of each public mark, unmodified, tinted in the
+    account's accent (or ink where the surface is monochrome). Account labels stay the user's own words.</p>
+  <div class="row">
+    <div class="phone">
+      <div class="title">Accounts</div>
+      <div class="card"><div class="hd"><svg class="mk c"><use href="#mk-claude"/></svg>Personal <span class="more">⋮</span></div>
+        <div class="meta">Max 20x · signed in · expires around 3 Oct</div></div>
+      <div class="card"><div class="hd"><svg class="mk c"><use href="#mk-claude"/></svg>Work <span class="more">⋮</span></div>
+        <div class="meta">Team · signed in</div></div>
+      <div class="card"><div class="hd"><svg class="mk g"><use href="#mk-chatgpt"/></svg>ChatGPT <span class="more">⋮</span></div>
+        <div class="meta">Plus · signed in with a code · balance $12.40</div></div>
+      <div class="card" style="opacity:.6"><div class="hd"><svg class="mk b"><use href="#mk-gemini"/></svg>Gemini <span class="more">⋮</span></div>
+        <div class="meta">Not signed in — Antigravity sign-in is blocked, see roadmap</div></div>
+      <div style="text-align:center;margin:14px 0 6px"><span class="btn ghost">+ Add account</span></div>
+      <div class="verdict">Settings → Accounts, cover screen. The mark is the only new pixel on a Claude card; no "Claude"
+        caption is added to labels that never needed one.</div>
+    </div>
+
+    <div>
+      <div class="phone" style="width:300px">
+        <div style="font-weight:600;margin-bottom:6px">⋮ on the ChatGPT card</div>
+        <div class="menu"><div>Rename…</div><div><b>Accent colour…</b></div><div style="color:var(--bad)">Remove account</div></div>
+        <div style="font-weight:600;margin:16px 0 4px">Accent colour · ChatGPT</div>
+        <div class="grid">
+          <span class="d sel" style="background:var(--chatgpt);border-color:var(--ink)" title="Provider colour (default)"></span>
+          <span class="d" style="background:#D97757"></span><span class="d" style="background:#1A73E8"></span>
+          <span class="d" style="background:#3949AB"></span><span class="d" style="background:#00ACC1"></span><span class="d" style="background:#00897B"></span>
+        </div>
+        <div class="grid">
+          <span class="d" style="background:#188038"></span><span class="d" style="background:#F9A825"></span><span class="d" style="background:#E64A19"></span>
+          <span class="d" style="background:#D93025"></span><span class="d" style="background:#D81B60"></span><span class="d" style="background:#8E24AA"></span>
+        </div>
+        <div class="verdict">Selected: Provider colour (default). The first swatch clears the override; the rest are today's
+          palette. Material You is global-only and not offered here.</div>
+      </div>
+      <div class="phone" style="width:300px;margin-top:16px">
+        <div style="font-weight:600;margin-bottom:6px">Settings → Theme colour (global)</div>
+        <div class="grid">
+          <span class="d sel tri" title="Per provider"></span>
+          <span class="d" style="background:conic-gradient(#8AB4F8,#F28B82,#81C995,#8AB4F8)" title="Material You"></span>
+          <span class="d" style="background:#D97757"></span><span class="d" style="background:#1A73E8"></span><span class="d" style="background:#3949AB"></span><span class="d" style="background:#00ACC1"></span>
+        </div>
+        <div class="verdict">Selected: Per provider — each account in its service's colour. New first swatch (a tri-colour dot);
+          it is where an install that never chose a colour lands.</div>
+      </div>
+    </div>
+
+    <div class="phone">
+      <div class="tabs">
+        <div class="tab"><svg class="mk s c"><use href="#mk-claude"/></svg>Personal</div>
+        <div class="tab"><svg class="mk s c"><use href="#mk-claude"/></svg>Work</div>
+        <div class="tab on"><svg class="mk s g"><use href="#mk-chatgpt"/></svg>ChatGPT</div>
+      </div>
+      <div class="card">
+        <div class="lbl"><b>5-hour window</b><span>resets 18:40</span></div>
+        <div class="bar"><i style="width:42%;background:var(--chatgpt)"></i><span class="tick" style="left:55%"></span></div>
+        <div class="lbl"><b>42% used</b><span>below pace</span></div>
+      </div>
+      <div class="card">
+        <div class="lbl"><b>7-day window</b><span>resets Tue 09:00</span></div>
+        <div class="bar"><i style="width:63%;background:var(--chatgpt)"></i><span class="tick" style="left:48%"></span></div>
+        <div class="lbl"><b>63% used</b><span class="warn">above pace</span></div>
+        <div class="lbl" style="margin-top:8px"><b>Spark</b><span>resets Tue 09:00</span></div>
+        <div class="bar"><i style="width:12%;background:var(--chatgpt)"></i></div>
+        <div class="lbl"><b>12% used</b><span>model cap</span></div>
+      </div>
+      <div class="card">
+        <div class="lbl"><b>Credits</b><span>no cap</span></div>
+        <div class="lbl" style="margin-top:4px"><b>$12.40 balance</b><span>post-limit budget</span></div>
+      </div>
+      <div class="verdict">Main screen, ChatGPT tab; the app's primary colour follows the selected tab's account. Same bars,
+        same pace tick. Spark sits under the 7-day card as a model cap, like Fable's cap on a Claude account. Credits is a
+        balance, not "used of cap".</div>
+    </div>
+  </div>
+
+  <div class="row" style="margin-top:26px">
+    <div>
+      <div class="notif">
+        <div class="app"><svg class="mk s g"><use href="#mk-chatgpt"/></svg> Cooldown · <b>ChatGPT</b> · 5-hour window</div>
+        <div class="big">42%</div>
+        <div class="lbl" style="margin-top:4px"><span>resets 18:40 · in 2h 10m</span><span>below pace</span></div>
+        <div class="bar" style="margin-top:10px"><i style="width:42%;background:var(--chatgpt)"></i></div>
+        <div class="strip"><svg class="mk s" style="color:#E6E1E5"><use href="#mk-claude"/></svg><span><b>Work:</b> 7-day window will run out early</span></div>
+        <div class="lbl" style="margin-top:8px"><span>7-day</span><b>63%</b></div>
+        <div class="bar"><i style="width:63%;background:var(--chatgpt)"></i></div>
+        <div style="margin-top:10px;font-size:12px;color:#C8C3CD">Show profile:
+          <span class="chip" style="border-color:#3A3840"><svg class="mk s" style="color:#C8C3CD"><use href="#mk-claude"/></svg>Personal</span>
+          <span class="chip" style="border-color:#3A3840"><svg class="mk s" style="color:#C8C3CD"><use href="#mk-claude"/></svg>Work</span>
+          <span class="chip on" style="background:#E6E1E5;color:#1C1B1F"><svg class="mk s" style="color:#1C1B1F"><use href="#mk-chatgpt"/></svg>ChatGPT</span></div>
+      </div>
+      <div class="verdict" style="width:360px">Pinned notification, <b>Huge number</b> style, showing the ChatGPT account. The mark
+        rides the label line (a 14 dp ImageView in the Huge-number row; drawn into the bitmap for the gauge style); the number
+        is untouched. A folded strip from a Claude account carries <i>its</i> mark in ink — decision 7 — so two services never
+        blur in one panel.</div>
+    </div>
+    <div>
+      <div class="mini"><svg viewBox="0 0 148 148" width="148" height="148">
+        <g fill="none" stroke-linecap="round" transform="rotate(-90 74 74)">
+          <circle cx="44" cy="44" r="22" stroke="var(--hair)" stroke-width="8"/>
+          <circle cx="44" cy="44" r="22" stroke="var(--claude)" stroke-width="8" stroke-dasharray="48 90"/>
+          <circle cx="104" cy="44" r="22" stroke="var(--hair)" stroke-width="8"/>
+          <circle cx="104" cy="44" r="22" stroke="var(--chatgpt)" stroke-width="8" stroke-dasharray="58 80"/>
+          <circle cx="74" cy="104" r="22" stroke="var(--hair)" stroke-width="8"/>
+          <circle cx="74" cy="104" r="22" stroke="var(--gemini)" stroke-width="8" stroke-dasharray="20 118"/>
+        </g>
+        <line x1="44" y1="18" x2="44" y2="24" stroke="var(--ink)" stroke-width="2" transform="rotate(130 44 44)"/>
+        <line x1="104" y1="18" x2="104" y2="24" stroke="var(--ink)" stroke-width="2" transform="rotate(200 104 44)"/>
+        <text x="44" y="48" text-anchor="middle" font-size="11" font-weight="700" fill="var(--ink)">35</text>
+        <text x="104" y="48" text-anchor="middle" font-size="11" font-weight="700" fill="var(--ink)">42</text>
+        <text x="74" y="108" text-anchor="middle" font-size="11" font-weight="700" fill="var(--ink)">15</text>
+        <svg x="36" y="72" class="mk" style="color:var(--claude)" width="16" height="16"><use href="#mk-claude"/></svg>
+        <svg x="96" y="72" class="mk" style="color:var(--chatgpt)" width="16" height="16"><use href="#mk-chatgpt"/></svg>
+        <svg x="66" y="132" class="mk" style="color:var(--gemini)" width="16" height="16"><use href="#mk-gemini"/></svg>
+      </svg></div>
+      <div class="verdict" style="width:148px">Mini-Rings, three accounts. Ring fill = each account's accent; pace ticks are
+        <b>ink</b> on this multi-account face (decision 7); the mark sits under each ring where the label goes.</div>
+    </div>
+    <div class="phone" style="width:300px">
+      <div style="font-weight:600;margin-bottom:6px">Quick Settings</div>
+      <div class="card"><div class="hd">Claude · Personal 35%</div><div class="meta">resets in 3h 10m</div></div>
+      <div class="card"><div class="hd">ChatGPT · Work 42%</div><div class="meta">resets in 2h 10m</div></div>
+      <div class="verdict">Tiles: the icon slot is the gauge, so no mark. Live label gains a "Provider · " prefix only when the
+        configured accounts span more than one provider. The picker's static labels become "Cooldown account 1–4".</div>
+    </div>
+  </div>
+
+  <!-- ============================ 5 · ADD ACCOUNT ============================ -->
+  <h2>5 · Add account <small>decision 5 · the one new screen</small></h2>
+  <p class="sub">"+ Add account" opens a three-row sheet. Picking a row mints the profile with that provider and starts <i>that</i>
+    provider's sign-in at once. Antigravity is present and greyed rather than hidden, so the app says what it is <i>for</i>.</p>
+  <div class="row">
+    <div class="phone">
+      <div class="title">Add account</div>
+      <div class="card"><div class="hd"><svg class="mk l c"><use href="#mk-claude"/></svg>Claude</div>
+        <div class="meta">Signs in through your browser, then paste the code back — as before.</div></div>
+      <div class="card"><div class="hd"><svg class="mk l g"><use href="#mk-chatgpt"/></svg>ChatGPT</div>
+        <div class="meta">Shows a short code to type at auth.openai.com — on this phone or any other device.</div></div>
+      <div class="card" style="opacity:.55"><div class="hd"><svg class="mk l b"><use href="#mk-gemini"/></svg>Gemini (Antigravity)</div>
+        <div class="meta">Not available yet — Google's sign-in for Antigravity can't finish on a phone. Coming when it can.</div></div>
+      <div class="verdict">Bottom sheet, 28 dp marks. The Gemini row goes live the day CCRM-55 (Antigravity Account) unblocks,
+        with copy for whichever route wins.</div>
+    </div>
+    <div class="phone">
+      <div class="title">Sign in to ChatGPT</div>
+      <div class="card">
+        <div class="meta">Go to</div>
+        <div style="font-weight:600;font-size:15px">auth.openai.com/codex/device</div>
+        <div class="meta" style="margin-top:8px">and enter this code</div>
+        <div class="code">QWXK-7HP2</div>
+        <div class="lbl"><span>Code expires in <b>14:32</b></span><span>Waiting for you to finish…</span></div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:center;margin-top:8px">
+        <span class="btn">Open in browser</span><span class="btn ghost">Copy code</span>
+      </div>
+      <div class="verdict">Device-code sheet. The app polls while the sheet is open and resumes on return; the moment the token
+        lands the sheet closes and the new tab appears. States: <b>waiting</b> (this), <b>expired</b> ("Get a new code"),
+        <b>denied</b>, <b>unavailable</b> (OpenAI 404 — copy names the browser fallback), <b>done</b>.</div>
+    </div>
+  </div>
+
+  <!-- ============================ 6 · STATES ============================ -->
+  <h2>6 · States this arc introduces <small>decision 6 · a window the account does not have is not shown</small></h2>
+  <p class="sub">CCRM-15 (Above-Pace Verification) exists because a state shipped unobserved. Rev A drew a placeholder card for
+    an absent 5-hour window; review said hide it. ChatGPT's states are needed for CCRM-54 (ChatGPT Account); Antigravity's
+    are here so the grammar is checked against them, even though CCRM-55 is blocked.</p>
+  <div class="row">
+    <div class="phone">
+      <div class="tabs"><div class="tab"><svg class="mk s c"><use href="#mk-claude"/></svg>Personal</div><div class="tab on"><svg class="mk s g"><use href="#mk-chatgpt"/></svg>ChatGPT</div></div>
+      <div class="card">
+        <div class="lbl"><b>7-day window</b><span>resets Tue 09:00</span></div>
+        <div class="bar"><i style="width:63%;background:var(--chatgpt)"></i><span class="tick" style="left:48%"></span></div>
+        <div class="lbl"><b>63% used</b><span class="warn">above pace</span></div>
+      </div>
+      <div class="card">
+        <div class="lbl"><b>Credits</b><span>no cap</span></div>
+        <div class="lbl" style="margin-top:4px"><b>$12.40 balance</b><span>post-limit budget</span></div>
+      </div>
+      <div class="verdict"><b>ChatGPT · no 5-hour window</b> (real since OpenAI lifted it for Plus / Pro on 2026-07-12): the
+        5-hour card is <b>gone</b>, the 7-day card leads, the pinned headline and the tile fall back to the 7-day figure, and a
+        Ring widget configured on 5h shows "No 5-hour window on this account". <b>Credits unlimited</b> → the credits card is
+        gone too. Same rule for a Claude account whose payload lacks a window (today it draws "—").</div>
+    </div>
+    <div class="phone">
+      <div class="tabs"><div class="tab"><svg class="mk s c"><use href="#mk-claude"/></svg>Personal</div><div class="tab on"><svg class="mk s b"><use href="#mk-gemini"/></svg>Gemini</div></div>
+      <div class="card">
+        <div class="lbl"><b>Gemini · 5-hour</b><span>not started</span></div>
+        <div class="bar"><i style="width:0%"></i></div>
+        <div class="meta">Starts with your first message — no reset time until then.</div>
+      </div>
+      <div class="card">
+        <div class="lbl"><b>Gemini · 7-day</b><span>resets Thu 02:00</span></div>
+        <div class="bar"><i style="width:60%;background:var(--gemini)"></i></div>
+        <div class="lbl"><b>60% used</b><span>≈ steps of 20 — no pace verdict</span></div>
+      </div>
+      <div class="verdict"><b>Antigravity</b> (for CCRM-55, later): <b>not started</b> has no number and no tick; a <b>stepped</b>
+        signal suppresses the pace verdict rather than flapping it; <b>unknown</b> (reset reported, amount not) never draws
+        as 0 or 100; the untouched Claude + GPT pool is <b>not shown</b> at all under decision 6.</div>
+    </div>
+    <div class="phone">
+      <div class="title">Settings → About</div>
+      <div class="card">
+        <div style="font-weight:600">Cooldown 1.5</div>
+        <div class="meta" style="margin-top:6px">Unofficial. Not affiliated with, endorsed by, or supported by Anthropic, OpenAI or Google.
+          "Claude" is a trademark of Anthropic, PBC. "ChatGPT" is a trademark of OpenAI. "Gemini" and "Antigravity" are trademarks of Google LLC.</div>
+      </div>
+      <div class="card">
+        <div style="font-weight:600">How it reads your usage</div>
+        <div class="meta" style="margin-top:6px">Claude: your own token via the Claude Code sign-in, an undocumented endpoint.<br>
+          ChatGPT: your own token via the Codex device-code sign-in, an undocumented endpoint.<br>
+          Each is read-only and never spends quota.</div>
+      </div>
+      <div class="verdict">The disclaimer grows from one trademark to four; the risk disclosure gets one line per provider in
+        the README's voice.</div>
+    </div>
+  </div>
+
+  <hr class="hr">
+
+  <h2>Decisions <small>review of rev A, 2026-09-06</small></h2>
+  <table class="rules">
+    <tr><th>#</th><th>Decision</th></tr>
+    <tr><td>1</td><td><b>Provider colour is the account's default accent, overridable per account</b> — three-level resolution: account override → global theme (unless "Per provider") → provider colour. The per-account override and the "Per provider" swatch are new.</td></tr>
+    <tr><td>2</td><td><b>Name: Cooldown.</b> Package, namespace, repo unchanged.</td></tr>
+    <tr><td>3</td><td><b>Icon: hourglass with three sands, all three colours now</b>, colours made more obvious (rev B section 3). Gemini's row is greyed in Add account rather than the icon waiting for it.</td></tr>
+    <tr><td>4</td><td><b>Provider logos, not dots</b>, identify the service on every surface; colour is for bars and theme. User's call, overriding rev A's trademark caution; the marks ship as hand-traced single-colour paths of the public marks, unmodified, with the About screen naming all four trademarks.</td></tr>
+    <tr><td>5</td><td><b>Antigravity present and greyed</b> in the Add-account sheet, with the reason, until CCRM-55 (Antigravity Account) unblocks.</td></tr>
+    <tr><td>6</td><td><b>Repo stays <code>CCooldown</code>.</b> And: <b>a window the account does not have is not shown at all</b> — no placeholder card, no dash — on any surface, Claude included.</td></tr>
+    <tr><td>7</td><td><b>Pace ticks are neutral ink on multi-account faces</b>; single-account faces keep the theme's cool partner. Confirmed as B3(b).</td></tr>
+  </table>
+
+  <h2>Rev B review — confirmed 2026-09-06 <small>the three things that changed after rev A</small></h2>
+  <table class="rules">
+    <tr><th>#</th><th>Looked at</th><th>Outcome</th></tr>
+    <tr><td>B1</td><td>Section 4, all three phones and the notification</td><td><b>Approved with larger logos:</b> 20 dp on cards and tabs, 14 dp in chips and on the pinned label line, 28 dp in the Add-account sheet. Tiles: text prefix only when providers are mixed.</td></tr>
+    <tr><td>B2</td><td>Section 4, the two small panels</td><td><b>Approved as drawn:</b> ⋮ → Accent colour… per account; "Per provider" swatch leads the global grid; three-level resolution.</td></tr>
+    <tr><td>B3</td><td>Section 6, first phone; section 1, decision 7</td><td><b>Both confirmed:</b> absent windows hidden on every surface, Claude included; ink pace ticks on multi-account faces only.</td></tr>
+  </table>
+</div>
+</body>
+</html>

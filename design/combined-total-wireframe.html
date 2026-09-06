@@ -1,0 +1,549 @@
+<title>Combined Total — CCRM-31 (rev B, for review)</title>
+<style>
+  :root {
+    --bg: #FAF8F6; --ink: #26211E; --muted: #6E6660; --accent: #C15F3C;
+    --hair: #E7E1DC; --card: #FFFFFF; --good: #2E7D52; --bad: #C62828;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171513; --ink: #EDE8E4; --muted: #9B928B; --accent: #E59980;
+      --hair: #2C2825; --card: #201D1B; --good: #7BC49A; --bad: #FF8A80;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171513; --ink: #EDE8E4; --muted: #9B928B; --accent: #E59980;
+    --hair: #2C2825; --card: #201D1B; --good: #7BC49A; --bad: #FF8A80;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    margin: 0; padding: 48px 24px 96px; line-height: 1.5;
+  }
+  .page { max-width: 1280px; margin: 0 auto; }
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 10px;
+  }
+  h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 8px; text-wrap: balance; }
+  .lede { color: var(--muted); max-width: 76ch; margin: 0 0 12px; font-size: 14px; }
+  h2 { font-size: 19px; font-weight: 650; margin: 54px 0 4px; }
+  h3 { font-size: 14px; font-weight: 650; margin: 30px 0 8px; }
+  .sub { color: var(--muted); font-size: 13px; max-width: 86ch; margin: 0 0 16px; }
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px;
+    background: color-mix(in srgb, var(--hair) 55%, transparent);
+    padding: 1px 5px; border-radius: 4px;
+  }
+  .flag {
+    margin: 14px 0 4px; padding: 13px 17px; border-radius: 10px;
+    background: var(--card); border: 1px solid var(--hair);
+    font-size: 13.5px; max-width: 94ch;
+  }
+  .flag.hot { border-color: color-mix(in srgb, var(--bad) 55%, var(--hair)); }
+  .flag.new { border-color: color-mix(in srgb, var(--good) 60%, var(--hair)); }
+  .flag b { font-weight: 650; }
+  .flag ul { margin: 8px 0 0; padding-left: 20px; }
+  .flag li { margin: 5px 0; }
+  .board {
+    border-radius: 18px; padding: 20px 22px 26px; border: 1px solid var(--hair);
+    margin-top: 14px; overflow-x: auto;
+  }
+  .board.lt { background: linear-gradient(140deg, #C6D2E0 0%, #DACEBE 55%, #E6D6C3 100%); }
+  .board.dk { background: linear-gradient(140deg, #1E2833 0%, #30272C 60%, #382D2F 100%); }
+  .boardcap {
+    margin: 0 0 16px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+  }
+  .lt .boardcap { color: rgba(20,20,30,.62); } .dk .boardcap { color: rgba(255,255,255,.52); }
+  .row { display: flex; gap: 26px; flex-wrap: wrap; align-items: flex-start; }
+  .cap2 { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 10.5px;
+          letter-spacing: .05em; margin-top: 8px; max-width: 34ch; line-height: 1.45; }
+  .lt .cap2 { color: rgba(20,20,30,.6); } .dk .cap2 { color: rgba(255,255,255,.52); }
+
+  /* ---- phone frame: a 400dp compact screen at 1:1 ---- */
+  .phone { width: 400px; border-radius: 20px; overflow: hidden; flex: 0 0 auto;
+           box-shadow: 0 8px 28px rgba(0,0,0,.22); }
+  .phone.wide { width: 760px; }
+  .phone.lt { background: #FBF9F8; color: #1D1B19; }
+  .phone.dk { background: #16130F; color: #EDE8E4; }
+  .appbar { display: flex; align-items: center; gap: 4px; height: 56px; padding: 0 4px 0 16px;
+            font-size: 20px; font-weight: 500; }
+  .phone.lt .appbar { background: #F3EDE9; } .phone.dk .appbar { background: #221E1A; }
+  .appbar .t { flex: 1; }
+  .appbar .ic { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center;
+                font-size: 15px; opacity: .8; }
+  .strip { display: flex; height: 48px; font-size: 14px; font-weight: 500; }
+  .strip div { flex: 1; display: grid; place-items: center; opacity: .6;
+               border-bottom: 1px solid rgba(128,128,128,.28); }
+  .strip div.on { opacity: 1; border-bottom: 2px solid var(--accent); color: var(--accent); }
+  .body { padding: 16px; }
+  .mcard { border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+  .phone.lt .mcard { background: #FFFFFF; box-shadow: 0 1px 3px rgba(0,0,0,.10); }
+  .phone.dk .mcard { background: #262220; }
+  .hl { display: flex; align-items: flex-end; gap: 6px; }
+  .hl .nm { font-size: 14px; font-weight: 600; }
+  .hl .sm { font-size: 14px; flex: 1; opacity: .65; }
+  .hl .pc { font-size: 16px; font-weight: 700; }
+  .bar { height: 10px; border-radius: 5px; margin-top: 8px; overflow: hidden; }
+  .phone.lt .bar { background: rgba(0,0,0,.09); } .phone.dk .bar { background: rgba(255,255,255,.13); }
+  .bar i { display: block; height: 100%; border-radius: 5px; }
+  .note { font-size: 12px; opacity: .66; margin-top: 8px; }
+  .note.err { opacity: 1; color: #C62828; } .phone.dk .note.err { color: #FF8A80; }
+  .divider { height: 1px; margin: 14px -16px 0; }
+  .phone.lt .divider { background: rgba(0,0,0,.09); } .phone.dk .divider { background: rgba(255,255,255,.11); }
+  .entry { display: flex; align-items: center; gap: 8px; height: 44px; margin: 0 -4px; padding: 0 4px; }
+  .entry .l { font-size: 14px; font-weight: 500; }
+  .entry .v { flex: 1; text-align: right; font-size: 14px; opacity: .72;
+              font-variant-numeric: tabular-nums; }
+  .entry .c { font-size: 17px; opacity: .55; }
+
+  /* ---- ring + legend ---- */
+  .ringwrap { position: relative; width: 176px; height: 176px; }
+  .ringwrap svg { display: block; }
+  .ringmid { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+  .ringmid .big { font-size: 28px; font-weight: 700; letter-spacing: -.01em;
+                  font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .ringmid .sub2 { font-size: 12px; opacity: .66; margin-top: 2px; }
+  .leg { margin-top: 18px; }
+  .leg .lr { display: flex; align-items: center; gap: 10px; height: 36px; font-size: 14px; }
+  .leg .sw { width: 12px; height: 12px; border-radius: 3px; flex: 0 0 auto; }
+  .leg .nm2 { flex: 1; }
+  .leg .mny { font-variant-numeric: tabular-nums; }
+  .leg .shr { width: 46px; text-align: right; opacity: .6; font-variant-numeric: tabular-nums; }
+  .foot { font-size: 12px; opacity: .66; margin-top: 6px; }
+
+  /* ---- thumbnail donuts for the state grid ---- */
+  .thumb { width: 96px; height: 96px; border-radius: 50%;
+           -webkit-mask: radial-gradient(farthest-side, transparent 60%, #000 61%);
+           mask: radial-gradient(farthest-side, transparent 60%, #000 61%); }
+  .st { flex: 0 0 auto; width: 168px; }
+  .st .tl { font-size: 12px; font-weight: 650; margin: 10px 0 2px; }
+  .st .tx { font-size: 11.5px; opacity: .7; line-height: 1.45; }
+
+  table.spec { border-collapse: collapse; margin-top: 14px; font-size: 13px; max-width: 100%; }
+  table.spec th, table.spec td { border: 1px solid var(--hair); padding: 7px 11px;
+                                 text-align: left; vertical-align: top; }
+  table.spec th { background: var(--card); font-weight: 650; font-size: 11.5px;
+                  text-transform: uppercase; letter-spacing: .05em; }
+  table.spec td.n { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; }
+  .ok { color: var(--good); font-weight: 650; }
+  .no { color: var(--bad); font-weight: 650; }
+  .q { border-left: 3px solid var(--accent); padding: 4px 0 4px 14px; margin: 22px 0; max-width: 92ch; }
+  .q.blocking { border-left-color: var(--bad); }
+  .q .qn { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11px;
+           color: var(--accent); letter-spacing: .08em; text-transform: uppercase; }
+  .q.blocking .qn { color: var(--bad); }
+  .rec { font-weight: 650; color: var(--accent); }
+  .nb { background: color-mix(in srgb, var(--accent) 12%, transparent);
+        border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--hair));
+        border-radius: 10px; padding: 13px 17px; margin: 20px 0; font-size: 13.5px; max-width: 94ch; }
+</style>
+
+<div class="page">
+<p class="eyebrow">CCRM-31 · Combined Total · rev B · spent-only · needs approval</p>
+<h1>One reading across every account</h1>
+<p class="lede">
+  Nothing in the app answers <i>how much have I spent in total</i>. This proposes the smallest
+  honest answer: a <b>one-line total on the credits card</b> that also opens a <b>Total spend</b>
+  screen, where a <b>share donut</b> — one slice per account, descending, with the 2.5% floor —
+  says who spent it. Every figure on the screen is a real spend figure. Every number below is a
+  worked example, not a placeholder.
+</p>
+
+<div class="flag new">
+  <b>rev B — the balance problem is designed out, not argued past.</b> Rev A kept a combined
+  denominator: <code>53% of $190.00</code> in the ring centre and <code>$90.22 left</code> in the
+  footer. Both leaned on the monthly cap standing in for a credit balance the API does not give us
+  — <code>spend.balance</code> is null in every payload, and the endpoint that carries it rejects
+  our bearer (CCBG-6 (Credits Denominator), <b>Won't fix</b>). So <b>both lines are gone</b>.
+  <ul>
+    <li><b>Spent</b> comes from <code>spend.used.amount_minor</code> — present, real, not in doubt.
+      This is the question CCRM-31 was filed to answer, and it needs nothing we don't have.</li>
+    <li><b>Left</b> would need <code>spend.balance</code>. Not available, so not claimed.</li>
+    <li>The <b>share ring is unaffected</b> — it never needed a denominator, which is why it is a
+      share rather than a gauge.</li>
+  </ul>
+  Two rev-A states — "some accounts uncapped" and "at the combined cap" — stop existing, because
+  nothing measures against a cap any more. <b>Decided 2026-08-27.</b>
+</div>
+
+<h2>1 · Where it lives</h2>
+<p class="sub">
+  Three homes were on the table in the roadmap. Two are wrong for the same reason: the reading is
+  <b>account-independent</b>, and both the main pager and the History screen are per-account
+  surfaces with a profile tab strip.
+</p>
+<table class="spec">
+  <tr><th>Option</th><th>Verdict</th><th>Why</th></tr>
+  <tr>
+    <td><b>A third pager page</b></td><td class="no">No</td>
+    <td>Reopens the CCRM-20 (Wide Chart) question of what the pager is for, and the roadmap already
+      leaned against it. Worse: an "All" tab in the strip would be a 4th tab at three accounts,
+      tripping <code>FIXED_TAB_LIMIT</code> and turning a fixed strip scrollable for everyone.</td>
+  </tr>
+  <tr>
+    <td><b>On the History screen</b></td><td class="no">No</td>
+    <td>History is windows over time and carries its own per-profile strip. Money is not history,
+      and it would inherit a tab strip it has no use for.</td>
+  </tr>
+  <tr>
+    <td><b>A card at the top of each profile</b></td><td class="no">No</td>
+    <td>Pushes the 5-hour window — the question you actually open the app with — below the fold, to
+      answer a rarer and more reflective question.</td>
+  </tr>
+  <tr>
+    <td><b>An entry row on the existing credits card → its own screen</b></td>
+    <td class="ok">Proposed</td>
+    <td>The one-line answer appears exactly where the question arises, costs <b>44&nbsp;dp inside a
+      card that already exists</b>, no app-bar slot, and no strip. The ring gets a full screen
+      instead of fighting a card for room. It is unreachable when no account has credits — which
+      is correct: there is nothing to total.</td>
+  </tr>
+</table>
+
+<h2>2 · The entry row on the credits card</h2>
+<p class="sub">
+  The credits card is unchanged above the divider — including its own <code>$37.60 left</code>,
+  which stays: <b>per-account</b>, that figure is <code>bindingRemainingMinor</code> against a cap
+  the user themselves set, and it is already shipped and already honest. What rev B refuses is
+  <i>summing</i> it. Below the divider, one 44&nbsp;dp row — a full-width tap target opening
+  <b>Total spend</b>. Shown only when <b>two or more</b> accounts are counted; at one account the
+  total <i>is</i> the card and the row would be a link to itself.
+</p>
+
+<div class="board lt">
+  <p class="boardcap">Light · 400 dp compact (Fold 7 cover) · Personal selected · 3 accounts counted</p>
+  <div class="row">
+    <div class="phone lt">
+      <div class="strip"><div class="on">Personal</div><div>Work</div><div>Product</div></div>
+      <div class="body">
+        <div class="mcard">
+          <div class="hl">
+            <span class="nm">Usage credits</span>
+            <span class="sm">$12.40 / $50.00</span>
+            <span class="pc">25% &#9432;</span>
+          </div>
+          <div class="bar"><i style="width:25%;background:#188038"></i></div>
+          <div class="note">$37.60 left · covers you when you hit your plan limits</div>
+          <div class="divider"></div>
+          <div class="entry">
+            <span class="l">Total across 3 accounts</span>
+            <span class="v">$99.78 spent</span>
+            <span class="c">&#8250;</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <p class="cap2">
+        · Existing card untouched: titleSmall name, bodyMedium money, titleMedium bold percent,
+        10 dp bar, bodySmall footer.<br><br>
+        · Divider is the card's full bleed (margin −16 dp), matching the Settings row divider.<br><br>
+        · Row: bodyMedium medium-weight label left, bodyMedium 72%-alpha money right, chevron.
+        44 dp tall — the minimum target, not 48, because it sits inside a card rather than a list.<br><br>
+        · <b>"spent", not "/ $190.00".</b> The word is doing real work: it says this is an amount,
+        not a position against a ceiling, and it is the same word the credits card itself already
+        uses for an uncapped account (<code>"$12.40 spent"</code>).
+      </p>
+    </div>
+  </div>
+</div>
+
+<h2>3 · The Total spend screen</h2>
+<p class="sub">
+  A fourth top-level <code>Screen</code> alongside MAIN / HISTORY / SETTINGS / GUIDE, titled
+  <b>Total spend</b>, with a back arrow and no tab strip. Content at <code>ContentMaxWidth</code>
+  (640 dp), like the guide — this is a reading, not a chart.
+</p>
+
+<div class="board dk">
+  <p class="boardcap">Dark · 400 dp compact · the happy path, and the case that justifies the slice floor</p>
+  <div class="row">
+    <div class="phone dk">
+      <div class="appbar"><span class="ic">&#8592;</span><span class="t">Total spend</span></div>
+      <div class="body">
+        <div class="mcard" style="display:grid;place-items:center;padding:24px 16px 16px">
+          <div class="ringwrap">
+            <svg width="176" height="176" viewBox="0 0 176 176">
+              <g transform="rotate(-90 88 88)" fill="none" stroke-linecap="butt">
+                <circle cx="88" cy="88" r="70" stroke="rgba(255,255,255,.10)" stroke-width="22"/>
+                <circle cx="88" cy="88" r="70" stroke="#E59980" stroke-width="22"
+                        stroke-dasharray="371.85 439.82" stroke-dashoffset="0"/>
+                <circle cx="88" cy="88" r="70" stroke="rgba(229,153,128,.62)" stroke-width="22"
+                        stroke-dasharray="50.99 439.82" stroke-dashoffset="-374.85"/>
+                <circle cx="88" cy="88" r="70" stroke="rgba(229,153,128,.34)" stroke-width="22"
+                        stroke-dasharray="8.0 439.82" stroke-dashoffset="-428.84"/>
+              </g>
+            </svg>
+            <div class="ringmid">
+              <div class="big">$99.78</div>
+              <div class="sub2">across 3 accounts</div>
+            </div>
+          </div>
+          <div class="leg" style="width:100%">
+            <div class="lr"><span class="sw" style="background:#E59980"></span>
+              <span class="nm2">Work</span><span class="mny">$86.10</span><span class="shr">86%</span></div>
+            <div class="lr"><span class="sw" style="background:rgba(229,153,128,.62)"></span>
+              <span class="nm2">Personal</span><span class="mny">$12.40</span><span class="shr">12%</span></div>
+            <div class="lr"><span class="sw" style="background:rgba(229,153,128,.34)"></span>
+              <span class="nm2">Product</span><span class="mny">$1.28</span><span class="shr">1%</span></div>
+          </div>
+          <div class="foot" style="width:100%">Updated 4m ago · oldest account 11m ago</div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <p class="cap2">
+        · Ring 176 dp across, 22 dp stroke, extent track at 10% ink. Starts at 12 o'clock,
+        <b>clockwise, descending by spend</b> — the biggest payer owns the first arc, so the answer
+        to "who spent it" is where the eye already is.<br><br>
+        · 3 dp gap between slices, taken off the end of each arc.<br><br>
+        · Centre: headlineMedium total, bodySmall "across N accounts". <b>No percentage</b> — there
+        is no denominator, and the ring is already a share.<br><br>
+        · Legend rows 36 dp: 12 dp swatch, label, money, share right at 60% alpha. Share is
+        rounded and <b>may not sum to 100%</b>; the money is the truth and is exact.<br><br>
+        · Product's real share is 1.3%. The floor lifts it to 2.5% so it stays a visible arc rather
+        than a hairline — <code>MINIMUM_SPEND_SLICE_SHARE</code> earning its keep, which the
+        roadmap noted it barely did at two accounts. <b>The legend still prints 1%</b>: the floor is
+        a drawing rule, never a number.<br><br>
+        · <b>No severity anywhere.</b> An account at its own cap still draws in its accent tint. The
+        ring's one channel is share; the warning ladder lives on the per-account card, which is the
+        only place a cap exists.
+      </p>
+    </div>
+  </div>
+</div>
+
+<h3>The slice floor, worked</h3>
+<table class="spec">
+  <tr><th>Account</th><th>Spend</th><th>True share</th><th>Drawn share</th><th>Arc</th></tr>
+  <tr><td>Work</td><td class="n">$86.10</td><td class="n">87.411%</td><td class="n">85.226%</td><td class="n">306.8°</td></tr>
+  <tr><td>Personal</td><td class="n">$12.40</td><td class="n">12.589%</td><td class="n">12.274%</td><td class="n">44.2°</td></tr>
+  <tr><td>Product</td><td class="n">$1.28</td><td class="n">1.300%</td><td class="n">2.500% ← floored</td><td class="n">9.0°</td></tr>
+  <tr><td><b>Total</b></td><td class="n"><b>$99.78</b></td><td class="n">100%</td><td class="n">100%</td><td class="n">360.0°</td></tr>
+</table>
+<p class="sub">
+  Rule: any slice under 2.5% is pinned at 2.5%; the remainder is redistributed among the rest in
+  proportion. Pure math in <code>SpendShare.kt</code>, unit-tested — including the degenerate case
+  where <i>every</i> slice is under the floor (5+ accounts of equal tiny spend), where the floor
+  must yield rather than sum past 360°.
+</p>
+
+<h3>Two-pane (Fold 7 inner, ≥ 600 dp)</h3>
+<div class="board lt">
+  <p class="boardcap">Light · 760 dp · ring left, legend right</p>
+  <div class="phone lt wide">
+    <div class="appbar"><span class="ic">&#8592;</span><span class="t">Total spend</span></div>
+    <div class="body">
+      <div class="mcard" style="display:flex;gap:32px;align-items:center;padding:24px">
+        <div class="ringwrap" style="width:200px;height:200px;flex:0 0 auto">
+          <svg width="200" height="200" viewBox="0 0 200 200">
+            <g transform="rotate(-90 100 100)" fill="none" stroke-linecap="butt">
+              <circle cx="100" cy="100" r="80" stroke="rgba(0,0,0,.09)" stroke-width="24"/>
+              <circle cx="100" cy="100" r="80" stroke="#D97757" stroke-width="24"
+                      stroke-dasharray="425.4 502.7" stroke-dashoffset="0"/>
+              <circle cx="100" cy="100" r="80" stroke="rgba(217,119,87,.62)" stroke-width="24"
+                      stroke-dasharray="58.7 502.7" stroke-dashoffset="-428.4"/>
+              <circle cx="100" cy="100" r="80" stroke="rgba(217,119,87,.34)" stroke-width="24"
+                      stroke-dasharray="9.6 502.7" stroke-dashoffset="-490.1"/>
+            </g>
+          </svg>
+          <div class="ringmid">
+            <div class="big">$99.78</div>
+            <div class="sub2">across 3 accounts</div>
+          </div>
+        </div>
+        <div style="flex:1">
+          <div class="leg" style="margin-top:0">
+            <div class="lr"><span class="sw" style="background:#D97757"></span>
+              <span class="nm2">Work</span><span class="mny">$86.10</span><span class="shr">86%</span></div>
+            <div class="lr"><span class="sw" style="background:rgba(217,119,87,.62)"></span>
+              <span class="nm2">Personal</span><span class="mny">$12.40</span><span class="shr">12%</span></div>
+            <div class="lr"><span class="sw" style="background:rgba(217,119,87,.34)"></span>
+              <span class="nm2">Product</span><span class="mny">$1.28</span><span class="shr">1%</span></div>
+          </div>
+          <div class="foot">Updated 4m ago · oldest account 11m ago</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="cap2">
+    <b>Width buys no new information here — only the absence of a scroll.</b> Rev A gave the wide
+    legend a <code>used / limit</code> column; spent-only removes it, and there is nothing else the
+    extra 360 dp could honestly add. Stated plainly rather than padded, because inventing a reason
+    to fill a wide layout is exactly what CCRM-20 (Wide Chart) rejected.
+  </p>
+</div>
+
+<h2>4 · Slice colour</h2>
+<p class="sub">
+  No per-account colour exists anywhere in the app, and inventing four hues would break the
+  single-accent grammar CCRM-3 (Unified Theming) enforces. Proposal: <b>the theme accent at four
+  descending strengths</b>, assigned by descending spend — 100%, 62%, 34%, 20% alpha — with a
+  fifth-and-beyond slice at 20% and distinguished only by the legend.
+</p>
+<div class="flag">
+  <b>The known weakness.</b> At four slices the 34% and 20% tints are close, and on the Amber theme
+  they are close <i>and</i> pale — the same thinness that CCBG-15 (Amber Ladder Blindness) records.
+  The mitigation is that the ring is a <b>share</b>, not a value to read off: the legend carries
+  every number, and the swatch only has to tie a row to an arc. Q4 offers the alternative.
+</div>
+
+<h2>5 · States</h2>
+<p class="sub">
+  The happy path is the least interesting part. These are the cases the surface has to survive —
+  and per the working agreement, they are the reason the wireframe exists at all. Rev B has six,
+  down from eight: <s>some accounts uncapped</s> and <s>at the combined cap</s> cannot occur once
+  nothing is measured against a cap.
+</p>
+
+<div class="board dk">
+  <p class="boardcap">Dark · the honest-refusal states, at thumbnail size</p>
+  <div class="row">
+    <div class="st">
+      <div class="thumb" style="background:conic-gradient(#E59980 0 100%)"></div>
+      <div class="tl">One account counted</div>
+      <div class="tx">Entry row absent — the card <i>is</i> the total. Screen unreachable. No
+        one-slice donut ever ships.</div>
+    </div>
+    <div class="st">
+      <div class="thumb" style="background:rgba(255,255,255,.10)"></div>
+      <div class="tl">Nothing spent yet</div>
+      <div class="tx">Empty track, centre reads <b>$0.00</b> / "across 3 accounts". No slices — a
+        floor must not manufacture arcs out of zero. Legend rows still listed, all $0.00.</div>
+    </div>
+    <div class="st">
+      <div class="thumb" style="background:conic-gradient(#E59980 0 100%);opacity:.35"></div>
+      <div class="tl">Two currencies</div>
+      <div class="tx">Refuses to sum. One ring per currency, stacked, each with its own centre and
+        legend. Entry row reads "Totals in 2 currencies ›" with <b>no figure</b>.</div>
+    </div>
+    <div class="st">
+      <div class="thumb" style="background:conic-gradient(#E59980 0 88%,rgba(229,153,128,.62) 88% 100%)"></div>
+      <div class="tl">An account has no data</div>
+      <div class="tx">Excluded and <b>said out loud</b>: "2 of 3 accounts counted — Product hasn't
+        been fetched". A silent under-total is the worst outcome here.</div>
+    </div>
+    <div class="st">
+      <div class="thumb" style="background:conic-gradient(#E59980 0 44%,rgba(229,153,128,.62) 44% 72%,rgba(229,153,128,.34) 72% 90%,rgba(229,153,128,.20) 90% 100%)"></div>
+      <div class="tl">Four accounts</div>
+      <div class="tx">Four tints, legend 4 × 36 dp = 144 dp. Still one screen at 400 dp with the
+        ring at 176. Five or more: the legend scrolls, tints stop at four.</div>
+    </div>
+    <div class="st">
+      <div class="thumb" style="background:conic-gradient(#E59980 0 100%);opacity:.55"></div>
+      <div class="tl">Credits hidden for an account</div>
+      <div class="tx">Excluded, and the count says "2 of 3". Precedent: <code>creditsVisible</code>
+        already gates the widget bar too, so it means "don't show me this account's money"
+        everywhere. See Q3.</div>
+    </div>
+  </div>
+</div>
+
+<h2>6 · Copy</h2>
+<table class="spec">
+  <tr><th>Slot</th><th>Text</th></tr>
+  <tr><td>Screen title</td><td>Total spend</td></tr>
+  <tr><td>Entry row</td><td class="n">Total across 3 accounts · $99.78 spent</td></tr>
+  <tr><td>Entry row, mixed currency</td><td class="n">Totals in 2 currencies</td></tr>
+  <tr><td>Ring centre</td><td class="n">$99.78 &nbsp;/&nbsp; across 3 accounts</td></tr>
+  <tr><td>Partial</td><td class="n">2 of 3 accounts counted — Product hasn't been fetched</td></tr>
+  <tr><td>Freshness</td><td class="n">Updated 4m ago · oldest account 11m ago</td></tr>
+</table>
+<p class="sub">
+  Six strings, down from eleven — the whole "left / cap / uncapped" family is gone. The freshness
+  line is not decoration: a combined total is a <b>sum of snapshots of different ages</b>, which no
+  existing surface has to admit, because every other surface shows one account. Naming the oldest
+  is the cheapest honest disclosure; the second clause drops when every account is within a minute
+  of the newest.
+</p>
+
+<h2>7 · Where the code goes</h2>
+<table class="spec">
+  <tr><th>File</th><th>Holds</th></tr>
+  <tr><td class="n">data/SpendShare.kt</td><td>Pure math: group by currency, drop non-counted
+    accounts, sum <code>usedMinor</code>, shares with the 2.5% floor. <b>No cap and no remainder
+    arithmetic</b> — it never touches <code>limitMinor</code> or
+    <code>bindingRemainingMinor</code>, which is what makes it immune to CCBG-6. No Android.</td></tr>
+  <tr><td class="n">test/SpendShareTest.kt</td><td>The six states above, the floor arithmetic, the
+    all-under-floor degenerate case, and mixed-exponent currencies.</td></tr>
+  <tr><td class="n">ui/ShareRingGeometry.kt</td><td>Shares → sweep angles + gaps, in the shape
+    <code>RingGeometry</code> already uses.</td></tr>
+  <tr><td class="n">TotalSpendScreen.kt</td><td>Compose, both width classes.</td></tr>
+  <tr><td class="n">MainActivity.kt</td><td><code>Screen.TOTAL</code>, the entry row on the credits
+    card, the app-bar title.</td></tr>
+</table>
+<div class="flag">
+  <b>The roadmap's extraction note is stale.</b> CCRM-31 says it "shares the ring drawing with
+  CCRM-3 phase 3 and CCRM-13 — whichever lands first owns the Canvas-to-bitmap extraction".
+  CCRM-39 (Ring Widget) already landed that: <code>ui/RingRenderer.kt</code> is the shared bitmap
+  ring. But a <b>multi-slice donut is different geometry</b>, not a parameter of a single-value
+  ring, and this one is drawn in Compose on a live screen rather than rasterised for Glance. So
+  CCRM-31 <b>reuses RingRenderer's stroke and gap conventions and adds its own geometry</b>; it
+  does not inherit or owe the extraction. The roadmap line needs correcting when this is built.
+</div>
+<p class="sub">
+  <b>Not in scope, deliberately:</b> no widget face, no notification line, no tile — a reflective
+  monthly reading has no business on a glanceable surface, and CCRM-24 (Share Card) is where an
+  exportable version would belong if ever. Alerts are untouched.
+</p>
+
+<h2>8 · Questions</h2>
+
+<div class="q" style="border-left-color:var(--good)">
+  <p class="qn" style="color:var(--good)">Q1 — answered 2026-08-27</p>
+  <b>Does the missing credit balance block this?</b> <b>No — it removes half the feature instead.</b>
+  <code>spend.used</code> is available and real; <code>spend.balance</code> is not. So the combined
+  percentage and the combined "left" line are gone, and what remains needs nothing the API doesn't
+  give us. Rev B above.
+</div>
+
+<div class="q" style="border-left-color:var(--good)">
+  <p class="qn" style="color:var(--good)">Q1b — answered 2026-08-27</p>
+  <b>Should the combined monthly cap appear anywhere?</b> <b>Not at all — spent-only.</b> Per-account
+  caps stay on each profile's credits card, where they are scoped to the account that set them and
+  cannot be misread as a combined ceiling.
+</div>
+
+<div class="q">
+  <p class="qn">Q2 — open</p>
+  <b>Entry row on the credits card, or a third app-bar icon?</b> The row costs no icon slot and puts
+  the answer where the question is, but it is only discoverable by someone who has credits and
+  scrolls to the card. A third icon next to History and Settings is discoverable but permanent, and
+  meaningless for anyone with no credit budget. <span class="rec">Recommend: the row.</span>
+</div>
+
+<div class="q">
+  <p class="qn">Q3 — open</p>
+  <b>Does an account with credits switched off count into the total?</b> Precedent says no — the
+  toggle already suppresses the widget bar, so it reads as "not this account's money, anywhere" —
+  and the count line would say "2 of 3". The counter-argument is that a thing called <i>total</i>
+  should be total. <span class="rec">Recommend: exclude, and say so in the count.</span>
+</div>
+
+<div class="q">
+  <p class="qn">Q4 — open</p>
+  <b>Accent tints for slices, or four distinct hues?</b> Tints keep one accent and work on all
+  twelve themes; four hues are unambiguous at a glance but introduce a second colour system and
+  will collide with some accents. <span class="rec">Recommend: tints</span> — the legend carries
+  every number, so the swatch only has to tie a row to an arc.
+</div>
+
+<div class="q">
+  <p class="qn">Q5 — open</p>
+  <b>Descending by spend, or fixed by account slot?</b> Descending puts the biggest payer at 12
+  o'clock and answers the question fastest; fixed by slot means a slice keeps its colour and
+  position between visits, so a change in the ring means a change in spending rather than a
+  reshuffle. <span class="rec">Recommend: descending</span>, since this is a screen you visit
+  occasionally, not one you watch.
+</div>
+
+<div class="nb">
+  <b>Nothing gets built until Q2–Q5 are answered.</b> Per working agreement 2, silence is not
+  approval — and if an answer is "change X", the revised wireframe comes before any code.
+</div>
+
+</div>

@@ -10,6 +10,542 @@ in priority order.** Bugs live in [BUGS.md](BUGS.md) (`CCBG-N`), not here.
 
 ---
 
+## Multi-provider — Claude + ChatGPT + Gemini (Antigravity) · **the next thing we build**
+
+**Decided 2026-09-06: the "Claude usage only" scope line is retired.** The app tracks the
+5-hour / 7-day usage windows of **three** services — Claude, ChatGPT and Google's Antigravity
+(the Gemini subscription) — and nothing else. Not "any AI provider": three named ones, each
+with its own colour and its own mark. The 2026-08-04 appendix ruled multi-provider out because
+everything enviable in OpenQuota read the developer's own machine. That is still true of *most*
+of OpenQuota, but a fresh crawl of its source and of the official CLIs (four sub-agent reports,
+kept in `design/research/2026-09-06-*.md`, summarised in the appendix addendum) found that the
+two things we actually need — a usage endpoint and a way to mint a token — are plain HTTPS for
+ChatGPT, and half-way there for Antigravity. Nothing below reads a local file or a local
+process.
+
+**The shape, in one sentence:** CCRM-6 (Multi-Account) already made *the account* the unit
+every surface loops over — tabs, widgets, tiles, alerts, history, shortcuts — so a ChatGPT
+account is **just another profile with a different fetcher**, and a provider is a **field on
+`Profile`**, not a new axis on any screen. The user picks Claude / ChatGPT / Gemini when adding
+an account and signs into that one; everything downstream already works per account.
+
+**Review 2026-09-06 — every question answered, recorded here and in the wireframe:**
+1. **Provider colour is the account's default accent, overridable per account** the way the
+   theme picker works today (the picker is global today; per-account is new — see CCRM-56 (Provider Identity)).
+2. **Name: Cooldown.** Package, namespace and repo stay `com.robin.claudeusage` / `CCooldown`.
+3. **Icon: the hourglass with three sands**, all three colours now (not two-then-three), the
+   colours made more obvious; Antigravity is greyed in the Add-account sheet as "coming".
+4. **Official provider logos, not dots**, identify the service on every surface — the user's
+   explicit call, overriding the trademark caution in rev A. Colour is for bars and theme.
+5. **Antigravity greyed in Add account** until CCRM-55 (Antigravity Account) unblocks.
+6. **Repo not renamed.** And a new rule: **a window the account does not have is not shown at
+   all** — no placeholder card, no dash, on any surface.
+7. **Pace ticks are neutral ink on faces that show more than one account**, resolving the
+   Gemini-blue / ChatGPT-green partner clash. Confirmed on rev B.
+
+**Rev B confirmed 2026-09-06** (B1–B3 in the wireframe): logos approved **larger** — 20 dp on
+cards and tabs, 14 dp in chips and on the pinned label line, 28 dp in the Add-account sheet;
+the per-account accent override and the "Per provider" swatch as drawn; absent windows hidden
+everywhere and ink ticks on multi-account faces. **Nothing in this arc is waiting on a design
+decision.** The step-by-step execution order lives in [RUNBOOK.md](RUNBOOK.md).
+
+**Build order for fresh sessions** (each item below is written so a fresh Opus or Sonnet
+session can build it from the text plus the wireframe, without this conversation):
+
+| Session | Item | Model | Needs Robin? |
+|---|---|---|---|
+| 1 | CCRM-53 (Provider Model) — pure logic, tests | Sonnet | No |
+| 2 | CCRM-54 (ChatGPT Account) part 1 — source, device flow, **payload capture** | Opus | Yes: one sign-in on the phone, own ChatGPT account |
+| 3 | CCRM-56 (Provider Identity) — rename, icon, marks, per-account accent, Add-account sheet, hidden windows | Sonnet | Wireframe rev B confirmed first |
+| 4 | CCRM-54 part 2 — the ChatGPT account on every surface + CCRM-57 (Provider Plumbing) | Sonnet | Device pass |
+| any | CCRM-55 (Antigravity Account) **spike** — terminal on the Mac | any | Yes: Antigravity signed in on the Mac |
+| — | Release v1.5: README, guide, brochure (per [RELEASING.md](RELEASING.md)) | — | — |
+
+Sessions 1 and 3 can run in parallel; 2 depends on 1; 4 depends on 1–3.
+
+### CCRM-53 · Provider Model — an account carries which service it tracks
+- **Status:** Planned · medium · pure logic, **no wireframe needed** · filed 2026-09-06 ·
+  **build first**
+- **Why:** [Profile.kt](app/src/main/java/com/robin/claudeusage/data/Profile.kt) is
+  `(key, slot, label)`; [ApiClient.kt](app/src/main/java/com/robin/claudeusage/data/ApiClient.kt),
+  [OAuthSignIn.kt](app/src/main/java/com/robin/claudeusage/data/OAuthSignIn.kt) and
+  `UsageParser` in [Models.kt](app/src/main/java/com/robin/claudeusage/data/Models.kt) are
+  Anthropic to the byte. Everything *above* them — the registry, the per-key stores, the
+  `configuredProfiles()` loops on every surface — is already provider-agnostic without knowing
+  it. This item adds the field and the seam; it changes no behaviour for a Claude account.
+- **Build — the enum.** New `data/Provider.kt`:
+  ```kotlin
+  enum class Provider(val key: String, val displayName: String, val vendor: String, val themeName: String) {
+      CLAUDE("claude", "Claude", "Anthropic", "Claude Orange"),
+      CHATGPT("chatgpt", "ChatGPT", "OpenAI", "ChatGPT Green"),
+      ANTIGRAVITY("antigravity", "Gemini", "Google", "Gemini Blue");
+      companion object { fun fromKey(key: String?): Provider = entries.firstOrNull { it.key == key } ?: CLAUDE }
+  }
+  ```
+  `themeName` names a `Palette.options` entry; the two new entries are added in CCRM-56
+  (Provider Identity), so until then `Palette.byName` falls back to the first option, which
+  is harmless. `vendor` is for error copy ("Couldn't reach OpenAI").
+- **Build — the field.** `Profile` gains `val provider: Provider = Provider.CLAUDE` as a
+  fourth constructor parameter. **Equality and `hashCode` stay key-only** — a provider is as
+  immutable as a key, but the rule that identity is the key must not be diluted. The registry
+  persists it as `"v": provider.key` in `ProfileRegistry.encode`, and `decode` reads
+  `Provider.fromKey(o.optString("v"))` — **absent → `CLAUDE`**, so every existing install and
+  both seeded slots read unchanged with no migration. `ProfileRegistry.add(label, provider)`
+  and the pure `Companion.add(state, label, provider)` take the provider; `seed` stays
+  Claude-only. `UsageRepository.addProfile(label, provider)` passes it through.
+- **Build — the seam.** New package `data/source/`:
+  ```kotlin
+  /** Everything a poll needs that differs per provider. Sign-in does NOT live here — the two
+   *  flows have different shapes (browser + pasted code vs device code) and different UI. */
+  interface UsageSource {
+      val provider: Provider
+      /** GET the usage payload with this provider's headers. */
+      fun fetchUsage(creds: Credentials): HttpResult
+      /** Redeem the refresh token. */
+      fun refresh(creds: Credentials): HttpResult
+      /** Token endpoint body → the new credentials plus what rides along (plan, account id). */
+      fun parseTokenResponse(body: String, previous: Credentials?): TokenGrant?
+      /** Usage body → the shared model. Null only when nothing usable is present. */
+      fun parseUsage(body: String): UsageData?
+      /** Which HTTP statuses mean "the token is dead", as opposed to "their server is down". */
+      fun isAuthFailure(status: Int): Boolean
+  }
+  data class TokenGrant(val creds: Credentials, val plan: String?, val tier: String?)
+  object Sources { fun of(provider: Provider): UsageSource }
+  ```
+  `ClaudeSource` **wraps the existing code untouched**: `fetchUsage` → `ApiClient.fetchUsage`,
+  `refresh` → `ApiClient.refreshToken`, `parseUsage` → `UsageParser.parse`, `isAuthFailure`
+  → `status == 401`, `parseTokenResponse` → the exact block `refreshAccessToken` runs today
+  (rotated refresh token kept if present, `expires_in` → `expiresAt`). The authorize-URL
+  encoding and the two-opposite-User-Agents rule are the most empirically fragile lines we
+  own and are **not** generalised; `ApiClient` keeps every function it has. `Sources.of` for
+  `CHATGPT` throws `NotImplementedError` until CCRM-54 (ChatGPT Account) lands; for
+  `ANTIGRAVITY` until CCRM-55 (Antigravity Account).
+- **Build — the repository.** In `UsageRepository`, `doFetch` and `refreshAccessToken` resolve
+  `val source = Sources.of(profile.provider)` once and replace the three direct calls:
+  `ApiClient.fetchUsage(token)` → `source.fetchUsage(creds.copy(accessToken = token))`;
+  `UsageParser.parse(resp.body)` → `source.parseUsage(resp.body)`; the refresh block →
+  `source.refresh(creds)` then `source.parseTokenResponse(body, creds)`. The `401` tests become
+  `source.isAuthFailure(resp.code)`. The gates, backoff, `saveSuccess`/`saveFailure`,
+  `historyStore.record` and alerts are untouched — they never knew the provider.
+- **Build — credentials.** `Credentials` gains `val accountId: String? = null` (ChatGPT sends
+  it back as a header; Claude never has one). `CredentialStore.load/save/clear` add the
+  `k(profile, "accountId")` entry. Nothing else in the store changes; the Claude paste path
+  (`parsePasted`) is Claude-only and stays where it is.
+- **Build — the window classifier.** Lesson from OpenQuota's `codex/mapper.rs`: classify a
+  window by **its duration**, never by which JSON slot it arrived in. New pure helper in
+  `Models.kt`:
+  ```kotlin
+  enum class WindowKind { SESSION, WEEKLY, OTHER }
+  fun classifyWindow(lengthSeconds: Long?): WindowKind = when (lengthSeconds) {
+      18_000L -> WindowKind.SESSION; 604_800L -> WindowKind.WEEKLY; null -> WindowKind.OTHER; else -> WindowKind.OTHER
+  }
+  ```
+  A weekly-only account puts its weekly limit in `primary_window`; and OpenAI suspended the
+  5-hour limit for Plus / Pro / Business on 2026-07-12, so `session` may simply be **absent**.
+  A parser must then return a valid `UsageData(session = null, …)`, never a null payload.
+- **Build — credits.** `SpendCredits` is money-in-minor-units against a monthly cap. ChatGPT's
+  `credits` is `{has_credits, unlimited, balance}` — a balance with no cap and an explicit
+  "unlimited". Two small widenings: `val unlimited: Boolean = false`, and `isReportable`
+  becomes `!unlimited && (hasLimit || usedMinor > 0L || (balanceMinor ?: 0L) > 0L)`.
+  An unlimited account has nothing to measure and, by review decision 6, shows nothing.
+- **Build — logging.** `AppLog` lines read `[poll][p2] manual → OK`. Non-Claude accounts log
+  `[poll][chatgpt:p3]` — prefix the key with `provider.key` **only when `provider != CLAUDE`**,
+  so every existing log line stays byte-identical.
+- **Not built here, deliberately:** `UsageData` stays `session / weekly / modelCaps / credits`.
+  ChatGPT maps onto it 1:1 (CCRM-54 (ChatGPT Account)). Antigravity's *second* pool has its own 5-hour window,
+  which this shape cannot hold; the `lanes` generalisation waits for CCRM-55 (Antigravity
+  Account) to unblock rather than being built speculatively.
+- **Tests** (`app/src/test/…`): `ProfileRegistryTest` — round-trip with `v`, absent `v` →
+  `CLAUDE`, unknown `v` → `CLAUDE`, `add` with a provider; `WindowKindTest` — the two
+  constants, null, and 3600; `SpendCreditsTest` (new or in `UsageParserTest`) — unlimited
+  hides, a positive balance alone reports, the existing cap/used rules unchanged;
+  `ClaudeSourceTest` — `parseTokenResponse` keeps the old refresh token when none is
+  rotated, and `isAuthFailure(403) == false`. Every existing test passes unchanged.
+- **Acceptance:** `./gradlew testDebugUnitTest` green; a release build installed over the
+  live install fetches all three Claude accounts with identical `[poll]` lines; the
+  `profiles` prefs file carries `"v":"claude"` on every entry after the first write.
+- **Contract is `layer:core`.** The Mac repo's `API-CONTRACT.md` and `fixtures/` gain a
+  provider dimension and a captured ChatGPT payload once CCRM-54 (ChatGPT Account) has one. Android leads and
+  is the reference implementation, as CCRM-8 (Mac Menu-Bar) established.
+- **Interacts with:** CCRM-17 (Window Pings) — Claude-only and ToS-disabled, stays behind
+  `provider == CLAUDE`; `ApiClient.ProbeHost` — grows one origin per provider in CCRM-54 (ChatGPT
+  Account) and CCRM-55 (Antigravity Account),
+  the GET-only rule holds; CCRM-38 (Plan Tier) — `Fmt.tierMultiplier` is Claude's `default_5x`
+  grammar and must not run on `plan_type: "pro"` (gated in CCRM-57 (Provider Plumbing)).
+
+### CCRM-54 · ChatGPT Account — Codex device-code sign-in and the two windows
+- **Status:** Planned · medium · part 1 (source + capture) after CCRM-53 (Provider Model);
+  part 2 (surfaces) after the CCRM-56 (Provider Identity) wireframe · filed 2026-09-06
+- **Verified in `openai/codex` source, 2026-09-06** (`codex-rs/login/src/device_code_auth.rs`,
+  `codex-rs/backend-client/src/client/rate_limit_resets.rs`, `codex-rs/login/src/auth/manager.rs`,
+  `codex-rs/login/src/token_data.rs`; full notes in `design/research/2026-09-06-phone-feasibility.md`):
+  - **Sign-in is a device-code flow.** `POST https://auth.openai.com/api/accounts/deviceauth/usercode`
+    with JSON `{"client_id": "app_EMoamEEZ73f0CkXaXp7hrann"}` → `{device_auth_id, user_code,
+    interval}`; show the user `https://auth.openai.com/codex/device` and the code (15-minute
+    expiry); poll `POST …/api/accounts/deviceauth/token` with `{device_auth_id, user_code}`
+    every `interval` seconds until it returns `{authorization_code, code_verifier}` — **the
+    server hands back the PKCE verifier**; exchange at `POST https://auth.openai.com/oauth/token`
+    (form-encoded) `grant_type=authorization_code&code=…&redirect_uri=https://auth.openai.com/deviceauth/callback&client_id=…&code_verifier=…`
+    → `{id_token, access_token, refresh_token}`. **No localhost, no app link, no pasted
+    secret**, completable on a different device. The client id is the Codex CLI's own.
+  - **Usage** is `GET https://chatgpt.com/backend-api/wham/usage` with `Authorization: Bearer`,
+    `ChatGPT-Account-Id: <id>` when known, `Accept: application/json`. Response: `plan_type`,
+    `rate_limit.{primary_window,secondary_window}.{used_percent, reset_at, limit_window_seconds}`
+    (`reset_at` is epoch **seconds**; some builds send `reset_after_seconds` instead),
+    `credits.{has_credits, unlimited, balance}`, `additional_rate_limits[]` (each
+    `{limit_name, rate_limit{…}}`, e.g. Spark), `rate_limit_reached_type`. Generated from an
+    OpenAPI spec in that repo — changes are additive and diffable.
+  - **Refresh** at the same token endpoint, `grant_type=refresh_token`, `client_id`,
+    `refresh_token`. The CLI refreshes 5 minutes before the JWT `exp` and proactively at 8
+    days. Failure bodies name `refresh_token_expired` / `refresh_token_reused` /
+    `refresh_token_invalidated`. **`refresh_token_reused` is a rotation trap**: never import a
+    desktop `auth.json` — the phone mints its own family, as it does for Claude.
+  - **Plan and account id come free** from the `id_token` JWT claims under
+    `https://api.openai.com/auth` (`chatgpt_plan_type`, `chatgpt_account_id`), no signature
+    check needed for our purpose. `PlanType` is `free, go, plus, pro, prolite, team,
+    business, enterprise, edu…` with a serde `other` — render unknown tiers title-cased.
+- **Build — part 1, the source** (`data/source/ChatGptSource.kt`), constants first:
+  `CLIENT_ID`, `ISSUER = "https://auth.openai.com"`, `TOKEN_URL = "$ISSUER/oauth/token"`,
+  `USAGE_URL = "https://chatgpt.com/backend-api/wham/usage"`, `USER_AGENT =
+  "Cooldown/${BuildConfig.VERSION_NAME} (Android)"` — **honest, ours**. OpenQuota sends its
+  own UA and is served; no UA gate is reported, unlike Anthropic's. `fetchUsage` sends the
+  three headers above and the UA. `refresh` posts the refresh grant — **check the encoding
+  against `manager.rs` at build time**: OpenQuota sends `application/x-www-form-urlencoded`
+  and is served; if the CLI sends JSON, match the CLI. `parseTokenResponse` reads
+  `access_token`, `refresh_token` (keep the previous one if absent), `expires_in` or, absent
+  that, the access token's JWT `exp`; decodes `id_token` for `chatgpt_plan_type` → `plan`
+  and `chatgpt_account_id` → `Credentials.accountId`; `tier = null` always.
+  `isAuthFailure` → `status == 401 || status == 403` (OpenQuota maps both to token-expired
+  before reading the body).
+- **Build — part 1, the parser** (`ChatGptUsageParser` in the same file, pure, tested):
+  - Collect `rate_limit.primary_window` and `secondary_window`, skipping nulls. For each,
+    `classifyWindow(limit_window_seconds)`: `SESSION` → `session`, `WEEKLY` → `weekly`,
+    `OTHER` → dropped with a debug log line. If `limit_window_seconds` is absent on both,
+    fall back to positional (primary → session, secondary → weekly). `percent =
+    used_percent`; `resetsAt = Instant.ofEpochSecond(reset_at)`, else `now + reset_after_seconds`,
+    else null; `serverSeverity = null`.
+  - `additional_rate_limits[]`: take each entry's **weekly** (`604800`) window as a
+    `ModelCap(limit_name.title-cased, window)`. A 5-hour additional window is dropped in this
+    item — `ModelCap` is weekly by contract (alerts drift it on the 7-day clock, `windowRows`
+    gives it `WEEKLY_MS`); recorded, not solved.
+  - `credits`: `SpendCredits(usedMinor = 0, limitMinor = null, exponent = 2, currency = "USD",
+    serverSeverity = null, balanceMinor = round(balance × 100), unlimited = unlimited)` when
+    `has_credits`; null otherwise. Hidden by `isReportable` when unlimited or zero.
+  - `plan_type` → returned alongside (the live value beats the id_token's; store via
+    `cache.setTokenMeta(profile, 0L, plan, null)` after a successful fetch).
+  - Return null only when no window, no cap and no credits parsed.
+  - Not read, deliberately: the `x-codex-*-used-percent` header fallbacks (OpenQuota-only
+    resilience for a shape change we have not seen) and `rate_limit_reached_type` (no field
+    in `UsageData` yet; revisit if the payload shows it set).
+- **Build — part 1, the device flow** (`data/CodexDeviceSignIn.kt`):
+  ```kotlin
+  object CodexDeviceSignIn {
+      data class Started(val deviceAuthId: String, val userCode: String, val intervalSec: Int,
+                         val verifyUrl: String, val expiresAtMs: Long, val profileKey: String)
+      sealed class Poll { object Pending : Poll(); object Expired : Poll(); object Denied : Poll()
+                          data class Granted(val authorizationCode: String, val codeVerifier: String) : Poll() }
+      class Unavailable : Exception()  // HTTP 404 from /usercode — OpenAI has the flow switched off
+      fun start(profile: Profile): Started          // POST usercode; persists Started to prefs "device_pending"
+      fun pending(context): Started?                 // survives process death like OAuthSignIn.pending
+      fun poll(started: Started): Poll               // POST token; map statuses exactly as device_code_auth.rs does
+      fun exchange(granted: Poll.Granted): HttpResult // POST /oauth/token authorization_code, device redirect_uri
+      fun clearPending(context)
+  }
+  ```
+  Which poll statuses mean pending vs denied is read off `device_code_auth.rs` (the
+  `poll_for_device_token` loop) at build time and pinned by a unit test. The poll loop runs in
+  a `viewModelScope`-style coroutine while the sheet is open, resumes on return to the
+  foreground, and gives up at `expiresAtMs`; no WorkManager — 15 minutes does not justify it.
+  `UsageRepository.completeDeviceSignIn(profile, granted)` mirrors `completeSignIn`: parse
+  the grant via `ChatGptSource.parseTokenResponse`, `credStore.save(stampAdded = true)`,
+  `setAuthState(OK)`, `setTokenMeta(profile, 0L, plan, null)`, `setRefreshExpiryEstimated(false)`,
+  `setNativeSignIn(true)`, then `doFetch(ignoreGates = true)`. **`refreshExpiresAt` stays 0**:
+  OpenAI's family has no fixed life we know, so the card shows no "expires around" line
+  (CCRM-16 (Sign-in Expiry Accuracy) rule: no estimate is better than a wrong one).
+- **Build — part 1, the capture.** Before any UI polish: a debug-section button "Capture
+  ChatGPT payload" on a ChatGPT card, which runs `fetchUsage` and writes the raw body to the
+  diagnostics log at DEBUG (the body has no tokens; `plan_type` and percentages only). Robin
+  signs in once on his own account; the body becomes
+  `app/src/test/resources/chatgpt-usage-2026-09.json` and replaces the synthetic fixture. If
+  `/usercode` returns 404 for this client, stop and file it — the fallback (below) moves up.
+- **Build — part 2, the surfaces** (all per the CCRM-56 (Provider Identity) wireframe, rev B):
+  - **Add account → ChatGPT** opens the **device-code sheet**: the URL, the code in a
+    monospace 30 sp line, "Copy code", "Open in browser" (Custom Tab, same picker as Claude),
+    a countdown from `expiresAtMs`, and a "Waiting for you to finish…" line. States:
+    *waiting*, *expired* (button "Get a new code"), *denied*, *unavailable* (copy names the
+    browser fallback), *done* (sheet closes, the new tab appears). Process death mid-flow
+    reopens the sheet from `pending()`.
+  - **Account card** for a ChatGPT profile: provider mark before the label, `StatusChip` as
+    today, `PlanChip(plan, tier = null)` → "Plus" / "Pro" / "Team" title-cased, **no
+    multiplier**, no "expires around" line, buttons **Sign in with a code** / **Refresh** /
+    **Clear**; the Claude-only *Backup method*, paste and QR paths are not rendered.
+  - **Main screen tab**: the 5-hour card and the 7-day card each render **only when their
+    window is non-null** (decision 6 — applies to Claude too); Spark rows sit under the 7-day
+    card as model caps; the credits card shows **"$12.40 balance"** when `usedMinor == 0 &&
+    balanceMinor != null` (new copy branch), nothing when unlimited.
+  - **Widgets**: `windowRows` already skips null windows. A Ring or Bar widget configured on a
+    window the account no longer has shows one line, "No 5-hour window on this account", in
+    the face's small text; the Pace widget hides the absent side of its 5h/7d toggle.
+  - **Pinned notification**: headline = `session` if present, else `weekly`; the provider mark
+    (12 dp) sits on the label line in every style; a folded strip from another account carries
+    *that* account's mark. **Tile**: same headline fallback.
+  - **Alerts**: nothing to do — `data.session?.let` already skips a missing window.
+- **Fallback sign-in**, built only if the device endpoint 404s: the browser PKCE flow with a
+  loopback `ServerSocket` on `127.0.0.1:1455` (only 1455 / 1457 are allowlisted) inside a
+  Custom Tab — a phone can serve localhost to its own browser; it needs a
+  `network-security-config` cleartext exception for `localhost` and port-contention handling.
+- **Rules we bind ourselves to:** never send `x-openai-codex-luna-reserve` (the source
+  reserves it for clients that can *apply* Reserve, "not passive account usage readers" — that
+  is us); never call `rate-limit-reset-credits/consume` — a **write** that spends a credit;
+  `ProbeHost.CHATGPT("https://chatgpt.com")` joins the GET-only allowlist; poll at the existing
+  cadence; log status codes only, never tokens, headers or bodies (the capture button is the
+  one DEBUG-level exception, body only).
+- **Multi-account for free:** every ChatGPT login is a profile. OpenQuota cannot show two
+  ChatGPT accounts at all; we get it from CCRM-6 (Multi-Account) without a line of new code.
+- **Tests:** `ChatGptUsageParserTest` — the fixture (synthetic from the documented shape
+  until the capture replaces it): both windows classified by duration; weekly-alone-in-primary;
+  absent `primary_window` → `session == null` and a non-null payload; epoch-seconds and
+  `reset_after_seconds`; Spark weekly → `ModelCap("Spark")`, Spark 5-hour dropped;
+  `credits.unlimited` → `isReportable == false`; `balance 12.4` → `balanceMinor 1240`;
+  junk → null. `CodexDeviceSignInTest` — JWT payload decode (a hand-built unsigned token),
+  poll-status mapping, `Unavailable` on 404. `ChatGptSourceTest` — `isAuthFailure(403)`,
+  refresh keeps the old refresh token when none is returned, `expires_in` absent → `exp`.
+- **Device pass (Fold 7, cover screen, Huge number style):** device-code sheet in all five
+  states; the new tab with real numbers; the absent-5-hour case if the plan has it lifted;
+  a Ring widget on the absent window; the pinned panel showing the ChatGPT account with a
+  Claude strip folded in; Quick Settings tile on the ChatGPT slot; re-sign-in after a forced
+  `Clear`; `[poll][chatgpt:pN]` lines in the log with no token material.
+- **Disclosure:** the README risk box grows an OpenAI paragraph — same posture as the
+  Anthropic one (our own token, the official CLI's client id, an internal endpoint, read-only,
+  honest User-Agent), same honesty. Ships with the v1.5 docs.
+
+### CCRM-55 · Antigravity Account — Gemini windows, spike before design
+- **Status:** Needs design · **Blocked on a spike** · large · filed 2026-09-06 · after
+  CCRM-54 (ChatGPT Account) · shown greyed in Add account meanwhile (review decision 5)
+- **What the data is** (OpenQuota `providers/antigravity/*`, corroborated by CodexBar and
+  OpenUsage docs; `design/research/2026-09-06-openquota-antigravity.md`):
+  `POST https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary` with
+  `Authorization: Bearer`, `User-Agent: antigravity`, body
+  `{"metadata":{"ideName":"antigravity","extensionName":"antigravity","ideVersion":"unknown","locale":"en"}}`
+  returns `response.groups[].buckets[]` with four `bucketId`s — `gemini-5h`, `gemini-weekly`,
+  `3p-5h`, `3p-weekly` — each with `remainingFraction` (0–1, **remaining**, so
+  `used = (1 − f) × 100`) and `resetTime` (ISO-8601). Two shared pools × two windows: the
+  Gemini pool (Pro and Flash draw from one quota) and the "Claude + GPT via Antigravity" pool.
+  Fallbacks `fetchAvailableModels` / `retrieveUserQuota` (per model, 5-hour only, pooled by
+  **worst** remaining fraction) and `loadCodeAssist` for the plan (**Ultra / Pro / Free**).
+  Google returns **no absolute numbers**, only fractions, and the signal is reported to move
+  in ~20 % steps. Token refresh is a form POST to `https://oauth2.googleapis.com/token` with
+  the installed-app client id **and secret** (`1071006060591-…apps.googleusercontent.com` /
+  `GOCSPX-…`, both public by design, both lifted from Google's binary).
+- **Why it is not "Planned": two blockers of different kinds.**
+  1. **Auth (hard).** Antigravity's Google OAuth client redirects to
+     `http://localhost:51121/oauth-callback`, has **no code-paste page** (Google retired the
+     OOB flow), and is a client we do not own. Google has been rejecting that very redirect
+     since January 2026 ("doesn't comply with Google's OAuth 2.0 policy" — `localhost`
+     hostname rather than the `127.0.0.1` literal), and we cannot fix a registration we do
+     not control.
+  2. **Data (soft).** CodexBar, which runs both the local and the remote path, reports that a
+     token minted *outside* an Antigravity session can get an availability-shaped payload —
+     every bucket at 100 % — rather than live quota, and that weekly grouping is unreliable
+     remotely. Unproven either way from a phone.
+- **The spike — a terminal on the Mac, no app code, do it whenever the Mac is free:**
+  1. Sign into Antigravity on the Mac. Read its refresh token:
+     `security find-generic-password -s gemini -a antigravity -w` (decode a
+     `go-keyring-base64:` prefix if present; the JSON's `refresh_token` field).
+  2. Quit Antigravity and `agy`. Refresh from a plain client:
+     `curl -s https://oauth2.googleapis.com/token -d client_id=… -d client_secret=… -d grant_type=refresh_token -d refresh_token=…`.
+  3. `curl -s -X POST https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary -H "Authorization: Bearer …" -H "User-Agent: antigravity" -H "Content-Type: application/json" -d '{"metadata":{"ideName":"antigravity","extensionName":"antigravity","ideVersion":"unknown","locale":"en"}}'`
+     with **no IDE running**. Record whether the four buckets carry real fractions or all
+     `1.0`. Repeat after a Gemini prompt to see the fraction move.
+  4. If real: repeat step 3 from the phone through a debug paste of the refresh token.
+  Save the redacted bodies in `design/research/`. The answer picks the auth route:
+  - **a. Mac relay.** CCRM-8 (Mac Menu-Bar)'s client owns Antigravity — the Mac is where
+    Antigravity lives, where the *richest* source (the local language server's
+    `RetrieveUserQuotaSummary`) is reachable, and where a loopback redirect is
+    uncontroversial — and relays a normalised snapshot to the phone. Best data, sidesteps the
+    auth blocker, but needs a phone↔Mac channel that **does not exist**; if chosen, that is
+    its own item.
+  - **b. Refresh-token paste.** Sign in on a computer once, paste the refresh token into the
+    phone; the phone refreshes forever after (Google refresh tokens for published apps do not
+    expire on a schedule). Ugly onboarding, fine steady state; the existing Claude paste path
+    is the precedent. **Best phone-only option.**
+  - **c. Loopback `127.0.0.1:51121` in a Custom Tab.** Technically the same trick as the
+    ChatGPT fallback; bets on a redirect Google is already flagging for a client we do not
+    own. One policy sweep from dying.
+  - Rejected: scraping `?code=` out of the failed page's address bar.
+- **Not Gemini CLI / Code Assist.** Google stopped serving individuals, AI Pro and AI Ultra
+  through it on **2026-06-18** (official deprecation notice) and points them at Antigravity;
+  only Code Assist Standard / Enterprise remain, which is not our audience. Its open-source
+  client is the **first-party reference for the `cloudcode-pa` protocol** and has the one
+  Google paste-page precedent (`authWithUserCode`, redirect
+  `https://codeassist.google.com/authcode`) — on a different client id. Read it; do not ship
+  it.
+- **States to wireframe when unblocked, every one new to this app:** **not started** (a
+  5-hour window with no usage has *no reset time at all*; the rails gauge has no such
+  state); **unknown** (`resetTime` present, fraction absent — never 0 % or 100 %); **an
+  untouched pool** (a Gemini-only user gets a Claude + GPT pair regardless — by decision 6 a
+  pool whose every lane is known-zero is **not shown**); a **stepped signal** against our
+  continuous pace line (suppress the verdict for quantised input rather than let it flap);
+  and the Pro plan's **weekly-empties-so-the-5-hour-refresh-does-nothing** interaction — the
+  thing Pro users are confused about and the strongest product argument for building this.
+- **Model impact:** the second pool's 5-hour window forces the `lanes` generalisation
+  deferred in CCRM-53 (Provider Model). Do it then, with the real payload in hand.
+- **ToS posture:** the highest of the three. Disclose it as plainly as the Anthropic box does.
+
+### CCRM-56 · Provider Identity — Cooldown: the name, the three-sand hourglass, the marks and the accents
+- **Status:** Planned · **wireframe rev B `design/provider-identity-wireframe.html` approved
+  2026-09-06** (decisions 1–7 and B1–B3 recorded at its foot) · gates every visible part of
+  CCRM-54 (ChatGPT Account) · keep the wireframe until the device pass is signed off.
+- **What cannot change — settle this first:** `applicationId com.robin.claudeusage`. Changing
+  it is a **different app** to Android: every install, placed widget, tile, credential and
+  year of history is lost, and the update checker can never reach the old installs. Package,
+  namespace, repo and the `UpdateCheck` URL stay exactly as they are.
+- **Build — 1, the name.** `res/values/strings.xml`: `app_name` → `Cooldown`; the three
+  widget descriptions → "Cooldown — …". Copy sweep (each is a literal today):
+  `MainActivity.kt:272` top-bar title → "Cooldown"; `SettingsScreen.kt:1855` About title →
+  "Cooldown", and the About body's disclaimer → *"Unofficial. Not affiliated with, endorsed
+  by, or supported by Anthropic, OpenAI or Google. "Claude" is a trademark of Anthropic, PBC.
+  "ChatGPT" is a trademark of OpenAI. "Gemini" and "Antigravity" are trademarks of Google
+  LLC."*; `SettingsScreen.kt:424` tap-target labels → `"app" to "Cooldown"`, and the second
+  option becomes the **pinned account's provider app** (`"provider" to "${provider.displayName} app"`;
+  packages: Claude → the constant `PinnedNotification.claudeLaunchIntent` uses today, ChatGPT
+  → `com.openai.chatgpt`, Gemini → `com.google.android.apps.bard`; the existing stored value
+  `"claude"` reads as `"provider"`); `SettingsScreen.kt:2572` log e-mail subject;
+  `widget/UsageWidget.kt:206` → "Cooldown · $profileLabel"; `alerts/Alerts.kt:80/85/112/158`
+  channel descriptions and the re-auth title lose "Claude" ("a usage window is nearly
+  exhausted", "a usage window has reset", "A newer Cooldown release…", "$label: Cooldown needs
+  re-auth"); `HistoryScreen.kt:289` → "as you use the account"; `tile/UsageTileService.kt:46/99`
+  and the manifest's four static tile labels → "Cooldown account 1…4", live label →
+  `"$profileLabel"` alone, or `"${provider.displayName} · $profileLabel"` when the configured
+  accounts span more than one provider. The Claude sign-in guide copy (`:1243, :1422, :1518,
+  :2191–2300, :2636`) is *about* Claude's sign-in and stays — it is only shown on a Claude
+  card. `UsageCache.themeColorName()`'s default string is handled in step 4.
+- **Build — 2, the icon (option A, all three colours).** Three vector edits, the geometry of
+  `ic_launcher_foreground.xml` otherwise kept:
+  - `ic_launcher_background.xml`: the warm radial → a **slate radial** (`#3A4356` at 0 % →
+    `#242B38` at 60 % → `#12161E` at 100 %, light top-left), so the three colours sit on a
+    neutral ground. The foreground's container circle (`r=31`, `#C4622D`) → `#1E2430`.
+  - **Lower bulb = three sands.** Wrap three horizontal slabs in a `<group>` with a
+    `<clip-path>` equal to the lower-glass interior
+    (`M45,71 c0,-9 7,-12 9,-17 c2,5 9,8 9,17 z`): blue `#4285F4` from y 66.5 to 71, green
+    `#10A37F` from 62.5 to 66.5, orange `#D97757` from 58.5 to 62.5 — the mound rises to
+    ~58.5 (today's `69.5`→`61.5` mound is replaced). The **falling grain and the top sand turn
+    orange** (`#D97757` → `#E59980` gradient): the Claude window is the one pouring. Cream
+    glass and caps unchanged.
+  - `ic_launcher_monochrome.xml`: the single silhouette gains the three slabs as separate
+    paths with `fillAlpha` 1.0 / 0.65 / 0.35 (orange, green, blue) — the launcher tints the
+    layer, alpha survives, so "three" survives without colour. `drawable/ic_launcher.xml`
+    (About screen) redrawn to match. Preview at 48 dp before committing: the three bands must
+    each be at least 3 dp tall on a 48 dp tile or the middle one vanishes.
+- **Build — 3, the marks (review decision 4: logos, not dots).** `ui/ProviderMark.kt`:
+  `@Composable fun ProviderMark(provider: Provider, size: Dp = 16.dp, tint: Color? = null)`
+  drawing `drawable/ic_provider_claude.xml`, `ic_provider_chatgpt.xml`,
+  `ic_provider_gemini.xml`; `providerMarkRes(provider): Int` for RemoteViews and Glance. The
+  three drawables are **hand-traced vector paths of each company's public mark** (Anthropic's
+  Claude starburst, OpenAI's knot, Google's Gemini spark), unmodified in shape, single-colour
+  so `tint` works; each file's header comment links the brand page it was traced from and its
+  usage terms. Rev A proposed a coloured dot to stay clear of trademarks; the user chose the
+  marks for legibility — identifying a service by its mark alongside a "not affiliated"
+  notice is how OpenQuota ships the same three glyphs. (CCRM-45 (Tracker Icon)'s constraint
+  was about Anthropic's *mascot* artwork, which stays out.) Placement and sizes, as approved (B1 — bumped from 16 / 12 / 24):
+  **20 dp** before the label on account cards and tab strips (6 dp gap); **14 dp** in the
+  pinned panel's "Show profile" chips, on the pinned label line in every style (a new
+  `ImageView` in the Huge-number layout row; drawn into the panel bitmap for the gauge style),
+  in widget labels when `multiProfile` and in the widget config picker; **28 dp** in the
+  Add-account sheet. Tiles cannot carry it (icon slot is the gauge) — the tile's label rule in
+  step 1 covers it. Status-bar and QS gauge glyphs untouched.
+- **Build — 4, the accents (review decision 1).** Today `themeColor` is one global pref
+  read at eight sites (`MainActivity:178`, `PinnedNotification:99`, `BarWidget:71`,
+  `RingWidget:84`, `UsageWidget:107`, `MiniRingsWidget:84`, `PaceWidget:112`,
+  `WidgetConfigActivity:117`). It becomes a **three-level resolution**:
+  ```kotlin
+  object Palette {
+      const val PER_PROVIDER = "Per provider"          // new global pseudo-option
+      // new options, appended: ThemeOption("ChatGPT Green", 0xFF10A37F, 0xFF19C39A)
+      //                        ThemeOption("Gemini Blue",  0xFF4285F4, 0xFF8AB4F8, PACE_VIOLET_LIGHT, PACE_VIOLET_DARK)
+      fun accentName(cache: UsageCache, profile: Profile): String =
+          cache.accountAccent(profile)                              // 1. per-account override, if set
+              ?: cache.themeColorName().takeIf { it != PER_PROVIDER } // 2. global choice, if not "Per provider"
+              ?: profile.provider.themeName                          // 3. the provider's colour
+  }
+  ```
+  `UsageCache.accountAccent(profile): String?` / `setAccountAccent(profile, name?)` at
+  `k(profile, "accent")` (add to `LEGACY_PROFILE_KEYS`). **Migration without a flag:** on
+  first read, if the `themeColor` key is **absent** the user never chose a colour → return
+  `PER_PROVIDER` (Claude accounts render Claude Orange, pixel-identical to today); if present,
+  their explicit choice stays the global override for every account. The eight call sites
+  become `Palette.accentName(cache, profile)`; the app's `MaterialTheme.primary` follows the
+  **selected tab's** account on Main and History, and the global/default on Settings
+  (`PER_PROVIDER` → `Palette.DEFAULT` there). `WidgetConfigActivity` themes from its initial
+  profile. Two visible additions: the Settings theme grid gains a first swatch **"Per
+  provider"** (a tri-colour dot) ahead of Material You; and the account card's ⋮ menu gains
+  **Accent colour…**, opening the same grid with a first swatch **"Provider colour (default)"**
+  that clears the override. Material You stays a global-only option.
+  **Decision 7 (confirmed B3):** faces that draw more than one account (Mini-Rings, the pinned
+  panel's folded strips) draw pace ticks in **neutral ink**; single-account faces keep the theme's
+  cool partner via `Palette.paceColor(accentName, dark)`.
+- **Build — 5, the Add-account sheet.** `+ Add account` opens a `ModalBottomSheet` with
+  three rows (28 dp mark, `displayName`, one line): Claude — "Signs in through your browser,
+  then paste the code back — as before."; ChatGPT — "Shows a short code to type at
+  auth.openai.com — on this phone or any other device."; Gemini (Antigravity) — **disabled,
+  55 % alpha**, "Not available yet — Google's sign-in for Antigravity can't finish on a phone.
+  Coming when it can." Picking a row calls `repo.addProfile(label = null, provider)`,
+  `Shortcuts.publish`, dismisses, and **immediately starts that provider's sign-in** on the
+  new card (Claude: `beginSignIn()`; ChatGPT: the device sheet). No name-first dialog, as
+  CCRM-6 (Multi-Account) settled.
+- **Build — 6, hidden windows (review decision 6).** In `ProfileScreen`, the 5-hour `Card`
+  renders only when `data.session != null`, the 7-day `Card` only when `data.weekly != null
+  || data.modelCaps.isNotEmpty()`; with neither and no credits, one line: "This account
+  reports no usage windows right now." Same rule in the History screen's 5h/7d toggle, the
+  Pace widget's toggle, and the pinned headline / tile fallback (spelled out in CCRM-54
+  (ChatGPT Account) part 2). Applies to Claude accounts too; today they draw "—".
+- **Rejected from OpenQuota, deliberately:** a per-provider *layer* (their one-stack
+  dashboard, one card per provider) — accounts stay the unit, no providers screen; a
+  **cross-provider combined percentage** — CCRM-31 (Combined Total) is a spend share across
+  Claude accounts, and averaging a ChatGPT window with a Claude window is meaningless;
+  auto-detecting installed tools — nothing to detect on a phone. **Adopted:** hide what is
+  not signed in (we already drop unconfigured tabs); per-provider brand colour on every
+  reading; their three brand values (Claude `#DE7356` → ours stays `#D97757`).
+- **Tests:** `SurfaceTokensTest` / a new `AccentResolutionTest` — the three-level rule,
+  absent-key → `PER_PROVIDER`, present-key → global wins, override wins over both;
+  `ThemeModeTest` unchanged; `ContractTest` (CCRM-37 (Contract Tests)) learns the four trademark lines.
+- **Device pass:** launcher tile at 48 dp in light and dark, themed (monochrome) under a
+  Material You launcher; About screen; Settings grid with the new first swatch; ⋮ → Accent
+  colour on one account and the widget for that account following it; the Add-account sheet
+  with the greyed third row; a Claude account with the 7-day card hidden (simulate with a
+  fixture in the debug faces activity).
+- **Docs ride with the release:** README hero and disclaimer, guide and brochure regenerate
+  for v1.5 when the first ChatGPT account ships.
+
+### CCRM-57 · Provider Plumbing — the long tail of Claude-only assumptions
+- **Status:** Planned · small pieces, done in the same session as CCRM-54 (ChatGPT Account)
+  part 2 · filed 2026-09-06
+- **Error taxonomy** (CCRM-27 (Error Taxonomy)): `ErrorKind.title`/`short` are fixed strings
+  naming Anthropic. Make them functions of the provider — `fun title(p: Provider)`, `fun
+  short(p: Provider)` — substituting `p.vendor` ("Couldn't reach OpenAI — check your
+  connection, or see if it's them."), and `AUTH`'s fix names the flow ("re-sign in from
+  Settings" is right for both). Persisted kinds are keys, so nothing stored changes.
+- **Quick Links** (CCRM-26 (Quick Links)): per provider — Claude: as today; ChatGPT:
+  `https://status.openai.com` and `https://chatgpt.com/#settings`; Gemini: Google Cloud
+  status and `https://antigravity.google`. A `Provider → List<QuickLink>` table, tested.
+- **Plan chip:** `PlanChip(plan, tier)` calls `Fmt.tierMultiplier(tier)` — pass `tier = null`
+  for non-Claude accounts so Claude's `default_5x` grammar never runs on `"pro"`. No
+  multiplier is invented for OpenAI (OpenQuota's `prolite → "Pro 5x"` has no source) or
+  Google.
+- **Window Pings** (CCRM-17 (Window Pings)): the section and the per-account toggle render
+  only for `provider == CLAUDE` (no inference endpoint we would send to; ToS-disabled anyway).
+- **Sign-in expiry** (CCRM-16 (Sign-in Expiry Accuracy)): the 30-day estimate is Anthropic's;
+  the "expires around" line, the expiry strip and the expiry alert are gated on
+  `refreshExpiresAt > 0`, which a ChatGPT account never sets.
+- **Diagnostics** (CCRM-34 (Diagnostics Log)): the `[poll][chatgpt:pN]` prefix from CCRM-53
+  (Provider Model); the log e-mail subject from CCRM-56 (Provider Identity).
+- **Contract tests** (CCRM-37 (Contract Tests)): the copy-drift test learns three provider
+  names, three vendors and four trademark lines.
+- **Probe allowlist:** `ProbeHost.CHATGPT` (CCRM-54 (ChatGPT Account)) — GET-only rule unchanged.
+
+---
+
 ## Next — small, high value, ready to build
 
 ### CCRM-39 · Ring Widget — small face, one window as a pace-marked ring
@@ -1617,7 +2153,17 @@ keys) would still make this a different product. Not filed, not an open question
   accounts' worth of readings competing for the same space-starved surfaces is a harder one.
 
 ### CCRM-31 · Combined Total — one aggregate reading across every account
-- **Status:** Needs design · medium
+- **Status:** Needs design · medium · **wireframe rev B on review
+  (`design/combined-total-wireframe.html`, 2026-08-27) — Q2–Q5 open**
+- **Decided 2026-08-27 — spent-only, and the CCBG-6 gate is designed out rather than argued
+  past.** Rev A carried a combined denominator (`53% of $190.00` in the ring centre, a
+  `$90.22 left` footer), both leaning on the monthly cap standing in for a credit balance
+  the API does not give us. **Both lines are gone.** `spend.used` is present and real and is
+  the question this item was filed to answer; `spend.balance` is not, so nothing is claimed
+  from it. The **share ring is unaffected** — it never needed a denominator, which is why it
+  is a share rather than a gauge — and two states stop existing, since nothing is measured
+  against a cap. Per-account caps stay on each profile's credits card, where they are scoped
+  to the account that set them. This supersedes the CCBG-6 (Credits Denominator) gate below.
 - **Note (CCRM-6 (Multi-Account), 2026-08-21):** "both accounts" below is now "every
   account". The ring's slice count comes from `configuredProfiles()`, not from two, and
   `MINIMUM_SPEND_SLICE_SHARE` earns its keep at four slices rather than being nearly
@@ -1642,11 +2188,64 @@ keys) would still make this a different product. Not filed, not an open question
     currencies. `SpendCredits` carries `currency` per account and we have never seen anything
     but USD — so the honest behaviour is to refuse to sum across currencies and show them
     separately, not to assume.
-  - **Gated on [CCBG-6](BUGS.md).** If the credits denominator is wrong, an aggregate of two
-    wrong denominators is worse than not shipping — it looks more authoritative and is no
-    more correct.
-- **Shares the ring drawing** with CCRM-3 phase 3 and CCRM-13. Whichever lands first owns the
-  Canvas-to-bitmap extraction.
+  - ~~**Gated on [CCBG-6](BUGS.md).**~~ **Resolved 2026-08-27** by the spent-only decision
+    above: with no combined denominator there is no aggregate of denominators to be wrong.
+- ~~**Shares the ring drawing** with CCRM-3 phase 3 and CCRM-13.~~ **Stale.** CCRM-39 (Ring
+  Widget) already landed the extraction — `ui/RingRenderer.kt` is the shared bitmap ring. A
+  multi-slice donut is *different geometry*, not a parameter of a single-value ring, and this
+  one is drawn in Compose on a live screen rather than rasterised for Glance. CCRM-31 reuses
+  RingRenderer's stroke and gap conventions and adds `ui/ShareRingGeometry.kt`; it neither
+  inherits nor owes the Canvas-to-bitmap extraction.
+
+### CCRM-52 · Spend Meter — spend per day, week and month, from the cumulative counter
+- **Status:** Needs design · medium · filed 2026-08-27
+- **Why:** Asked for directly — a day/week/month usage dashboard "like a network usage or
+  power usage app gives me". The framing is the right one: `spend.used` is a **cumulative
+  counter**, so differencing it across polls gives spend-per-bucket exactly the way a power
+  app turns a meter reading into a daily bar. Nothing in the app shows spend *over time*;
+  CCRM-1 (Credits Display) shows the running total and CCRM-31 (Combined Total) shows how
+  it splits between accounts, but both are a single instant.
+- **Token counts are not this item, and never will be.** The same request asked about
+  *tokens*. The payload has **no token field anywhere** — `limits[]` carries `percent`,
+  `resets_at`, `severity` and a model display name; `spend` carries currency. OpenQuota's
+  token dashboard reads Claude Code's own JSONL logs out of `~/.claude` and prices them
+  against a bundled LiteLLM snapshot; a phone has neither the logs nor the install. The
+  appendix already rules this out — see *Everything downstream of local Claude Code JSONL
+  logs*. **This item is money over time, which the appendix does not rule out:** it rules
+  out token counts and *priced* estimates, not differencing the API's own money figure.
+- **What ports from the existing surfaces:** the History screen already owns day/week bars,
+  the profile tab strip and a 5-hour/7-day toggle, so spend wants to be a **third mode
+  there**, not a fourth screen. Needs no `spend.balance`, so CCBG-6 (Credits Denominator)
+  does not gate it.
+- **The five constraints that shape the design** — every one of them is a state to draw
+  before any code, per working agreement 2:
+  1. **Forward-only, no backfill.** `HistoryStore` records percent and prunes at 8 days
+     (`MAX_AGE_MS`), so there is nothing to reconstruct. Day view is useful in a week,
+     week view in a month, month view in a quarter.
+  2. **The counter resets monthly.** A *decrease* in `usedMinor` means a new billing month.
+     The delta across that boundary must be attributed to **nothing** rather than guessed,
+     or the reset renders as a spike.
+  3. **Bucket edges are only as sharp as the poll cadence.** Phone off or dozing overnight
+     puts a 14-hour gap in one bucket. Range **sums stay exact**; day attribution is fuzzy
+     at the edges, and the surface has to say so — the same disclosure duty as CCRM-30
+     (Estimate Honesty).
+  4. **Most days read $0.00 for most people.** Credits only tick once a plan window has
+     actually run out. A dashboard that is usually empty is the real product risk, and the
+     empty state is the first thing to wireframe, not the last.
+  5. **The current month is already on the card.** `spend.used` *is* this month. The new
+     information is past months and the day/week shape — so the month view has to justify
+     itself against a figure the user can already see.
+- **Do this part first, whatever happens to the dashboard:** extend `HistoryStore.record`
+  to persist `credits.usedMinor` + `currency` + `exponent` alongside the percentages, and
+  give spend its **own retention** — the 8-day prune is right for a 7-day window curve and
+  fatally wrong for a month view. Cheap now, and the series cannot be created retroactively
+  later, which is the whole reason to start. Interacts with CCRM-14 (Clear History), whose
+  clear must reach the new store, and with CCBG-1 (History Retention) on ownership.
+- **Open questions:** whether month buckets are calendar months or billing months (the
+  counter resets on the billing boundary, which we only observe indirectly, by the decrease);
+  whether the combined-across-accounts series is in scope or strictly per-account like the
+  rest of History; and whether a bar chart or a stepped line reads better for a quantity that
+  is mostly zero.
 
 ---
 
@@ -2094,3 +2693,60 @@ theirs**, which hardcodes a lookup for `display_name == "Fable"`; the trend char
 (Trend Chart) is richer than their `UsageTrend.svelte`); notification tap-to-open (CCRM-2
 (Notification Tap Target)); and the pace projection maths, where our `Projection` and their
 `pacing.rs` independently agree on `used / elapsedFraction`.
+
+### Addendum 2026-09-06 — the multi-provider re-read
+
+The appendix above was written to explain why *nothing* from OpenQuota's other providers
+ported. The multi-provider arc (CCRM-53 (Provider Model) to CCRM-57 (Provider Plumbing))
+reverses the *scope* decision, not the analysis: it was re-checked against a fresh crawl of
+OpenQuota's source (commit `0b21b35`, MIT-licensed, v0.5.0) and of the official `openai/codex`
+and `google-gemini/gemini-cli` repos, by four sub-agents whose reports the roadmap items
+summarise. What follows is what still does not port, and the handful of things that do.
+
+**Still structurally unavailable on a phone, for the same reason as before — OpenQuota reads
+the machine it runs on:**
+- Every **credential** OpenQuota holds is *read from disk or the OS keychain*, never minted:
+  `~/.codex/auth.json` (and a macOS Keychain item "Codex Auth") for ChatGPT; the Keychain
+  item `service=gemini, account=antigravity` for Google. It never runs an authorization flow
+  for either — it only *refreshes* tokens the real CLI/IDE created. We do the opposite (the
+  phone mints its own family), which is why our ChatGPT path is the Codex **device-code
+  flow** the CLI ships and OpenQuota never needed.
+- The **Codex token history** (Today / Yesterday / 30 days / model breakdown / estimated
+  cost) walks `~/.codex/sessions/**/*.jsonl` — the CLI's own transcripts — exactly like the
+  Claude JSONL case above. No server equivalent exists.
+- **Antigravity's richest source** is the IDE's local language server: process discovery
+  via `ps` / `lsof` / `/proc`, a CSRF token read out of the process's own argv, TLS
+  verification off, Connect-RPC to `127.0.0.1`. Phone-impossible by construction. Only the
+  *cloud* fallback (`cloudcode-pa.googleapis.com` `v1internal:*`) is reachable from a phone,
+  and it is the degraded one — see CCRM-55 (Antigravity Account).
+- **Auto-detecting installed tools**, drag-reorderable provider cards, a fixed 320 px popup,
+  the tray composite — desktop shapes.
+- The **nine other providers** (Cursor, Copilot, Devin, Grok, OpenCode, OpenRouter, Z.ai,
+  Kimi, MiniMax). Out of scope permanently, not deferred: three named services, by decision.
+- **`rate-limit-reset-credits/consume`** — OpenQuota can *spend* a ChatGPT reset credit. A
+  write, in a read-only app. Never.
+
+**What ports, as pattern rather than code:**
+- **Classify windows by duration, not by slot** (`codex/mapper.rs`): 18000 s → session,
+  604800 s → weekly, positional only as a last resort. Adopted in CCRM-53 (Provider Model).
+- The four Antigravity bucket ids (`gemini-5h`, `gemini-weekly`, `3p-5h`, `3p-weekly`), the
+  `remainingFraction` inversion, and **worst-of-pool** when per-model rows have to collapse
+  into a pool. Recorded in CCRM-55 (Antigravity Account).
+- Per-provider brand colours — Claude `#DE7356`, OpenAI `#10A37F`, Google `#4285F4` — as the
+  starting point for CCRM-56 (Provider Identity)'s tokens (ours keep `#D97757` for Claude,
+  the theme value that already ships).
+- **Hide what is not signed in** on the dashboard (grey it only in the configuration
+  screen) — the rule CCRM-6 (Multi-Account) already applies to tabs; CCRM-56 (Provider Identity) applies it to
+  the Add-account sheet in the *other* direction (greyed, with the reason) for the one
+  provider we cannot sign into yet.
+- Their `QuotaWindow` carries `estimated` and `source_note` flags — the idea CCRM-30
+  (Estimate Honesty) already implements. Reassuring, not new.
+
+**Explicitly rejected, having looked:** their magic plan renames (`prolite → "Pro 5x"`,
+`pro → "Pro 20x"`, no source given) — we show `plan_type` as is until a multiplier is
+verified, per CCRM-38 (Plan Tier); a **cross-provider combined percentage** — different
+pools, different plans, meaningless as one number; a per-provider *layer* in the UI —
+accounts stay the unit.
+
+**Licence note:** OpenQuota is MIT. We read it as a reference and copy *patterns*; if a line
+of its code is ever copied, its copyright notice comes with it.

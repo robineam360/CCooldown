@@ -52,6 +52,10 @@ parsing, scheduling, tests, docs, or a bug fix that restores an already-approved
   proposing something that was already ruled out.
 - [BUGS.md](BUGS.md) — defects, `CCBG-N`, with a status and a severity.
 - [RELEASING.md](RELEASING.md) — the release process.
+- [RUNBOOK.md](RUNBOOK.md) — the ordered, checkable execution plan for a multi-session arc
+  (currently the multi-provider arc, CCRM-53 (Provider Model) onwards): one step per fresh
+  session, the prompt to paste, and what "done" means. Tick steps off there; statuses still
+  live in the tracker files.
 - `release/docs/` — the user-facing guide and brochure (HTML → headless Chrome; sources in
   `docs/src/`).
 
@@ -60,5 +64,10 @@ see CCRM-8 (Mac Menu-Bar) for the reasoning, which centres on the GitHub `releas
 stream being repo-wide. Do not add another platform's code here, and do not fork this repo to
 start another client — start clean and copy the shared contract in.
 
-Claude Cooldown tracks **Claude usage only**. Adding other AI providers is not a roadmap gap;
-it's out of scope.
+The app tracks the usage windows of **exactly three services — Claude, ChatGPT and Google's
+Antigravity (Gemini)** — decided 2026-09-06, see the *Multi-provider* section of
+[ROADMAP.md](ROADMAP.md) (CCRM-53 (Provider Model) onwards). Not "any AI provider": three named
+ones, each with its own colour. Cursor, Copilot, OpenRouter and the rest are out of scope
+permanently, not deferred. Nothing here may read a local file or a local process to get usage —
+a phone has neither — so a provider only qualifies if its usage is a plain HTTPS call with a
+token the phone can mint itself.
