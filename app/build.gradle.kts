@@ -48,6 +48,9 @@ android {
 
     buildFeatures {
         compose = true
+        // BuildConfig.VERSION_NAME is the honest User-Agent ChatGptSource sends
+        // (CCRM-54 (ChatGPT Account)); nothing else needs generated build config.
+        buildConfig = true
     }
 
     compileOptions {

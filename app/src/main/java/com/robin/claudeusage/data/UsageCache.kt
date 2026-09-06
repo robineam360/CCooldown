@@ -2,6 +2,7 @@ package com.robin.claudeusage.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.robin.claudeusage.data.source.Sources
 
 enum class AuthState { NO_CREDENTIALS, OK, REAUTH_NEEDED }
 
@@ -13,10 +14,29 @@ data class Snapshot(
     val authState: AuthState,
     /** CCRM-27 (Error Taxonomy): the typed kind behind [lastStatus]. */
     val lastStatusKind: String = ErrorKind.INTERNAL.key,
+    /**
+     * Whose parser reads [rawJson] back (CCRM-54 (ChatGPT Account)). The cached body is
+     * re-parsed on *read*, not kept as an object, so the provider has to travel with the
+     * snapshot — CCRM-53 (Provider Model) routed the fetch-time parse through the seam
+     * and left this one hardcoded to Claude, which made a signed-in ChatGPT account fetch
+     * successfully and then render "No data yet" on every surface at once. Found on the
+     * phone 2026-09-06, minutes after the first real sign-in.
+     */
+    val provider: Provider = Provider.CLAUDE,
 ) {
     // Lazy, not get(): the UI reads this several times per composition and
     // on a 5-second tick — one parse per snapshot is plenty.
-    val data: UsageData? by lazy { rawJson?.let { UsageParser.parse(it) } }
+    val data: UsageData? by lazy {
+        rawJson?.let {
+            // A provider with no source yet (Antigravity, CCRM-55) must read as "no
+            // data", never as a crash on a lazy the whole UI touches.
+            try {
+                Sources.of(provider).parseUsage(it)
+            } catch (_: NotImplementedError) {
+                null
+            }
+        }
+    }
 }
 
 /**
@@ -88,6 +108,7 @@ class UsageCache(context: Context) {
             // string once; the next failure writes the real kind.
             lastStatusKind = prefs.getString(k(profile, "lastStatusKind"), null)
                 ?: ErrorKind.fromStatus(lastStatus).key,
+            provider = profile.provider,
         )
     }
 

@@ -73,6 +73,16 @@ Sessions 1 and 3 can run in parallel; 2 depends on 1; 4 depends on 1–3.
   `ProfileRegistryTest` provider cases). The device check (a release build over the live
   install still polling every Claude account with identical `[poll]` lines) is deferred to
   Step 5 of [RUNBOOK.md](RUNBOOK.md), since it needs the phone in hand.
+  **Amended 2026-09-06 during CCRM-54 (ChatGPT Account) part 1:** the seam covered the
+  *fetch-time* parse in `doFetch` but not the *read-time* one — `Snapshot.data` re-parses
+  the cached body on every read and was hardcoded to Anthropic's `UsageParser`. A ChatGPT
+  account therefore fetched HTTP 200, recorded "Last success", and showed "No data yet" on
+  the tab, every widget, the tile and the pinned notification at once. `Snapshot` now
+  carries `provider` (defaulting to `CLAUDE`, so nothing else moved) and parses through
+  `Sources.of`, guarded so a provider with no source yet reads as no data rather than
+  throwing inside a lazy the whole UI touches. `SnapshotTest` is the regression. The
+  lesson generalises: a seam has to cover every place the provider's *format* is read,
+  not just every place its *endpoint* is called.
 - **Why:** [Profile.kt](app/src/main/java/com/robin/claudeusage/data/Profile.kt) is
   `(key, slot, label)`; [ApiClient.kt](app/src/main/java/com/robin/claudeusage/data/ApiClient.kt),
   [OAuthSignIn.kt](app/src/main/java/com/robin/claudeusage/data/OAuthSignIn.kt) and
@@ -182,8 +192,31 @@ Sessions 1 and 3 can run in parallel; 2 depends on 1; 4 depends on 1–3.
   grammar and must not run on `plan_type: "pro"` (gated in CCRM-57 (Provider Plumbing)).
 
 ### CCRM-54 · ChatGPT Account — Codex device-code sign-in and the two windows
-- **Status:** Planned · medium · part 1 (source + capture) after CCRM-53 (Provider Model);
-  part 2 (surfaces) after the CCRM-56 (Provider Identity) wireframe · filed 2026-09-06
+- **Status:** In progress — part 1 done (2026-09-06). `ChatGptSource` +
+  `ChatGptUsageParser`, `CodexDeviceSignIn`, `UsageRepository.completeDeviceSignIn` and
+  the `ProbeHost.CHATGPT` allowlist entry are built and green (321 tests). **Signed in on
+  the phone with a real account and captured a real payload** — the fixture is
+  `app/src/test/resources/chatgpt-usage-2026-09.json` (Plus, `user_id` / `account_id` /
+  `email` redacted; the live endpoint returns all three). `[poll][chatgpt:p5] auto → OK`
+  with no token material, and the account renders 9% / 79% on the tab with correct resets.
+  Two source facts settled against `openai/codex` and recorded in code comments: the
+  refresh grant is **JSON** (`request_chatgpt_token_refresh` in `login/src/auth/manager.rs`,
+  not form-encoded as the research file recorded — the code *exchange* at the same URL is
+  form-encoded), and **403 and 404 both mean "keep polling"** in `poll_for_token`, with no
+  distinct denied status. `/usercode` did **not** 404, so the loopback fallback is not
+  needed and Step 4 stands as written. Part 2 (surfaces) is next, after CCRM-56 (Provider
+  Identity).
+- **Confirmed live on the phone, 2026-09-06** (Fold 7, release-signed build over the live
+  install): device sign-in completes end to end; the usage body is HTTP 200 and carries
+  **both** windows on a Plus account (`limit_window_seconds` 18000 and 604800), so the
+  July suspension of the 5-hour limit is not universal and neither branch may be assumed.
+  The live payload also carries five keys the documented shape didn't mention —
+  `code_review_rate_limit`, `model_usage`, `spend_control`, `promo`,
+  `rate_limit_reset_credits` — plus `allowed` / `limit_reached` inside `rate_limit`; none
+  is a usage reading and all are ignored. **`credits.balance` arrives as a JSON *string***
+  (`"0"`), not the number the documented shape showed; both spellings are pinned by test.
+  And the body carries `user_id`, `account_id` and `email`, so the capture button's output
+  is personal data — the committed fixture is redacted and a test guards it.
 - **Verified in `openai/codex` source, 2026-09-06** (`codex-rs/login/src/device_code_auth.rs`,
   `codex-rs/backend-client/src/client/rate_limit_resets.rs`, `codex-rs/login/src/auth/manager.rs`,
   `codex-rs/login/src/token_data.rs`; full notes in `design/research/2026-09-06-phone-feasibility.md`):

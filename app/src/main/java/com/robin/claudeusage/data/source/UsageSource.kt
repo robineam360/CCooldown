@@ -25,6 +25,14 @@ interface UsageSource {
     /** Usage body → the shared model. Null only when nothing usable is present. */
     fun parseUsage(body: String): UsageData?
 
+    /**
+     * The plan named by the *usage* payload, when the provider reports one there —
+     * ChatGPT does, and its live value beats the one the id_token carried at sign-in
+     * (CCRM-54 (ChatGPT Account)). Null by default, so Claude writes nothing and its
+     * plan keeps coming from the token response exactly as before.
+     */
+    fun planFrom(body: String): String? = null
+
     /** Which HTTP statuses mean "the token is dead", as opposed to "their server is down". */
     fun isAuthFailure(status: Int): Boolean
 }
@@ -34,7 +42,7 @@ data class TokenGrant(val creds: Credentials, val plan: String?, val tier: Strin
 object Sources {
     fun of(provider: Provider): UsageSource = when (provider) {
         Provider.CLAUDE -> ClaudeSource
-        Provider.CHATGPT -> throw NotImplementedError("ChatGPT source lands in CCRM-54 (ChatGPT Account)")
+        Provider.CHATGPT -> ChatGptSource
         Provider.ANTIGRAVITY -> throw NotImplementedError("Antigravity source lands in CCRM-55 (Antigravity Account)")
     }
 }

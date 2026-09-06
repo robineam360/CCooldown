@@ -49,7 +49,7 @@ fix it in ROADMAP.md and note it in the step's *Log* line.
 |---|---|---|---|---|---|
 | 0 | Commit the current tree | Haiku (or Sonnet) | low | 1 min | ☑ |
 | 1 | CCRM-53 (Provider Model) | Sonnet | medium | no | ☑ |
-| 2 | CCRM-54 (ChatGPT Account) part 1 — source, device flow, payload capture | Opus | high | one sign-in on the phone | ☐ |
+| 2 | CCRM-54 (ChatGPT Account) part 1 — source, device flow, payload capture | Opus | high | one sign-in on the phone | ☑ |
 | 3 | CCRM-56 (Provider Identity) — rename, icon, marks, accents, Add-account sheet, hidden windows | Sonnet | medium | approve the icon at 48 dp | ☐ |
 | 4 | CCRM-54 (ChatGPT Account) part 2 + CCRM-57 (Provider Plumbing) — the ChatGPT account on every surface | Sonnet | medium | no | ☐ |
 | 5 | Device pass on the Fold 7 | Sonnet | medium | phone in hand | ☐ |
@@ -184,13 +184,52 @@ sign in at `auth.openai.com/codex/device` with the code, tap *Capture ChatGPT pa
 the log from Settings → Diagnostics, paste the body into the session.
 
 **Done when:**
-- ☐ Device-code sign-in completed on the phone with Robin's own account.
-- ☐ Real payload captured and committed as the test fixture; parser tests run against it.
-- ☐ The account polls on the normal schedule; `[poll][chatgpt:pN]` lines appear; no token
+- ☑ Device-code sign-in completed on the phone with Robin's own account.
+- ☑ Real payload captured and committed as the test fixture; parser tests run against it.
+- ☑ The account polls on the normal schedule; `[poll][chatgpt:pN]` lines appear; no token
   material in the log.
-- ☐ Status line updated, ticked, committed.
+- ☑ Status line updated, ticked, committed.
 
 **Log:**
+
+2026-09-06 — built `ChatGptSource` + `ChatGptUsageParser`, `CodexDeviceSignIn`,
+`UsageRepository.completeDeviceSignIn` / `captureUsagePayload`, `ProbeHost.CHATGPT` and a
+`UsageSource.planFrom` hook (null by default, so Claude is untouched). Two facts verified
+against `openai/codex` before writing, recorded in code comments: the refresh grant is
+**JSON**, not form-encoded as `design/research/2026-09-06-phone-feasibility.md` recorded —
+`request_chatgpt_token_refresh` in `login/src/auth/manager.rs`; the code *exchange* at the
+same URL really is form-encoded, so the two differ — and in `poll_for_token`
+(`login/src/device_code_auth.rs`) **403 and 404 both mean pending**, with no distinct
+denied status, so `Poll.Denied` is our name for the single terminal bucket. Note 404 means
+the opposite thing on `/usercode`, where it means the flow is switched off; only `start`
+raises `Unavailable`.
+
+**`/usercode` did not 404** — device sign-in is live for the Codex client id, so Step 4
+stands unedited and the loopback fallback is not needed. Signed in on the Fold 7 over
+wireless adb on a release-signed build (the debug unlock is a runtime 7-tap, so no
+debug-signed APK and no uninstall — the three Claude accounts and their history were
+untouched), captured a real Plus payload, and it is now
+`app/src/test/resources/chatgpt-usage-2026-09.json`. **The body carries `user_id`,
+`account_id` and `email`** — redacted in the fixture, with a test guarding it, since this
+is a public repo. Real-shape surprises: both windows present on Plus (the July 5-hour
+suspension is not universal); `credits.balance` is a JSON *string*; `additional_rate_limits`
+null; five undocumented sibling keys, none of them readings.
+
+The device check found a real defect the unit tests could not: `Snapshot.data` re-parses
+the cached body on read and was hardcoded to Anthropic's `UsageParser`, so the account
+fetched HTTP 200, wrote "Last success", and showed "No data yet" everywhere at once. Fixed
+by giving `Snapshot` a `provider` (default `CLAUDE`) and routing through `Sources.of`;
+`SnapshotTest` is the regression, and CCRM-53 (Provider Model)'s Status carries the
+amendment. Reinstalled and confirmed on the phone: 9% / 79% with correct resets, and
+`[poll][chatgpt:p5] auto → OK` with no token material. 321 tests green.
+
+Two things left on the phone deliberately: the debug-made ChatGPT account (labelled
+"Account 4", key `p5`) which Steps 4 and 5 need, and the app log level on **Debug**.
+Scaffolding added beyond the brief, all debug-gated: a `+ Add ChatGPT account` button —
+there is no other way to make one before CCRM-56 (Provider Identity) builds the real
+Add-account sheet — and the endpoint probe's host button now cycles all three hosts
+instead of flip-flopping two. For part 2: the sheet's "code expires in 14m" is computed
+once and does not tick down; the real sheet needs a live countdown.
 
 ---
 

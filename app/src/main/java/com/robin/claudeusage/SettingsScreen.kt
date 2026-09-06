@@ -87,11 +87,13 @@ import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import com.robin.claudeusage.data.ApiClient
 import com.robin.claudeusage.data.AuthState
+import com.robin.claudeusage.data.CodexDeviceSignIn
 import com.robin.claudeusage.data.OAuthSignIn
 import com.robin.claudeusage.data.PingSchedule
 import com.robin.claudeusage.data.Profile
 import com.robin.claudeusage.data.ProfileRegistry
 import com.robin.claudeusage.data.Projection
+import com.robin.claudeusage.data.Provider
 import com.robin.claudeusage.data.SignInExpiry
 import com.robin.claudeusage.data.UpdateCheck
 import com.robin.claudeusage.data.UpdateGate
@@ -108,6 +110,7 @@ import com.robin.claudeusage.ui.hasTwoColumns
 import com.robin.claudeusage.widget.BarWidgetReceiver
 import com.robin.claudeusage.widget.UsageWidgetReceiver
 import com.robin.claudeusage.work.Polling
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -176,6 +179,7 @@ fun SettingsScreen(
                     repo, profile, use24h, onOpenGuide,
                     label = labels.getValue(profile),
                     canRemove = profiles.size > 1,
+                    debugUnlocked = debugUnlocked,
                     onRename = { renaming = profile },
                     onRemove = { removing = profile },
                 )
@@ -778,7 +782,7 @@ fun SettingsScreen(
             SectionLabel("Debug")
             TrendDiagnostics(repo, use24h)
             Spacer(Modifier.height(10.dp))
-            DebugSection(repo)
+            DebugSection(repo) { namesTick++; Shortcuts.publish(context) }
         }
     }
 
@@ -1029,6 +1033,8 @@ private fun TokenCard(
     onOpenGuide: () -> Unit,
     label: String,
     canRemove: Boolean,
+    /** CCRM-54 (ChatGPT Account) part 1: gates the temporary device-code path below. */
+    debugUnlocked: Boolean,
     onRename: () -> Unit,
     onRemove: () -> Unit,
 ) {
@@ -1224,6 +1230,17 @@ private fun TokenCard(
                     Spacer(Modifier.height(10.dp))
                     Text(it, style = MaterialTheme.typography.bodySmall)
                 }
+                return@Column
+            }
+
+            // CCRM-54 (ChatGPT Account) part 1. A non-Claude account has none of the
+            // machinery below it: no authorize URL, no pasted `code#state`, no QR or
+            // desktop-JSON backup, and no ~30-day family estimate to draw an "expires
+            // around" line from. Until part 2 builds the real device-code sheet to the
+            // approved wireframe, this stands in so the payload can be captured on the
+            // phone. Everything above this line — the label, chip, ⋮ menu — is shared.
+            if (profile.provider != Provider.CLAUDE) {
+                ChatGptAccountBody(repo, profile, label, use24h, debugUnlocked) { stateKey++ }
                 return@Column
             }
 
@@ -1452,6 +1469,264 @@ private fun TokenCard(
                 TextButton(onClick = { showBrowserPicker = false }) { Text("Cancel") }
             },
         )
+    }
+}
+
+/**
+ * The temporary ChatGPT account body (CCRM-54 (ChatGPT Account) part 1) — **debug
+ * scaffolding, not a design**. Deliberately plain: the real device-code sheet with its
+ * five states, the provider mark, the plan chip and the quick links all land in part 2,
+ * built to `design/provider-identity-wireframe.html`. Nothing here is drawn to a
+ * wireframe, which is why the two buttons that do anything are behind the debug unlock.
+ *
+ * The poll runs in the composition's own scope while the card is on screen and resumes
+ * from [UsageRepository.pendingDeviceSignIn] after process death — fifteen minutes does
+ * not justify WorkManager.
+ */
+@Composable
+private fun ChatGptAccountBody(
+    repo: UsageRepository,
+    profile: Profile,
+    label: String,
+    use24h: Boolean,
+    debugUnlocked: Boolean,
+    onStateChanged: () -> Unit,
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val clipboard = LocalClipboardManager.current
+    var tick by remember { mutableIntStateOf(0) }
+    val hasToken = remember(tick) { repo.hasCredentials(profile) }
+    val snapshot = remember(tick) { repo.snapshot(profile) }
+    val plan = remember(tick) { repo.plan(profile) }
+    var busy by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf<String?>(null) }
+    var started by remember { mutableStateOf(repo.pendingDeviceSignIn(profile)) }
+    var capture by remember { mutableStateOf<String?>(null) }
+
+    fun bump() {
+        tick++
+        onStateChanged()
+    }
+
+    LaunchedEffect(started?.deviceAuthId) {
+        val flow = started ?: return@LaunchedEffect
+        while (true) {
+            delay(flow.intervalSec * 1000L)
+            val poll = try {
+                repo.pollDeviceSignIn(flow)
+            } catch (e: Exception) {
+                message = "Couldn't reach OpenAI — ${e.javaClass.simpleName}. Still waiting."
+                continue
+            }
+            when (poll) {
+                CodexDeviceSignIn.Poll.Pending -> Unit
+                CodexDeviceSignIn.Poll.Expired -> {
+                    repo.cancelDeviceSignIn()
+                    started = null
+                    message = "That code expired — get a new one."
+                    break
+                }
+                is CodexDeviceSignIn.Poll.Denied -> {
+                    repo.cancelDeviceSignIn()
+                    started = null
+                    message = "Sign-in didn't go through (HTTP ${poll.status}) — start again."
+                    break
+                }
+                is CodexDeviceSignIn.Poll.Granted -> {
+                    busy = true
+                    val result = repo.completeDeviceSignIn(profile, poll)
+                    busy = false
+                    started = null
+                    message = if (result.message == "OK") {
+                        Polling.schedulePeriodic(context, repo.cacheSettings().pollIntervalMinutes())
+                        "$label signed in — usage fetched, polling started."
+                    } else {
+                        result.message
+                    }
+                    bump()
+                    break
+                }
+            }
+        }
+    }
+
+    fun beginDeviceSignIn() {
+        scope.launch {
+            busy = true
+            message = null
+            try {
+                started = repo.startDeviceSignIn(profile)
+            } catch (_: CodexDeviceSignIn.Unavailable) {
+                // The one failure with its own remedy: OpenAI can feature-flag the whole
+                // flow off, and the answer is the browser fallback, not another code.
+                message = "OpenAI has device sign-in switched off for this client — " +
+                    "the browser fallback is needed (CCRM-54)."
+            } catch (e: Exception) {
+                message = "Couldn't start sign-in — ${e.message ?: e.javaClass.simpleName}"
+            }
+            busy = false
+        }
+    }
+
+    Spacer(Modifier.height(8.dp))
+    val flow = started
+    if (flow != null) {
+        Text("Finish signing in", style = MaterialTheme.typography.titleSmall)
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "Open the page below in any browser — it can be a different device — sign in " +
+                "to ChatGPT, and enter this code.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(8.dp))
+        SelectionContainer {
+            Text(
+                flow.userCode,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 24.sp,
+                style = MaterialTheme.typography.titleLarge,
+            )
+        }
+        Spacer(Modifier.height(2.dp))
+        Text(
+            flow.verifyUrl,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(8.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = {
+                clipboard.setText(androidx.compose.ui.text.AnnotatedString(flow.userCode))
+            }) { Text("Copy code") }
+            OutlinedButton(onClick = {
+                openInBrowser(context, flow.verifyUrl, null)
+            }) { Text("Open in browser") }
+            TextButton(onClick = {
+                repo.cancelDeviceSignIn()
+                started = null
+                message = null
+            }) { Text("Cancel") }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "Waiting for you to finish… code expires in ${Fmt.dhm(flow.expiresAtMs)}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    } else if (!hasToken) {
+        Text(
+            "Not signed in",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(12.dp))
+        if (debugUnlocked) {
+            Button(enabled = !busy, onClick = { beginDeviceSignIn() }) {
+                Text("Sign in with a code")
+            }
+        } else {
+            Text(
+                "ChatGPT sign-in lands in CCRM-54 part 2.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    } else {
+        Text(
+            "Last checked: ${Fmt.dayTimeWithAgo(snapshot.lastAttemptAt, use24h)}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (plan != null) {
+            Text(
+                "Plan: $plan",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        // No "expires around" line, deliberately: OpenAI's token family has no fixed
+        // life we know of, and CCRM-16 (Sign-in Expiry Accuracy) says no estimate beats
+        // a wrong one.
+        Spacer(Modifier.height(10.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(
+                enabled = !busy,
+                onClick = {
+                    scope.launch {
+                        busy = true
+                        val result = repo.refreshNow(profile, manual = true)
+                        message = if (result.message == "OK") "Checked — working." else result.message
+                        busy = false
+                        bump()
+                    }
+                },
+            ) { Text("Refresh") }
+            if (debugUnlocked) {
+                OutlinedButton(enabled = !busy, onClick = { beginDeviceSignIn() }) {
+                    Text("Sign in with a code")
+                }
+            }
+            TextButton(
+                enabled = !busy,
+                onClick = {
+                    repo.clearCredentials(profile)
+                    message = "$label signed out."
+                    capture = null
+                    bump()
+                },
+            ) { Text("Clear", color = MaterialTheme.colorScheme.error) }
+        }
+        if (debugUnlocked) {
+            Spacer(Modifier.height(4.dp))
+            Button(
+                enabled = !busy,
+                onClick = {
+                    scope.launch {
+                        busy = true
+                        capture = "Capturing…"
+                        val resp = repo.captureUsagePayload(profile)
+                        capture = when (resp) {
+                            null -> "No credentials for $label"
+                            else -> "HTTP ${resp.code}\n\n${resp.body}"
+                        }
+                        busy = false
+                    }
+                },
+            ) { Text("Capture ChatGPT payload") }
+            Spacer(Modifier.height(2.dp))
+            Text(
+                "Writes the raw usage body to the diagnostics log at DEBUG — set the log " +
+                    "level to Debug first, then export it from Diagnostics. The body " +
+                    "carries no token material.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            capture?.let { text ->
+                Spacer(Modifier.height(8.dp))
+                SelectionContainer {
+                    Text(
+                        text,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        lineHeight = 15.sp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                MaterialTheme.colorScheme.surfaceVariant,
+                                RoundedCornerShape(8.dp),
+                            )
+                            .padding(12.dp),
+                    )
+                }
+            }
+        }
+    }
+
+    message?.let {
+        Spacer(Modifier.height(6.dp))
+        Text(it, style = MaterialTheme.typography.bodySmall)
     }
 }
 
@@ -1990,11 +2265,28 @@ private fun TrendDiagnostics(repo: UsageRepository, use24h: Boolean) {
 }
 
 @Composable
-private fun DebugSection(repo: UsageRepository) {
+private fun DebugSection(repo: UsageRepository, onAccountsChanged: () -> Unit) {
     var showDebug by remember { mutableStateOf(false) }
-    val profiles = remember { repo.profiles() }
+    var accountsTick by remember { mutableIntStateOf(0) }
+    val profiles = remember(accountsTick) { repo.profiles() }
     var debugProfile by remember { mutableStateOf(profiles.first()) }
     SectionCard {
+        // CCRM-54 (ChatGPT Account) part 1: the only way to make a ChatGPT account
+        // until CCRM-56 (Provider Identity) builds the real "+ Add account" sheet with
+        // its three rows. Debug-gated precisely because it is not the approved design.
+        OutlinedButton(onClick = {
+            repo.addProfile(provider = Provider.CHATGPT)
+            accountsTick++
+            onAccountsChanged()
+        }) { Text("+ Add ChatGPT account") }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Scaffolding for the payload capture. The real Add-account sheet lands in " +
+                "CCRM-56; sign in from the new card above with \"Sign in with a code\".",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(12.dp))
         // CCRM-16: the ~30-day family estimate has never been verified against a
         // real expiry — this age readout is how we learn the true number the first
         // time a family dies of old age rather than revocation.
@@ -2118,12 +2410,11 @@ private fun EndpointProbe(repo: UsageRepository) {
                 profile = profiles[(profiles.indexOf(profile) + 1).mod(profiles.size)]
             }) { Text(repo.cacheSettings().profileLabel(profile)) }
             Spacer(Modifier.width(8.dp))
+            // Cycles the whole allowlist: with CCRM-54 (ChatGPT Account) it has three
+            // entries, and a flip-flop would leave the third unreachable.
             OutlinedButton(onClick = {
-                host = if (host == ApiClient.ProbeHost.CLAUDE_AI) {
-                    ApiClient.ProbeHost.ANTHROPIC
-                } else {
-                    ApiClient.ProbeHost.CLAUDE_AI
-                }
+                val hosts = ApiClient.ProbeHost.entries
+                host = hosts[(hosts.indexOf(host) + 1).mod(hosts.size)]
             }) { Text(host.origin.removePrefix("https://")) }
         }
         Spacer(Modifier.height(8.dp))

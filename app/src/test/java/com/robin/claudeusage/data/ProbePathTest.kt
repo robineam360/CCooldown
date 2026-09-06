@@ -65,9 +65,9 @@ class ProbePathTest {
      * origin is `claude.ai`. Pinned so nobody "corrects" it back to the constant.
      */
     @Test
-    fun `probe hosts are an allowlist of the two we intend`() {
+    fun `probe hosts are an allowlist of the three we intend`() {
         assertEquals(
-            listOf("https://api.anthropic.com", "https://claude.ai"),
+            listOf("https://api.anthropic.com", "https://claude.ai", "https://chatgpt.com"),
             ApiClient.ProbeHost.entries.map { it.origin },
         )
     }

@@ -139,6 +139,15 @@ object ApiClient {
     enum class ProbeHost(val origin: String) {
         ANTHROPIC("https://api.anthropic.com"),
         CLAUDE_AI("https://claude.ai"),
+
+        /**
+         * OpenAI's usage host (CCRM-54 (ChatGPT Account)). Joins the allowlist for the
+         * same reason the other two are on it: the probe must never be able to send a
+         * bearer token anywhere a typo can reach. The GET-only rule matters more here
+         * than anywhere else — `rate-limit-reset-credits/consume` on this host is a
+         * **write** that spends one of the account's credits.
+         */
+        CHATGPT("https://chatgpt.com"),
     }
 
     /**
@@ -147,19 +156,28 @@ object ApiClient {
      * to a billing API could change a spend limit or buy credits, so no other method is
      * reachable from here.
      *
-     * Sends the same headers as [fetchUsage], including the claude-code User-Agent that
-     * keeps `api.anthropic.com` out of the aggressive rate-limit bucket. Results are
+     * Sends the same headers as [fetchUsage] on the Anthropic hosts, including the
+     * claude-code User-Agent that keeps `api.anthropic.com` out of the aggressive
+     * rate-limit bucket; [ProbeHost.CHATGPT] gets OpenAI's headers instead. Results are
      * returned raw and are never parsed or cached — see `UsageRepository.probeEndpoint`.
      */
     fun probe(accessToken: String, host: ProbeHost, path: String): HttpResult {
-        val request = Request.Builder()
+        val builder = Request.Builder()
             .url(host.origin + normalizeProbePath(path))
             .get()
             .header("Authorization", "Bearer $accessToken")
-            .header("anthropic-beta", "oauth-2025-04-20")
-            .header("User-Agent", USER_AGENT)
-            .header("Content-Type", "application/json")
-            .build()
+        if (host == ProbeHost.CHATGPT) {
+            // OpenAI's hosts get OpenAI's headers and our honest User-Agent — sending
+            // a claude-code UA to chatgpt.com would be a lie, and anthropic-beta there
+            // is noise (CCRM-54 (ChatGPT Account)).
+            builder.header("Accept", "application/json")
+                .header("User-Agent", com.robin.claudeusage.data.source.ChatGptSource.USER_AGENT)
+        } else {
+            builder.header("anthropic-beta", "oauth-2025-04-20")
+                .header("User-Agent", USER_AGENT)
+                .header("Content-Type", "application/json")
+        }
+        val request = builder.build()
         client.newCall(request).execute().use { resp ->
             return HttpResult(resp.code, resp.body?.string() ?: "")
         }

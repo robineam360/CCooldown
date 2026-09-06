@@ -3,6 +3,7 @@ package com.robin.claudeusage.data
 import android.content.Context
 import androidx.glance.appwidget.updateAll
 import com.robin.claudeusage.alerts.Alerts
+import com.robin.claudeusage.data.source.ChatGptSource
 import com.robin.claudeusage.data.source.Sources
 import com.robin.claudeusage.diag.AppLog
 import com.robin.claudeusage.ui.Fmt
@@ -134,6 +135,7 @@ class UsageRepository(private val context: Context) {
         cache.setFirstRefreshFailAt(profile, 0L)
         cache.setStaleNotified(profile, false)
         OAuthSignIn.clearPending(context)
+        CodexDeviceSignIn.clearPending(context)
     }
 
     /**
@@ -179,6 +181,9 @@ class UsageRepository(private val context: Context) {
 
         credStore.clear(profile)
         if (OAuthSignIn.pending(context)?.profile == profile) OAuthSignIn.clearPending(context)
+        if (CodexDeviceSignIn.pending(context)?.profileKey == profile.key) {
+            CodexDeviceSignIn.clearPending(context)
+        }
         cache.clearProfile(profile)
         historyStore.clear(profile)
         sessionLogStore.clear(profile)
@@ -206,6 +211,25 @@ class UsageRepository(private val context: Context) {
     fun startSignIn(profile: Profile): String = OAuthSignIn.begin(context, profile)
 
     fun cancelSignIn() = OAuthSignIn.clearPending(context)
+
+    // --- OpenAI device-code sign-in (CCRM-54 (ChatGPT Account)) ---
+
+    /**
+     * Asks OpenAI for a user code. Throws [CodexDeviceSignIn.Unavailable] when the flow
+     * is switched off for this client, which the caller must render rather than swallow —
+     * it is the one outcome with a different remedy (the browser fallback).
+     */
+    suspend fun startDeviceSignIn(profile: Profile): CodexDeviceSignIn.Started =
+        withContext(Dispatchers.IO) { CodexDeviceSignIn.start(context, profile) }
+
+    suspend fun pollDeviceSignIn(started: CodexDeviceSignIn.Started): CodexDeviceSignIn.Poll =
+        withContext(Dispatchers.IO) { CodexDeviceSignIn.poll(started) }
+
+    /** A device flow that survived process death, for the account it belongs to. */
+    fun pendingDeviceSignIn(profile: Profile): CodexDeviceSignIn.Started? =
+        CodexDeviceSignIn.pending(context)?.takeIf { it.profileKey == profile.key }
+
+    fun cancelDeviceSignIn() = CodexDeviceSignIn.clearPending(context)
 
     /** Fetch one profile. Manual calls respect a 180s floor since last success. */
     suspend fun refreshNow(profile: Profile, manual: Boolean): FetchResult = withContext(Dispatchers.IO) {
@@ -328,6 +352,105 @@ class UsageRepository(private val context: Context) {
             Alerts.evaluate(context, cache)
             result
         }
+
+    /**
+     * Completes OpenAI's device-code sign-in (CCRM-54 (ChatGPT Account)): redeems the
+     * grant the poll handed back, persists a token family this phone owns, and fetches
+     * once immediately. Mirrors [completeSignIn] step for step, with two deliberate
+     * differences:
+     *
+     * - **`refreshExpiresAt` stays 0.** OpenAI's family has no fixed life we know of, so
+     *   the card shows no "expires around" line at all — CCRM-16 (Sign-in Expiry
+     *   Accuracy)'s rule that no estimate beats a wrong one.
+     * - **`tier` is always null.** `Fmt.tierMultiplier` parses Anthropic's `default_5x`
+     *   grammar and must never be handed `plan_type: "pro"`.
+     *
+     * Never import a desktop `auth.json`: OpenAI's refresh tokens rotate, and redeeming
+     * one twice invalidates the whole family (`refresh_token_reused`). The phone mints
+     * its own, exactly as it does for Claude.
+     */
+    suspend fun completeDeviceSignIn(
+        profile: Profile,
+        granted: CodexDeviceSignIn.Poll.Granted,
+    ): FetchResult = withContext(Dispatchers.IO) {
+        val result = mutex.withLock {
+            val resp = try {
+                CodexDeviceSignIn.exchange(granted)
+            } catch (e: IOException) {
+                return@withLock FetchResult.Error(e.message ?: "network error")
+            }
+            if (resp.code !in 200..299) {
+                AppLog.log(
+                    context, AppLog.Level.WARN, "auth", profile,
+                    "device sign-in exchange failed: HTTP ${resp.code}",
+                )
+                return@withLock FetchResult.Error(
+                    "Sign-in failed (HTTP ${resp.code}) — get a new code and try again"
+                )
+            }
+            val grant = ChatGptSource.parseTokenResponse(resp.body, credStore.load(profile))
+                ?: return@withLock FetchResult.Error("Sign-in response was missing a token")
+            if (grant.creds.refreshToken.isEmpty()) {
+                return@withLock FetchResult.Error("Sign-in response was missing a refresh token")
+            }
+            credStore.save(profile, grant.creds, stampAdded = true)
+            cache.setAuthState(profile, AuthState.OK)
+            cache.setTokenMeta(profile, 0L, grant.plan, null)
+            cache.setRefreshExpiryEstimated(profile, false)
+            cache.setNativeSignIn(profile, true)
+            cache.setLastRenewedAt(profile, 0L)
+            cache.setFirstRefreshFailAt(profile, 0L)
+            cache.setStaleNotified(profile, false)
+            CodexDeviceSignIn.clearPending(context)
+            AppLog.log(context, AppLog.Level.INFO, "auth", profile, "device sign-in completed")
+            val r = doFetch(profile, manual = false, ignoreGates = true)
+            updateWidgets()
+            r
+        }
+        Alerts.evaluate(context, cache)
+        result
+    }
+
+    /**
+     * Debug-only payload capture (CCRM-54 (ChatGPT Account) part 1). Fetches the usage
+     * body with this profile's token and writes it to the diagnostics log at DEBUG so it
+     * can be exported from the phone and become the parser's fixture.
+     *
+     * The **one** deliberate exception to the "never log bodies" rule, and only the body:
+     * no tokens, no headers, no `id_token`. Nothing is parsed or cached, so an unexpected
+     * shape can't poison the snapshot; the rate gates are untouched, as with
+     * [probeEndpoint], because this isn't a usage read either.
+     */
+    suspend fun captureUsagePayload(profile: Profile): HttpResult? = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            val creds = credStore.load(profile) ?: return@withLock null
+            val source = Sources.of(profile.provider)
+            val now = System.currentTimeMillis()
+            var token = creds.accessToken
+            if (creds.expiresAt in 1 until now + EXPIRY_MARGIN_MS) {
+                token = refreshAccessToken(profile, creds) ?: return@withLock null
+            }
+            val resp = try {
+                var r = source.fetchUsage(creds.copy(accessToken = token))
+                if (source.isAuthFailure(r.code)) {
+                    val fresh = refreshAccessToken(profile, credStore.load(profile) ?: creds)
+                    if (fresh != null) r = source.fetchUsage(creds.copy(accessToken = fresh))
+                }
+                r
+            } catch (e: IOException) {
+                HttpResult(0, e.message ?: "no network")
+            } catch (e: Exception) {
+                HttpResult(0, e.message ?: "unexpected error")
+            }
+            // One line, so it survives the log's line-based trim intact.
+            val oneLine = resp.body.replace(Regex("\\s*\\R\\s*"), " ")
+            AppLog.log(
+                context, AppLog.Level.DEBUG, "capture", profile,
+                "usage body (HTTP ${resp.code}): $oneLine",
+            )
+            resp
+        }
+    }
 
     /**
      * Sends a window ping (CCRM-17). **Does not verify** — see [verifyWindowPing].
@@ -498,6 +621,15 @@ class UsageRepository(private val context: Context) {
                     val at = System.currentTimeMillis()
                     cache.saveSuccess(profile, resp.body, at)
                     historyStore.record(profile, parsed, at)
+                    // Providers that name the plan in the usage payload correct it here;
+                    // Claude's default returns null and writes nothing (CCRM-54).
+                    source.planFrom(resp.body)?.let { plan ->
+                        if (plan != cache.plan(profile)) {
+                            cache.setTokenMeta(
+                                profile, cache.refreshExpiresAt(profile), plan, cache.tier(profile),
+                            )
+                        }
+                    }
                     FetchResult.Success()
                 }
                 resp.code == 200 -> {
