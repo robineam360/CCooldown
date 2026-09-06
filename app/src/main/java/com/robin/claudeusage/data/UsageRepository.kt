@@ -442,13 +442,14 @@ class UsageRepository(private val context: Context) {
             } catch (e: Exception) {
                 HttpResult(0, e.message ?: "unexpected error")
             }
-            // One line, so it survives the log's line-based trim intact.
-            val oneLine = resp.body.replace(Regex("\\s*\\R\\s*"), " ")
+            // Redact first, then flatten to one line so it survives the log's
+            // line-based trim intact.
+            val safe = AppLog.redactPayload(resp.body).replace(Regex("\\s*\\R\\s*"), " ")
             AppLog.log(
                 context, AppLog.Level.DEBUG, "capture", profile,
-                "usage body (HTTP ${resp.code}): $oneLine",
+                "usage body (HTTP ${resp.code}): $safe",
             )
-            resp
+            resp.copy(body = safe)
         }
     }
 

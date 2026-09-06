@@ -1697,9 +1697,10 @@ private fun ChatGptAccountBody(
             ) { Text("Capture ChatGPT payload") }
             Spacer(Modifier.height(2.dp))
             Text(
-                "Writes the raw usage body to the diagnostics log at DEBUG — set the log " +
-                    "level to Debug first, then export it from Diagnostics. The body " +
-                    "carries no token material.",
+                "Writes the usage body to the diagnostics log at DEBUG — set the log " +
+                    "level to Debug first, then export it from Diagnostics. No token " +
+                    "material, and the account's id and email are redacted: OpenAI " +
+                    "returns them alongside the percentages.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -2328,7 +2329,11 @@ private fun DebugSection(repo: UsageRepository, onAccountsChanged: () -> Unit) {
         }
         if (showDebug) {
             Spacer(Modifier.height(8.dp))
-            val raw = repo.snapshot(debugProfile).rawJson
+            // Redacted for the same reason the capture button's output is: this box
+            // exists to be copied out, and a ChatGPT payload names the account holder
+            // (CCRM-54 (ChatGPT Account)). Keys and structure survive, which is all a
+            // shape check needs.
+            val raw = repo.snapshot(debugProfile).rawJson?.let { AppLog.redactPayload(it) }
                 ?: "(nothing cached yet for ${repo.cacheSettings().profileLabel(debugProfile)})"
             SelectionContainer {
                 Text(

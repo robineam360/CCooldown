@@ -223,6 +223,17 @@ by giving `Snapshot` a `provider` (default `CLAUDE`) and routing through `Source
 amendment. Reinstalled and confirmed on the phone: 9% / 79% with correct resets, and
 `[poll][chatgpt:p5] auto → OK` with no token material. 321 tests green.
 
+**Follow-up, same day:** the fixture was redacted but the *log* wasn't — the capture
+button had written the real body, email and all, to `app-log.txt`, whose Share button
+exists to send it to someone else. Added `AppLog.redactPayload`, a recursive scrub of
+identifying keys (plus a free-text email regex for bodies that aren't JSON), applied to
+the capture line, to the `HttpResult` the debug card renders for copying, and to "Show
+last raw response". Shape survives, identity doesn't. The log already on the phone was
+rewritten in place — all 354 lines kept, only the one payload redacted — and a fresh
+capture confirmed `"email":"[redacted]"` on device. `AppLog`'s hard-rule comment now says
+personal data as well as tokens: "carries no token material" was the test that let this
+through, and it was the wrong test.
+
 Two things left on the phone deliberately: the debug-made ChatGPT account (labelled
 "Account 4", key `p5`) which Steps 4 and 5 need, and the app log level on **Debug**.
 Scaffolding added beyond the brief, all debug-gated: a `+ Add ChatGPT account` button —

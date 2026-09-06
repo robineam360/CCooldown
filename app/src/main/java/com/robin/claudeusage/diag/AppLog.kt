@@ -6,6 +6,8 @@ import android.os.PowerManager
 import com.robin.claudeusage.data.Profile
 import com.robin.claudeusage.data.Provider
 import com.robin.claudeusage.data.UsageCache
+import org.json.JSONArray
+import org.json.JSONObject
 import java.io.File
 import java.time.Instant
 import java.time.ZoneId
@@ -31,6 +33,12 @@ import java.time.format.DateTimeFormatter
  * **Hard rule (the v0.14 history scrub is the precedent): never log tokens,
  * authorization headers, or the `code_verifier`.** This is a public repo and
  * logs get pasted into emails. Log outcomes and status codes, never payloads.
+ *
+ * The one sanctioned exception — the CCRM-54 (ChatGPT Account) capture button, which
+ * logs a usage body at DEBUG — goes through [redactPayload] first. "Carries no token
+ * material" was the test that let it through, and it was the wrong test: OpenAI's usage
+ * body carries the account holder's **email address**. Anything writing a payload here
+ * redacts it first, no exceptions.
  */
 object AppLog {
 
@@ -103,6 +111,80 @@ object AppLog {
 
     /** Pure trim rule — keep the newest [keep] lines. */
     fun trimmed(lines: List<String>, keep: Int = KEEP_LINES): List<String> = lines.takeLast(keep)
+
+    /**
+     * Keys whose values are the account holder, not the account's usage. Matched on the
+     * key name at any depth, so a nested `{"user": {"email": …}}` is caught too.
+     *
+     * Discovered the hard way (CCRM-54 (ChatGPT Account), 2026-09-06): OpenAI's
+     * `/backend-api/wham/usage` returns `user_id`, `account_id` **and the account's email
+     * address** alongside the percentages. The documented shape never mentioned them, so
+     * the first real capture wrote Robin's email into a log whose whole purpose is being
+     * shared. Nothing in this app needs any of these fields.
+     */
+    private val IDENTIFYING_KEYS = setOf(
+        "email", "email_address", "user_id", "userid", "account_id", "accountid",
+        "chatgpt_user_id", "chatgpt_account_id", "org_id", "organization_id",
+        "organization_uuid", "phone", "phone_number", "sub",
+    )
+
+    private const val PLACEHOLDER = "[redacted]"
+
+    private val EMAIL_RE = Regex("""[\w.+-]+@[\w-]+\.[\w.-]+""")
+
+    /**
+     * Strips personal identifiers out of a payload before it is shown or logged.
+     *
+     * The **body** of a usage response is the one thing this app may log at DEBUG (the
+     * capture button), because it carries no token material — but "no tokens" turned out
+     * not to mean "no personal data". This closes that gap without losing the shape,
+     * which is the only reason to capture a body at all: keys and structure survive,
+     * values that identify a person don't.
+     *
+     * A body that isn't JSON still gets an email scrub rather than being dropped — a
+     * malformed body is exactly when you most want to see it.
+     */
+    fun redactPayload(body: String): String {
+        val trimmedBody = body.trim()
+        return try {
+            when {
+                trimmedBody.startsWith("{") -> redact(JSONObject(trimmedBody)).toString()
+                trimmedBody.startsWith("[") -> redact(JSONArray(trimmedBody)).toString()
+                else -> EMAIL_RE.replace(body, PLACEHOLDER)
+            }
+        } catch (_: Exception) {
+            EMAIL_RE.replace(body, PLACEHOLDER)
+        }
+    }
+
+    private fun redact(o: JSONObject): JSONObject {
+        // Snapshot the keys first: putting into a JSONObject while iterating its own
+        // keys() is undefined.
+        for (key in o.keys().asSequence().toList()) {
+            when {
+                key.lowercase() in IDENTIFYING_KEYS -> if (!o.isNull(key)) o.put(key, PLACEHOLDER)
+                else -> when (val v = o.opt(key)) {
+                    is JSONObject -> o.put(key, redact(v))
+                    is JSONArray -> o.put(key, redact(v))
+                    is String -> if (EMAIL_RE.containsMatchIn(v)) o.put(key, EMAIL_RE.replace(v, PLACEHOLDER))
+                    else -> Unit
+                }
+            }
+        }
+        return o
+    }
+
+    private fun redact(a: JSONArray): JSONArray {
+        for (i in 0 until a.length()) {
+            when (val v = a.opt(i)) {
+                is JSONObject -> a.put(i, redact(v))
+                is JSONArray -> a.put(i, redact(v))
+                is String -> if (EMAIL_RE.containsMatchIn(v)) a.put(i, EMAIL_RE.replace(v, PLACEHOLDER))
+                else -> Unit
+            }
+        }
+        return a
+    }
 
     /**
      * Doze state at the moment an alarm fires — the single most useful fact for
