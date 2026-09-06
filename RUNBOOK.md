@@ -337,16 +337,22 @@ Read CLAUDE.md, then RUNBOOK.md — its Conventions block and Step 4 — then RO
 (Provider Plumbing) in full, and open design/provider-identity-wireframe.html sections 4–6
 (approved). Part 1 of CCRM-54 is built (ChatGptSource, CodexDeviceSignIn, the real fixture) and
 CCRM-56 (Provider Identity) has landed the marks, accents, Add-account sheet and hidden-window
-rule. Build: the real device-code sheet with its five states, replacing the debug path; the
-ChatGPT account card (mark, plan chip with no multiplier, no "expires around", Sign in with a
-code / Refresh / Clear, no backup/paste/QR); the main-screen tab (Spark rows as model caps,
-"$X balance" credits copy); Ring/Bar "No 5-hour window on this account"; the Pace widget toggle
-hiding the absent side; pinned headline and tile fallback to the 7-day window; and every
-CCRM-57 item (provider-aware ErrorKind copy, the Quick Links table, PlanChip tier=null for
-non-Claude, Window Pings gated to Claude, expiry lines gated on refreshExpiresAt > 0,
-contract-test copy). Remove the debug capture button. Tests green; set CCRM-54 and CCRM-57 to
-Done; close per the Close-out rule (commit as feat(CCRM-54): …), then follow the Handover rule
-and print Step 5.
+rule — including ProfileScreen, HistoryScreen's 5h/7d toggle, and **the Pace widget's on-face
+toggle already hides the absent side** (`hasSession`/`hasWeekly` in `PaceWidget.kt`); verify it
+rather than rebuilding it. Two small items CCRM-56 also picked up in passing, worth knowing
+before you touch the same files: `PinnedNotification`'s tap-target is now
+`providerLaunchIntent(context, provider)` (stored value "claude" reads as "provider"), and
+ChatGPT's "Sign in with a code" is no longer `debugUnlocked`-gated — the debug-only *payload
+capture* button is what "remove the debug capture button" below refers to. Build: the real
+device-code sheet with its five states, replacing the debug path; the ChatGPT account card
+(mark, plan chip with no multiplier, no "expires around", Sign in with a code / Refresh /
+Clear, no backup/paste/QR); the main-screen tab (Spark rows as model caps, "$X balance"
+credits copy); Ring/Bar "No 5-hour window on this account"; pinned headline and tile fallback
+to the 7-day window; and every CCRM-57 item (provider-aware ErrorKind copy, the Quick Links
+table, PlanChip tier=null for non-Claude, Window Pings gated to Claude, expiry lines gated on
+refreshExpiresAt > 0, contract-test copy). Remove the debug capture button. Tests green; set
+CCRM-54 and CCRM-57 to Done; close per the Close-out rule (commit as feat(CCRM-54): …), then
+follow the Handover rule and print Step 5.
 ```
 
 **Done when:**
